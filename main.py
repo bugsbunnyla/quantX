@@ -272,7 +272,7 @@ def main():
     symbols, capital, view = interactive_inputs(args)
 
     print("\n=================================================")
-    print("🚀 QUANT XPERT X STARTING")
+    print("[MAIN] QUANT XPERT X STARTING")
     print("=================================================\n")
 
     #print("Symbols:", symbols)
@@ -294,7 +294,7 @@ def main():
     if view in ["horizontal", "both"]:
 
         print("\n=================================================")
-        print("📊 HORIZONTAL MULTIINDEX VIEW")
+        print("[MAIN] HORIZONTAL MULTIINDEX VIEW")
         print("=================================================\n")
 
         print(output)
@@ -306,7 +306,7 @@ def main():
     if view in ["vertical", "both"]:
 
         print("\n=================================================")
-        print("📊 VERTICAL STACKED VIEW")
+        print("[MAIN] VERTICAL STACKED VIEW")
         print("=================================================\n")
 
         print(output.T)
@@ -316,7 +316,7 @@ def main():
     # =====================================================
 
     print("\n=================================================")
-    print("🧠 SIGNAL SUMMARY")
+    print("[MAIN] SIGNAL SUMMARY")
     print("=================================================\n")
 
     print(
@@ -326,7 +326,7 @@ def main():
     )
 
     print("\n=================================================")
-    print("✅ ANALYSIS COMPLETE")
+    print("[MAIN] ANALYSIS COMPLETE")
     print("=================================================\n")
 
 
@@ -347,7 +347,7 @@ def main():
     # 4. SUMMARY (MINIMAL OUTPUT ONLY)
     # =====================================================
     print("\n=================================================")
-    print("📊 SYSTEM SUMMARY")
+    print("[MAIN] SYSTEM SUMMARY")
     print("=================================================\n")
 
     #print("Engine output:", getattr(engine_output, "shape", None))
@@ -355,7 +355,7 @@ def main():
     
 
     print("\n=================================================")
-    print("✅ COMPLETE")
+    print("[MAIN] COMPLETE")
     print("=================================================\n")
 
 

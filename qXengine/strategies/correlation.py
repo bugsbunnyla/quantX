@@ -15,18 +15,10 @@ from ..StrategyResult import StrategyResult
 # 8. CORRELATION VOLATILITY  Formula σρ 	​=StdDev(ρ t−w:t 	​)  Purpose Measures instability of correlation regime pd.Series
 # 9. HRESHOLD FORMULA (STATIC OR DYNAMIC)  Static θ=0.5 Dynamic (better) θt  =μρ +k⋅σρ float or pd.Series
 # 10. CORRELATION MOMENTUM Formula Mt	​=ρt​−ρt−1	​ Meaning positive → strengthening correlation regime negative → decoupling pd.Series
-import numpy as np
-import pandas as pd
-
-from .BaseStrategy import BaseStrategy
-from ..StrategyResult import StrategyResult
-
+#===================================================================
 
 class CorrelationStrategy(BaseStrategy):
 
-    # ==================================================
-    # MAIN STRATEGY
-    # ==================================================
     def run(self):
 
         cfg = self.cfg
@@ -36,18 +28,59 @@ class CorrelationStrategy(BaseStrategy):
         signal_threshold = cfg.get("signal_threshold", 0.50)
 
         # ==================================================
+        # FIX INPUT DATA ONLY
+        # ==================================================
+        cleaned = {}
+
+        for sym, df in self.data.items():
+
+            if not isinstance(df, pd.DataFrame):
+                continue
+
+            if "close" not in df.columns:
+                continue
+
+            tmp = df.copy()
+
+            if "date" in tmp.columns:
+
+                tmp["date"] = pd.to_datetime(
+                    tmp["date"],
+                    errors="coerce"
+                )
+
+                tmp = tmp.dropna(subset=["date"])
+                tmp = tmp.sort_values("date")
+                tmp = tmp.set_index("date")
+
+            else:
+
+                if not isinstance(
+                    tmp.index,
+                    pd.DatetimeIndex
+                ):
+
+                    tmp.index = pd.to_datetime(
+                        tmp.index,
+                        errors="coerce"
+                    )
+
+                    tmp = tmp[tmp.index.notna()]
+
+                tmp = tmp.sort_index()
+
+            cleaned[sym] = tmp
+
+        # ==================================================
         # PRICE MATRIX
         # ==================================================
         prices = pd.DataFrame({
             sym: df["close"]
-            for sym, df in self.data.items()
-            if isinstance(df, pd.DataFrame)
-            and "close" in df.columns
+            for sym, df in cleaned.items()
         }).dropna()
 
-        # ==================================================
-        # VALIDATION
-        # ==================================================
+        prices = prices.sort_index()
+
         if prices.empty or prices.shape[1] < 2:
 
             return StrategyResult(
@@ -56,7 +89,8 @@ class CorrelationStrategy(BaseStrategy):
                 metrics={
                     "error": "insufficient assets"
                 },
-                signals={}
+                signals={},
+                chart=None
             )
 
         # ==================================================
@@ -72,7 +106,8 @@ class CorrelationStrategy(BaseStrategy):
                 metrics={
                     "error": "insufficient return history"
                 },
-                signals={}
+                signals={},
+                chart=None
             )
 
         # ==================================================
@@ -83,29 +118,36 @@ class CorrelationStrategy(BaseStrategy):
 
         for i in range(corr_window, len(returns)):
 
-            window = returns.iloc[i - corr_window:i]
+            window = returns.iloc[
+                i - corr_window:i
+            ]
 
             corr_matrix = window.corr()
 
             values = corr_matrix.values
 
-            # remove diagonal (self-correlation)
-            mask = ~np.eye(values.shape[0], dtype=bool)
+            mask = ~np.eye(
+                values.shape[0],
+                dtype=bool
+            )
 
-            avg_corr = np.nanmean(values[mask])
+            avg_corr = np.nanmean(
+                values[mask]
+            )
 
             avg_corr_values.append(avg_corr)
-            dates.append(returns.index[i])
+
+            # datetime index inherited
+            dates.append(
+                returns.index[i]
+            )
 
         avg_correlation = pd.Series(
             avg_corr_values,
-            index=dates,
+            index=pd.DatetimeIndex(dates),
             name="avg_correlation"
         )
 
-        # ==================================================
-        # VALIDATION
-        # ==================================================
         if avg_correlation.empty:
 
             return StrategyResult(
@@ -114,7 +156,8 @@ class CorrelationStrategy(BaseStrategy):
                 metrics={
                     "error": "unable to calculate correlations"
                 },
-                signals={}
+                signals={},
+                chart=None
             )
 
         # ==================================================
@@ -122,7 +165,10 @@ class CorrelationStrategy(BaseStrategy):
         # ==================================================
         rolling_mean_corr = (
             avg_correlation
-            .rolling(lookback, min_periods=1)
+            .rolling(
+                lookback,
+                min_periods=1
+            )
             .mean()
         )
 
@@ -131,7 +177,10 @@ class CorrelationStrategy(BaseStrategy):
         # ==================================================
         correlation_volatility = (
             avg_correlation
-            .rolling(lookback, min_periods=1)
+            .rolling(
+                lookback,
+                min_periods=1
+            )
             .std()
             .fillna(0)
         )
@@ -139,34 +188,51 @@ class CorrelationStrategy(BaseStrategy):
         # ==================================================
         # SPREAD
         # ==================================================
-        spread = avg_correlation - rolling_mean_corr
+        spread = (
+            avg_correlation
+            - rolling_mean_corr
+        )
 
         # ==================================================
         # ZSCORE
         # ==================================================
         zscore = (
-            avg_correlation - rolling_mean_corr
-        ) / (correlation_volatility + 1e-8)
+            avg_correlation
+            - rolling_mean_corr
+        ) / (
+            correlation_volatility
+            + 1e-8
+        )
 
         zscore = (
             zscore
-            .replace([np.inf, -np.inf], np.nan)
+            .replace(
+                [np.inf, -np.inf],
+                np.nan
+            )
             .fillna(0)
         )
 
         # ==================================================
         # MOMENTUM
         # ==================================================
-        momentum = avg_correlation.diff().fillna(0)
+        momentum = (
+            avg_correlation
+            .diff()
+            .fillna(0)
+        )
 
         # ==================================================
-        # REGIME DETECTION
+        # REGIME
         # ==================================================
         regime_series = (
-            avg_correlation > signal_threshold
+            avg_correlation
+            > signal_threshold
         ).astype(int)
 
-        latest_corr = float(avg_correlation.iloc[-1])
+        latest_corr = float(
+            avg_correlation.iloc[-1]
+        )
 
         regime = (
             "risk_on"
@@ -175,13 +241,30 @@ class CorrelationStrategy(BaseStrategy):
         )
 
         # ==================================================
-        # BUILD CHART (PAIRTRADING STYLE)
+        # CHART
         # ==================================================
         chart = self.build_chart(
-            series=self.cfg.get("chart", {}).get("series"),
-            title=self.cfg.get("title"),
-            charttype=self.cfg.get("chart", {}).get("type"),
-            chartmode=self.cfg.get("chart", {}).get("mode"),
+            series=self.cfg.get(
+                "chart",
+                {}
+            ).get(
+                "series"
+            ),
+            title=self.cfg.get(
+                "title"
+            ),
+            charttype=self.cfg.get(
+                "chart",
+                {}
+            ).get(
+                "type"
+            ),
+            chartmode=self.cfg.get(
+                "chart",
+                {}
+            ).get(
+                "mode"
+            ),
         )
 
         # ==================================================
@@ -194,14 +277,18 @@ class CorrelationStrategy(BaseStrategy):
 
             "assets": prices.shape[1],
 
-            "mean_corr": float(avg_correlation.mean()),
-            "std_corr": float(avg_correlation.std()),
+            "mean_corr": float(
+                avg_correlation.mean()
+            ),
+
+            "std_corr": float(
+                avg_correlation.std()
+            ),
+
             "latest_corr": latest_corr,
 
-            "latest_zscore": (
-                float(zscore.iloc[-1])
-                if not zscore.empty
-                else 0.0
+            "latest_zscore": float(
+                zscore.iloc[-1]
             ),
 
             "regime": regime
@@ -214,19 +301,16 @@ class CorrelationStrategy(BaseStrategy):
             "avg_correlation": avg_correlation,
             "rolling_mean_corr": rolling_mean_corr,
             "correlation_volatility": correlation_volatility,
-
             "spread": spread,
             "zscore": zscore,
             "momentum": momentum,
-
             "regime_series": regime_series,
-
             "latest_corr": latest_corr,
             "regime": regime
         }
 
         # ==================================================
-        # FINAL OUTPUT
+        # SUCCESS
         # ==================================================
         return StrategyResult(
             name="CorrelationStrategy",

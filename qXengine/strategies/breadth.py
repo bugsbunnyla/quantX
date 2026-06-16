@@ -10,14 +10,47 @@ from ..StrategyResult import StrategyResult
 #3. Step 3 — Smoothed Breadth (moving averages) Short MA:MAshort,t	​=SMA(Breadtht	​,20)Long MA:MAlong,t	​=SMA(Breadtht	​,50)
 #4. Breadth Momentum / Spread Spreadt	​=MAshort,t	​−MAlong,t 	​Interpretation: 0 → improving participation< 0 → weakening participation 
 #
-import pandas as pd
-
-from .BaseStrategy import BaseStrategy
-from ..StrategyResult import StrategyResult
-
 
 class BreadthStrategy(BaseStrategy):
 
+    # =====================================================
+    #  FORCE CLEAN DATETIME INDEX 
+    # =====================================================
+    def _prepare_returns(self):
+
+        frames = {}
+
+        for sym, df in self.data.items():
+
+            if not isinstance(df, pd.DataFrame):
+                continue
+
+            tmp = df.copy()
+
+            # ---- CASE 1: explicit date column ----
+            if "date" in tmp.columns:
+                tmp["date"] = pd.to_datetime(tmp["date"], errors="coerce")
+                tmp = tmp.dropna(subset=["date"])
+                tmp = tmp[tmp["date"] > pd.Timestamp("2000-01-01")]
+                tmp = tmp.sort_values("date")
+                tmp = tmp.set_index("date")
+
+            # ---- CASE 2: index already exists ----
+            else:
+                tmp.index = pd.to_datetime(tmp.index, errors="coerce")
+                tmp = tmp[tmp.index.notna()]
+                tmp = tmp[tmp.index > pd.Timestamp("2000-01-01")]
+                tmp = tmp.sort_index()
+
+            # ---- ensure numeric returns ----
+            if "ret" in tmp.columns:
+                frames[sym] = tmp["ret"]
+            elif "close" in tmp.columns:
+                frames[sym] = tmp["close"].pct_change()
+
+        return pd.DataFrame(frames).dropna()
+
+    # =====================================================
     def run(self):
 
         lookback = self.get_cfg("lookback", 20)
@@ -25,20 +58,9 @@ class BreadthStrategy(BaseStrategy):
         ma_long = self.get_cfg("ma_long", 50)
 
         # =====================================================
-        # RETURNS MATRIX
+        # CLEAN UNIVERSE (🔥 FIX HERE)
         # =====================================================
-        rets = pd.DataFrame({
-            sym: df["ret"]
-            for sym, df in self.data.items()
-            if isinstance(df, pd.DataFrame) and "ret" in df.columns
-        })
-
-        if rets.empty:
-            rets = pd.DataFrame({
-                sym: df["close"].pct_change()
-                for sym, df in self.data.items()
-                if isinstance(df, pd.DataFrame) and "close" in df.columns
-            })
+        rets = self._prepare_returns()
 
         if rets.empty:
             return StrategyResult(
@@ -46,19 +68,17 @@ class BreadthStrategy(BaseStrategy):
                 data=self.data,
                 metrics={"error": "no valid return data"},
                 signals={},
-                chart={
-                    "chartdata": pd.DataFrame()
-                }
+                chart={"chartdata": pd.DataFrame()}
             )
 
         # =====================================================
-        # LOOKBACK
+        # OPTIONAL LOOKBACK WINDOW (SAFE NOW)
         # =====================================================
-        if lookback and len(rets) > lookback:
+        if len(rets) > lookback:
             rets = rets.tail(lookback)
 
         # =====================================================
-        # CORE BREADTH MATRIX
+        # CORE BREADTH (UNCHANGED FORMULA)
         # =====================================================
         breadth = (rets > 0).sum(axis=1) / float(rets.shape[1])
 
@@ -68,28 +88,7 @@ class BreadthStrategy(BaseStrategy):
         breadth_spread = ma_short_series - ma_long_series
 
         # =====================================================
-        # SIGNALS (analysis layer only)
-        # =====================================================
-        signals = {
-            "breadth": breadth,
-            "ma_short": ma_short_series,
-            "ma_long": ma_long_series,
-            "breadth_spread": breadth_spread
-        }
-
-        # =====================================================
-        # METRICS (scalar layer only)
-        # =====================================================
-        metrics = {
-            "lookback": lookback,
-            "ma_short": ma_short,
-            "ma_long": ma_long,
-            "avg_breadth": float(breadth.mean()),
-            "assets": rets.shape[1]
-        }
-
-        # =====================================================
-        # CHART MATRIX (THIS IS THE KEY FIX)
+        # FINAL CHART MATRIX (INDEX IS NOW CLEAN DATETIME)
         # =====================================================
         chart_matrix = pd.DataFrame({
             "breadth": breadth,
@@ -98,14 +97,30 @@ class BreadthStrategy(BaseStrategy):
             "breadth_spread": breadth_spread
         })
 
+        chart_matrix.index = pd.to_datetime(chart_matrix.index, errors="coerce")
+        chart_matrix = chart_matrix[chart_matrix.index.notna()]
+        chart_matrix = chart_matrix[chart_matrix.index > pd.Timestamp("2000-01-01")]
+        chart_matrix = chart_matrix.sort_index()
+
         # =====================================================
         # RESULT
         # =====================================================
         return StrategyResult(
             name="BreadthStrategy",
             data=self.data,
-            metrics=metrics,
-            signals=signals,
+            metrics={
+                "lookback": lookback,
+                "ma_short": ma_short,
+                "ma_long": ma_long,
+                "avg_breadth": float(breadth.mean()),
+                "assets": rets.shape[1]
+            },
+            signals={
+                "breadth": breadth,
+                "ma_short": ma_short_series,
+                "ma_long": ma_long_series,
+                "breadth_spread": breadth_spread
+            },
             chart={
                 "chartdata": chart_matrix,
                 "type": "line",

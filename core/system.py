@@ -368,7 +368,6 @@ class QuantX:
 
        return closes, volumes
     def data(self):
-
         prices_dict = {}
         volumes_dict = {}
         valid_symbols = []
@@ -381,7 +380,6 @@ class QuantX:
 
               if len(closes) == 0:
                 continue
-
               prices_dict[sym] = closes
               volumes_dict[sym] = volumes
 
@@ -392,20 +390,16 @@ class QuantX:
            except Exception:
               continue
 
-        self.symbols = valid_symbols   # 🔥 CRITICAL FIX
-
+        self.symbols = valid_symbols   #  CRITICAL FIX
         for k in prices_dict:
            prices_dict[k] = self.pad_nan(prices_dict[k], max_len)
 
         for k in volumes_dict:
            volumes_dict[k] = self.pad_nan(volumes_dict[k], max_len)
-
         P = pd.DataFrame.from_dict(prices_dict, orient="index").T
         V = pd.DataFrame.from_dict(volumes_dict, orient="index").T
-
         P = P.interpolate(limit=5)
         V = V.interpolate(limit=5)
-
         return P, V
 
     def dataLastAfterPrior(self):
@@ -536,7 +530,6 @@ class QuantX:
 #
     def analyze_symbol(self, P, V, R, s):
         EPS = 1e-12
-
         R = R.fillna(0.0)
         V = V.fillna(0.0)
 

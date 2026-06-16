@@ -14,11 +14,13 @@ from ..StrategyResult import StrategyResult
 # 
 class PairTradingFallback(BaseStrategy):
 
-    # ----------------------------
-    # HALF-LIFE (same as PairTrading)
-    # ----------------------------
+    # ==================================================
+    # HALF-LIFE
+    # ==================================================
     def compute_half_life(self, spread: pd.Series) -> float:
+
         try:
+
             spread = spread.dropna()
 
             if len(spread) < 20:
@@ -30,7 +32,11 @@ class PairTradingFallback(BaseStrategy):
             if len(lagged) != len(delta):
                 return np.inf
 
-            beta = np.polyfit(lagged.values, delta.values, 1)[0]
+            beta = np.polyfit(
+                lagged.values,
+                delta.values,
+                1
+            )[0]
 
             if beta >= 0 or np.isnan(beta):
                 return np.inf
@@ -40,9 +46,9 @@ class PairTradingFallback(BaseStrategy):
         except:
             return np.inf
 
-    # ----------------------------
+    # ==================================================
     # MAIN STRATEGY
-    # ----------------------------
+    # ==================================================
     def run(self):
 
         cfg = self.cfg
@@ -57,16 +63,63 @@ class PairTradingFallback(BaseStrategy):
         max_pairs = cfg.get("max_pairs", 5)
         min_half_life = cfg.get("min_half_life", 5)
 
-        # ----------------------------
+        # ==================================================
+        # CLEAN INPUT DATA (FIX FOR 1970 ISSUES)
+        # ==================================================
+        cleaned = {}
+
+        for sym, df in self.data.items():
+
+            if not isinstance(df, pd.DataFrame):
+                continue
+
+            if "close" not in df.columns:
+                continue
+
+            tmp = df.copy()
+
+            if "date" in tmp.columns:
+
+                tmp["date"] = pd.to_datetime(
+                    tmp["date"],
+                    errors="coerce"
+                )
+
+                tmp = tmp.dropna(subset=["date"])
+                tmp = tmp.sort_values("date")
+                tmp = tmp.set_index("date")
+
+            else:
+
+                if not isinstance(tmp.index, pd.DatetimeIndex):
+
+                    tmp.index = pd.to_datetime(
+                        tmp.index,
+                        errors="coerce"
+                    )
+
+                    tmp = tmp[tmp.index.notna()]
+
+                tmp = tmp.sort_index()
+
+            tmp = tmp[~tmp.index.duplicated(keep="last")]
+
+            cleaned[sym] = tmp
+
+        # ==================================================
         # PRICE MATRIX
-        # ----------------------------
+        # ==================================================
         prices = pd.DataFrame({
             sym: df["close"]
-            for sym, df in self.data.items()
-            if "close" in df.columns
-        }).dropna()
+            for sym, df in cleaned.items()
+        })
+
+        prices = prices.sort_index()
+        prices = prices.ffill()
+        prices = prices.dropna(how="all")
 
         if prices.empty or prices.shape[1] < 2:
+
             return StrategyResult(
                 name="PairTradingFallback",
                 data=self.data,
@@ -74,12 +127,13 @@ class PairTradingFallback(BaseStrategy):
                 signals={}
             )
 
-        # ----------------------------
-        # RETURNS + CORRELATION
-        # ----------------------------
+        # ==================================================
+        # RETURNS
+        # ==================================================
         rets = prices.pct_change().dropna()
 
         if len(rets) < corr_window:
+
             return StrategyResult(
                 name="PairTradingFallback",
                 data=self.data,
@@ -102,9 +156,9 @@ class PairTradingFallback(BaseStrategy):
         spreads_out = {}
         signals_out = {}
 
-        # ----------------------------
-        # PAIR LOOP (fallback logic)
-        # ----------------------------
+        # ==================================================
+        # PAIR LOOP
+        # ==================================================
         for sym_x, sym_y in top_pairs:
 
             if sym_x not in prices or sym_y not in prices:
@@ -126,10 +180,11 @@ class PairTradingFallback(BaseStrategy):
                 if x_win.isna().any() or y_win.isna().any():
                     continue
 
-                # ----------------------------
-                # FALLBACK HEDGE (OLS like core strategy)
-                # ----------------------------
-                beta = np.polyfit(x_win.values, y_win.values, 1)[0]
+                beta = np.polyfit(
+                    x_win.values,
+                    y_win.values,
+                    1
+                )[0]
 
                 spread_hist = y_win - beta * x_win
 
@@ -142,9 +197,6 @@ class PairTradingFallback(BaseStrategy):
 
                 z = (spread - mean) / (std + 1e-8)
 
-                # ----------------------------
-                # SIGNAL LOGIC (same structure)
-                # ----------------------------
                 if z > entry_z:
                     signal = -1
                 elif z < -entry_z:
@@ -154,9 +206,7 @@ class PairTradingFallback(BaseStrategy):
                 else:
                     signal = 0
 
-                t = prices.index[i]
-
-                time_index.append(t)
+                time_index.append(prices.index[i])
                 spread_series.append(spread)
                 z_series.append(z)
                 signal_series.append(signal)
@@ -164,13 +214,24 @@ class PairTradingFallback(BaseStrategy):
             if len(spread_series) < 20:
                 continue
 
-            spread_series = pd.Series(spread_series, index=time_index)
-            z_series = pd.Series(z_series, index=time_index)
-            signal_series = pd.Series(signal_series, index=time_index)
+            # ==================================================
+            # FORCE CLEAN DATETIME SERIES (CRITICAL FIX)
+            # ==================================================
+            spread_series = pd.Series(
+                spread_series,
+                index=pd.to_datetime(time_index)
+            )
 
-            # ----------------------------
-            # HALF-LIFE FILTER (optional safety layer)
-            # ----------------------------
+            z_series = pd.Series(
+                z_series,
+                index=pd.to_datetime(time_index)
+            )
+
+            signal_series = pd.Series(
+                signal_series,
+                index=pd.to_datetime(time_index)
+            )
+
             hl = self.compute_half_life(spread_series)
 
             if hl < min_half_life:
@@ -185,9 +246,9 @@ class PairTradingFallback(BaseStrategy):
 
             signals_out[key] = signal_series
 
-        # ----------------------------
-        # CHART (NOW MATCHES PairTrading STYLE)
-        # ----------------------------
+        # ==================================================
+        # CHART
+        # ==================================================
         chart_cfg = self.cfg.get("chart", {})
 
         chart = self.build_chart(
@@ -197,9 +258,9 @@ class PairTradingFallback(BaseStrategy):
             chartmode=chart_cfg.get("mode", "overlay")
         )
 
-        # ----------------------------
+        # ==================================================
         # METRICS
-        # ----------------------------
+        # ==================================================
         metrics = {
             "lookback": lookback,
             "corr_window": corr_window,
@@ -215,9 +276,6 @@ class PairTradingFallback(BaseStrategy):
             ])) if spreads_out else None
         }
 
-        # ----------------------------
-        # FINAL OUTPUT (IDENTICAL STRUCTURE TO PairTrading)
-        # ----------------------------
         return StrategyResult(
             name="PairTradingFallback",
             data=self.data,

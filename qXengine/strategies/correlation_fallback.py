@@ -45,12 +45,68 @@ class CorrelationFallback(BaseStrategy):
             )
 
         # =====================================================
+        # CLEAN INPUT DATA (FIX FOR 1970 / BAD INDEX)
+        # =====================================================
+        cleaned = {}
+
+        for sym, df in self.data.items():
+
+            if not isinstance(df, pd.DataFrame):
+                continue
+
+            if "close" not in df.columns:
+                continue
+
+            tmp = df.copy()
+
+            # -----------------------------
+            # CASE 1: explicit date column
+            # -----------------------------
+            if "date" in tmp.columns:
+
+                tmp["date"] = pd.to_datetime(
+                    tmp["date"],
+                    errors="coerce"
+                )
+
+                tmp = tmp.dropna(subset=["date"])
+                tmp = tmp.sort_values("date")
+                tmp = tmp.set_index("date")
+
+            # -----------------------------
+            # CASE 2: index-based time
+            # -----------------------------
+            else:
+
+                if not isinstance(tmp.index, pd.DatetimeIndex):
+
+                    tmp.index = pd.to_datetime(
+                        tmp.index,
+                        errors="coerce"
+                    )
+
+                tmp = tmp[tmp.index.notna()]
+
+                # REMOVE 1970-STYLE BAD DATES
+                tmp = tmp[tmp.index > pd.Timestamp("2000-01-01")]
+
+                tmp = tmp.sort_index()
+
+            tmp = tmp[~tmp.index.duplicated(keep="last")]
+
+            cleaned[sym] = tmp
+
+        # =====================================================
         # PRICE + RETURNS
         # =====================================================
         price_df = pd.DataFrame({
-            a: self.data[a]["close"]
-            for a in assets
-        }).dropna()
+            a: cleaned[a]["close"]
+            for a in cleaned
+        })
+
+        price_df = price_df.sort_index()
+        price_df = price_df.ffill()
+        price_df = price_df.dropna(how="all")
 
         returns = price_df.pct_change().dropna()
 
@@ -58,7 +114,7 @@ class CorrelationFallback(BaseStrategy):
             return StrategyResult("CorrelationFallback", self.data, {}, {})
 
         # =====================================================
-        # ROLLING CORRELATION (TIME SERIES)
+        # ROLLING CORRELATION
         # =====================================================
         rolling_corr = returns.rolling(corr_window).corr()
 
@@ -73,7 +129,7 @@ class CorrelationFallback(BaseStrategy):
         avg_corr = float(avg_corr_series.iloc[-1])
 
         # =====================================================
-        # DISPERSION (VOLATILITY REGIME)
+        # DISPERSION
         # =====================================================
         dispersion_series = returns.rolling(dispersion_window).std().mean(axis=1)
 
@@ -83,14 +139,13 @@ class CorrelationFallback(BaseStrategy):
         )
 
         # =====================================================
-        # REGIME ENGINE (QUANT LOGIC)
+        # REGIME ENGINE
         # =====================================================
         regime_series = avg_corr_series.apply(
             lambda x: 1 if x >= signal_threshold
             else (-1 if x <= low_corr_threshold else 0)
         )
 
-        # override for instability spike
         regime_series = regime_series.copy()
         regime_series[z_dispersion > 1.5] = -1
 
@@ -106,18 +161,18 @@ class CorrelationFallback(BaseStrategy):
         )
 
         # =====================================================
-        # EQUITY PROXY
+        # EQUITY CURVE
         # =====================================================
         equity_curve = (1 + returns.mean(axis=1)).cumprod()
 
         # =====================================================
-        # THRESHOLD BANDS (CHART SAFE)
+        # THRESHOLD LINES
         # =====================================================
         threshold_high = pd.Series(signal_threshold, index=avg_corr_series.index)
         threshold_low = pd.Series(low_corr_threshold, index=avg_corr_series.index)
 
         # =====================================================
-        # CHART (BUILDER SYSTEM)
+        # CHART
         # =====================================================
         chart_cfg = cfg.get("chart", {})
 
@@ -137,14 +192,13 @@ class CorrelationFallback(BaseStrategy):
             "signal_threshold": signal_threshold,
             "low_corr_threshold": low_corr_threshold,
             "dispersion_window": dispersion_window,
-
             "avg_corr": avg_corr,
             "dispersion": float(dispersion_series.iloc[-1]),
             "regime": regime
         }
 
         # =====================================================
-        # SIGNALS (FULL STRUCTURE)
+        # SIGNALS
         # =====================================================
         signals = {
             "signal": signal_series,
@@ -156,9 +210,6 @@ class CorrelationFallback(BaseStrategy):
             "threshold_low": threshold_low
         }
 
-        # =====================================================
-        # FINAL OUTPUT
-        # =====================================================
         return StrategyResult(
             "CorrelationFallback",
             self.data,

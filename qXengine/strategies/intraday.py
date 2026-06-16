@@ -18,26 +18,25 @@ from ..strategies.BaseStrategy import BaseStrategy
 # Where:\theta = \text{signal_threshold}	​
 # Dual signal - momentum + reversal  with cross asset comparable zscore signal S/σ
 # A volatility- and liquidity-adjusted hybrid momentum–reversion intraday factor with noise gating.
+import numpy as np
+import pandas as pd
+
+from ..StrategyResult import StrategyResult
+from ..strategies.BaseStrategy import BaseStrategy
+
+
 class IntradayStrategy(BaseStrategy):
 
     requires_factor_engine = False
 
     # -------------------------------------------------
-    # MOMENTUM (F1 COMPONENT)
-    # -------------------------------------------------
     def momentum(self, df, window=20):
-
         return df["close"].pct_change(window)
 
     # -------------------------------------------------
-    # REVERSAL (F1 COMPONENT)
-    # -------------------------------------------------
     def reversal(self, df, window=5):
-
         return -df["close"].pct_change(window)
 
-    # -------------------------------------------------
-    # VWAP DEVIATION (LIQUIDITY FACTOR)
     # -------------------------------------------------
     def vwap_deviation(self, df):
 
@@ -50,7 +49,26 @@ class IntradayStrategy(BaseStrategy):
         return (df["close"] - vwap) / (vwap + 1e-8)
 
     # -------------------------------------------------
-    # MAIN STRATEGY
+    # 🔥 STRICT TIME CLEANER (CORE FIX)
+    # -------------------------------------------------
+    def _ensure_datetime_index(self, df):
+
+        if "date" in df.columns:
+            df = df.copy()
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
+            df = df[df["date"] > pd.Timestamp("2000-01-01")]
+            df = df.sort_values("date")
+            df = df.set_index("date")
+        else:
+            df = df.copy()
+            df.index = pd.to_datetime(df.index, errors="coerce")
+            df = df[df.index.notna()]
+            df = df[df.index > pd.Timestamp("2000-01-01")]
+            df = df.sort_index()
+
+        return df
+
     # -------------------------------------------------
     def run(self):
 
@@ -63,99 +81,65 @@ class IntradayStrategy(BaseStrategy):
 
         signals_out = {}
         scores_out = {}
-
         volume_stress_out = {}
         dislocation_events_out = {}
 
-        # -------------------------------------------------
-        # SYMBOL LOOP
-        # -------------------------------------------------
-        for sym, df in self.data.items():
+        # =================================================
+        # CLEAN INPUT DATA (CRITICAL)
+        # =================================================
+        cleaned = {
+            sym: self._ensure_datetime_index(df)
+            for sym, df in self.data.items()
+            if "close" in df.columns
+        }
 
-            if "close" not in df.columns:
-                continue
+        # -------------------------------------------------
+        for sym, df in cleaned.items():
 
             if len(df) < max(lookback, vol_window, volume_window):
                 continue
 
-            # ----------------------------
-            # F1: Momentum + Reversal
-            # ----------------------------
             mom = self.momentum(df, lookback)
             rev = self.reversal(df, max(2, lookback // 4))
 
             raw_signal = (mom + rev).fillna(0)
 
-            # ----------------------------
-            # F2: Volatility Normalization
-            # ----------------------------
             vol = raw_signal.rolling(vol_window).std().replace(0, np.nan)
             norm_signal = raw_signal / (vol + 1e-8)
 
-            # ----------------------------
-            # F3: Volume Adjustment (FIXED)
-            # ----------------------------
             if "volume" in df.columns:
 
                 vol_ma = df["volume"].rolling(volume_window).mean()
                 vol_ratio = df["volume"] / (vol_ma + 1e-8)
 
                 norm_signal = norm_signal * vol_ratio
-
                 volume_stress_out[sym] = vol_ratio.fillna(1.0)
 
             else:
-                volume_stress_out[sym] = pd.Series(
-                    1.0,
-                    index=df.index
-                )
+                volume_stress_out[sym] = pd.Series(1.0, index=df.index)
 
-            # ----------------------------
-            # VWAP INTEGRATION (FIXED ADDITION)
-            # ----------------------------
             vwap_dev = self.vwap_deviation(df)
-
             norm_signal = norm_signal + 0.5 * vwap_dev
 
-            # ----------------------------
-            # CLEAN SIGNAL
-            # ----------------------------
-            norm_signal = norm_signal.replace(
-                [np.inf, -np.inf],
-                np.nan
-            ).fillna(0)
+            norm_signal = norm_signal.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-            # ----------------------------
-            # F4: SCORE (LOOKBACK MEAN)
-            # ----------------------------
-            final_score = float(
-                norm_signal.tail(lookback).mean()
-            )
+            final_score = float(norm_signal.tail(lookback).mean())
 
-            if np.isnan(final_score):
-                continue
-
-            # ----------------------------
-            # F5: THRESHOLD FILTER
-            # ----------------------------
             if abs(final_score) < threshold:
                 final_score = 0.0
 
-            # ----------------------------
-            # DISLOCATION EVENTS (FOR CHART MARKERS)
-            # ----------------------------
-            dislocation_events_out[sym] = (
-                norm_signal.abs() > threshold
-            ).astype(int)
+            dislocation_events_out[sym] = (norm_signal.abs() > threshold).astype(int)
 
-            # ----------------------------
-            # STORE OUTPUTS
-            # ----------------------------
+            # =================================================
+            # 🔥 FINAL GUARANTEE: FORCE DATETIME INDEX
+            # =================================================
+            norm_signal.index = pd.to_datetime(norm_signal.index, errors="coerce")
+            norm_signal = norm_signal[norm_signal.index.notna()]
+            norm_signal = norm_signal.sort_index()
+
             signals_out[sym] = norm_signal
             scores_out[sym] = final_score
 
-        # -------------------------------------------------
-        # CHART (UNCHANGED CONFIG COMPATIBILITY)
         # -------------------------------------------------
         chart = self.build_chart(
             series=self.cfg.get("chart").get("series"),
@@ -164,27 +148,17 @@ class IntradayStrategy(BaseStrategy):
             chartmode=self.cfg.get("chart").get("mode"),
         )
 
-        # -------------------------------------------------
-        # METRICS
-        # -------------------------------------------------
-        metrics = {
-            "lookback": lookback,
-            "vol_window": vol_window,
-            "volume_window": volume_window,
-            "signal_threshold": threshold,
-            "universe_size": len(signals_out),
-            "average_score": float(
-                np.mean(list(scores_out.values()))
-            ) if scores_out else 0.0,
-        }
-
-        # -------------------------------------------------
-        # FINAL OUTPUT
-        # -------------------------------------------------
         return StrategyResult(
             name="IntradayStrategy",
             data=self.data,
-            metrics=metrics,
+            metrics={
+                "lookback": lookback,
+                "vol_window": vol_window,
+                "volume_window": volume_window,
+                "signal_threshold": threshold,
+                "universe_size": len(signals_out),
+                "average_score": float(np.mean(list(scores_out.values()))) if scores_out else 0.0,
+            },
             signals={
                 "signal": signals_out,
                 "volume_stress": volume_stress_out,

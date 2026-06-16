@@ -242,41 +242,34 @@ import plotly.graph_objects as go
 
 class IntradayStrategyChart(StrategyChart):
 
-    # ==================================================
-    # FIXED STATIC MAP (FULLY ALIGNED WITH STRATEGY)
-    # ==================================================
-    STATIC_MAP = {
-        "metrics": [
-            "lookback",
-            "vol_window",
-            "volume_window",
-            "signal_threshold",
-            "universe_size",
-            "average_score"
-        ],
-        "chart": [
-            "signal",
-            "volume_stress",
-            "dislocation_events",
-            "score"
-        ]
-    }
+    # -------------------------------------------------
+    @staticmethod
+    def _clean(series):
 
-    # ==================================================
-    # LINE PLOT HELPER
-    # ==================================================
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except:
+            return None
+
+        s.index = pd.to_datetime(s.index, errors="coerce")
+        s = s[s.index.notna()]
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+        s = s.sort_index()
+
+        if s.empty:
+            return None
+
+        return s
+
+    # -------------------------------------------------
     @staticmethod
     def _plot_series(fig, series, name, color=None):
 
+        series = IntradayStrategyChart._clean(series)
         if series is None:
-            return False
-
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
             return False
 
         fig.add_trace(
@@ -288,25 +281,17 @@ class IntradayStrategyChart(StrategyChart):
                 line=dict(color=color) if color else None
             )
         )
-
         return True
 
-    # ==================================================
-    # STEP SIGNAL HELPER (DISCRETE SERIES)
-    # ==================================================
+    # -------------------------------------------------
     @staticmethod
     def _plot_signal(fig, series, name, color=None):
 
+        series = IntradayStrategyChart._clean(series)
         if series is None:
             return False
 
-        try:
-            series = pd.Series(series).fillna(0)
-        except Exception:
-            return False
-
-        if series.empty:
-            return False
+        series = series.fillna(0)
 
         fig.add_trace(
             go.Scatter(
@@ -319,28 +304,17 @@ class IntradayStrategyChart(StrategyChart):
                 line=dict(color=color) if color else None
             )
         )
-
         return True
 
-    # ==================================================
-    # MARKER PLOT (DISLOCATION EVENTS)
-    # ==================================================
+    # -------------------------------------------------
     @staticmethod
     def _plot_markers(fig, series, name):
 
+        series = IntradayStrategyChart._clean(series)
         if series is None:
             return False
 
-        try:
-            series = pd.Series(series).fillna(0)
-        except Exception:
-            return False
-
-        if series.empty:
-            return False
-
         points = series[series > 0]
-
         if points.empty:
             return False
 
@@ -350,95 +324,44 @@ class IntradayStrategyChart(StrategyChart):
                 y=points.values,
                 mode="markers",
                 name=name,
-                marker=dict(
-                    size=6,
-                    color="red",
-                    symbol="circle"
-                ),
-                opacity=0.8
+                marker=dict(size=6, color="red")
             )
         )
-
         return True
 
-    # ==================================================
-    # MAIN RENDER
-    # ==================================================
+    # -------------------------------------------------
     @staticmethod
     def render(item):
 
         fig = go.Figure()
 
         signals = getattr(item, "signals", {}) or {}
-        metrics = getattr(item, "metrics", {}) or {}
 
         signal_map = signals.get("signal", {})
         volume_map = signals.get("volume_stress", {})
         event_map = signals.get("dislocation_events", {})
         score_map = signals.get("score", {})
 
-        # ==================================================
-        # SIGNAL + VOLUME STRESS
-        # ==================================================
         for sym in signal_map.keys():
 
-            IntradayStrategyChart._plot_series(
-                fig,
-                signal_map.get(sym),
-                f"{sym} Signal",
-                "steelblue"
-            )
+            IntradayStrategyChart._plot_series(fig, signal_map.get(sym), f"{sym} Signal", "steelblue")
+            IntradayStrategyChart._plot_series(fig, volume_map.get(sym), f"{sym} Volume", "orange")
+            IntradayStrategyChart._plot_series(fig, score_map.get(sym), f"{sym} Score", "gray")
 
-            IntradayStrategyChart._plot_series(
-                fig,
-                volume_map.get(sym),
-                f"{sym} Volume Stress",
-                "orange"
-            )
-
-            # optional score overlay (faint)
-            IntradayStrategyChart._plot_series(
-                fig,
-                score_map.get(sym),
-                f"{sym} Score",
-                "gray"
-            )
-
-        # ==================================================
-        # DISLOCATION EVENTS (MARKERS)
-        # ==================================================
         for sym, events in event_map.items():
+            IntradayStrategyChart._plot_markers(fig, events, f"{sym} Events")
 
-            IntradayStrategyChart._plot_markers(
-                fig,
-                events,
-                f"{sym} Dislocations"
-            )
+        fig.add_hline(y=0, line_color="gray", opacity=0.4)
 
-        # ==================================================
-        # ZERO LINE (REFERENCE)
-        # ==================================================
-        fig.add_hline(
-            y=0,
-            line_dash="solid",
-            line_color="gray",
-            opacity=0.4
-        )
-
-        # ==================================================
-        # LAYOUT
-        # ==================================================
         fig.update_layout(
             template="plotly_dark",
             title=getattr(item, "name", "Intraday Strategy"),
             xaxis_title="Time",
-            yaxis_title="Normalized Signal",
-            legend_title="Series",
+            yaxis_title="Signal",
             hovermode="x unified"
         )
 
         return fig
-
 # ===================================================
 # Correlation Fallback Chart
 # ===================================================
@@ -471,35 +394,88 @@ class CorrelationFallbackChart(StrategyChart):
             "threshold_high",
             "threshold_low"
         ],
-        "chart": []  # chart already built by strategy via build_chart()
+        "chart": []
     }
 
     # ==================================================
-    # HELPERS
+    # CORE CLEANER (FIX 1970 / BAD INDEX)
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except:
+            return None
+
+        # numeric cleanup (safe for all signal types)
+        s = pd.to_numeric(s, errors="coerce")
+
+        # force datetime index
+        s.index = pd.to_datetime(s.index, errors="coerce")
+
+        # remove bad timestamps (NaT + 1970 garbage)
+        s = s[s.index.notna()]
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+
+        # sort + deduplicate
+        s = s.sort_index()
+        s = s[~s.index.duplicated(keep="last")]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
+    # PLOT HELPER
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None):
 
-        if series is None:
-            return False
+        s = CorrelationFallbackChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 line=dict(color=color) if color else None
             )
         )
+
+        return True
+
+    # ==================================================
+    # STEP STYLE (REGIME)
+    # ==================================================
+    @staticmethod
+    def _plot_step(fig, series, name, color=None):
+
+        s = CorrelationFallbackChart._clean(series)
+
+        if s is None:
+            return False
+
+        fig.add_trace(
+            go.Scatter(
+                x=s.index,
+                y=s.values,
+                mode="lines",
+                line_shape="hv",
+                name=name,
+                opacity=0.7,
+                line=dict(color=color) if color else None
+            )
+        )
+
         return True
 
     # ==================================================
@@ -523,7 +499,7 @@ class CorrelationFallbackChart(StrategyChart):
         threshold_low = signals.get("threshold_low")
 
         # ==================================================
-        # 1. CORRELATION LINE
+        # 1. CORRELATION
         # ==================================================
         CorrelationFallbackChart._plot_series(
             fig,
@@ -533,7 +509,7 @@ class CorrelationFallbackChart(StrategyChart):
         )
 
         # ==================================================
-        # 2. SIGNAL (REGIME ALLOCATION)
+        # 2. SIGNAL
         # ==================================================
         CorrelationFallbackChart._plot_series(
             fig,
@@ -543,7 +519,7 @@ class CorrelationFallbackChart(StrategyChart):
         )
 
         # ==================================================
-        # 3. DISPERSION (INSTABILITY)
+        # 3. DISPERSION
         # ==================================================
         CorrelationFallbackChart._plot_series(
             fig,
@@ -553,7 +529,7 @@ class CorrelationFallbackChart(StrategyChart):
         )
 
         # ==================================================
-        # 4. EQUITY CURVE (OPTIONAL CONTEXT)
+        # 4. EQUITY CURVE
         # ==================================================
         CorrelationFallbackChart._plot_series(
             fig,
@@ -580,9 +556,9 @@ class CorrelationFallbackChart(StrategyChart):
         )
 
         # ==================================================
-        # 6. REGIME (STEP STYLE)
+        # 6. REGIME (STEP)
         # ==================================================
-        CorrelationFallbackChart._plot_series(
+        CorrelationFallbackChart._plot_step(
             fig,
             regime,
             "Regime State",
@@ -602,18 +578,15 @@ class CorrelationFallbackChart(StrategyChart):
         )
 
         return fig
+
 # ===================================================
 # Pair Trading Fallback Chart
 # ===================================================
 import pandas as pd
 import plotly.graph_objects as go
 
-
 class PairTradingFallbackChart(StrategyChart):
 
-    # ==================================================
-    # FIXED STATIC MAP (matches strategy output exactly)
-    # ==================================================
     STATIC_MAP = {
         "metrics": [
             "lookback",
@@ -630,30 +603,55 @@ class PairTradingFallbackChart(StrategyChart):
             "spread",
             "signal"
         ],
-        "chart": []  # IMPORTANT: chart already built by strategy
+        "chart": []
     }
 
     # ==================================================
-    # HELPERS
+    # CORE FIX (1970 REMOVAL)
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except:
+            return None
+
+        s = pd.to_numeric(s, errors="coerce").dropna()
+
+        s.index = pd.to_datetime(s.index, errors="coerce")
+
+        s = s[s.index.notna()]
+
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+
+        s = s.sort_index()
+
+        s = s[~s.index.duplicated(keep="last")]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
+    # PLOT HELPERS
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None):
 
-        if series is None:
-            return False
+        s = PairTradingFallbackChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 line=dict(color=color) if color else None
@@ -664,21 +662,15 @@ class PairTradingFallbackChart(StrategyChart):
     @staticmethod
     def _plot_step(fig, series, name):
 
-        if series is None:
-            return False
+        s = PairTradingFallbackChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 line_shape="hv",
                 name=name,
@@ -705,32 +697,29 @@ class PairTradingFallbackChart(StrategyChart):
         exit_z = metrics.get("exit_zscore")
 
         # ==================================================
-        # 1. SPREAD + ZSCORE
+        # SPREAD + ZSCORE
         # ==================================================
         for pair, pair_data in spreads.items():
 
             if not isinstance(pair_data, dict):
                 continue
 
-            spread = pair_data.get("spread")
-            zscore = pair_data.get("zscore")
-
             PairTradingFallbackChart._plot_series(
                 fig,
-                spread,
+                pair_data.get("spread"),
                 f"{pair} Spread",
                 "steelblue"
             )
 
             PairTradingFallbackChart._plot_series(
                 fig,
-                zscore,
+                pair_data.get("zscore"),
                 f"{pair} Z-Score",
                 "orange"
             )
 
         # ==================================================
-        # 2. SIGNALS
+        # SIGNALS
         # ==================================================
         for pair, signal in trade_signals.items():
 
@@ -741,22 +730,19 @@ class PairTradingFallbackChart(StrategyChart):
             )
 
         # ==================================================
-        # 3. ENTRY / EXIT LEVELS
+        # ENTRY / EXIT LINES
         # ==================================================
         if entry_z is not None:
 
             fig.add_hline(
                 y=entry_z,
                 line_dash="dash",
-                line_color="red",
-                annotation_text=f"Entry +{entry_z}"
+                line_color="red"
             )
-
             fig.add_hline(
                 y=-entry_z,
                 line_dash="dash",
-                line_color="red",
-                annotation_text=f"Entry -{entry_z}"
+                line_color="red"
             )
 
         if exit_z is not None:
@@ -764,19 +750,16 @@ class PairTradingFallbackChart(StrategyChart):
             fig.add_hline(
                 y=exit_z,
                 line_dash="dot",
-                line_color="green",
-                annotation_text=f"Exit +{exit_z}"
+                line_color="green"
             )
-
             fig.add_hline(
                 y=-exit_z,
                 line_dash="dot",
-                line_color="green",
-                annotation_text=f"Exit -{exit_z}"
+                line_color="green"
             )
 
         # ==================================================
-        # 4. LAYOUT (NO CHART OVERRIDE)
+        # LAYOUT
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
@@ -788,12 +771,12 @@ class PairTradingFallbackChart(StrategyChart):
         )
 
         return fig
+
 # ===================================================
 # ForecastStrategyChart
 #====================================================
 import pandas as pd
 import plotly.graph_objects as go
-
 
 class ForecastStrategyChart(StrategyChart):
 
@@ -811,26 +794,51 @@ class ForecastStrategyChart(StrategyChart):
     }
 
     # ==================================================
-    # LINE PLOT HELPER
+    # CORE FIX: REMOVE 1970 / BAD INDEXES
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except Exception:
+            return None
+
+        s = pd.to_numeric(s, errors="coerce").dropna()
+
+        s.index = pd.to_datetime(s.index, errors="coerce")
+
+        s = s[s.index.notna()]
+
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+
+        s = s.sort_index()
+
+        s = s[~s.index.duplicated(keep="last")]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
+    # PLOT HELPER
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None, dashed=False, opacity=1.0):
 
-        if series is None:
-            return False
+        s = ForecastStrategyChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 opacity=opacity,
@@ -860,15 +868,12 @@ class ForecastStrategyChart(StrategyChart):
         actual_data = signals.get("actual", {})
 
         # ==================================================
-        # FORECAST VS ACTUAL (PER SYMBOL)
+        # PLOTS
         # ==================================================
         for sym, forecast in forecast_data.items():
 
             actual = actual_data.get(sym)
 
-            # ----------------------------
-            # FORECAST LINE
-            # ----------------------------
             ForecastStrategyChart._plot_series(
                 fig,
                 forecast,
@@ -876,9 +881,6 @@ class ForecastStrategyChart(StrategyChart):
                 color="orange"
             )
 
-            # ----------------------------
-            # ACTUAL LINE
-            # ----------------------------
             ForecastStrategyChart._plot_series(
                 fig,
                 actual,
@@ -887,7 +889,7 @@ class ForecastStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # ZERO LINE (REFERENCE)
+        # ZERO LINE
         # ==================================================
         fig.add_hline(
             y=0,
@@ -896,23 +898,20 @@ class ForecastStrategyChart(StrategyChart):
         )
 
         # ==================================================
-        # OPTIONAL PERFORMANCE ANNOTATION
+        # ANNOTATION
         # ==================================================
-        assets = metrics.get("assets")
-        horizon = metrics.get("forecast_horizon")
-
-        if assets is not None:
-
-            fig.add_annotation(
-                text=f"Assets: {assets} | Horizon: {horizon}",
-                showarrow=False,
-                xref="paper",
-                yref="paper",
-                x=0.01,
-                y=0.99,
-                align="left",
-                font=dict(color="white", size=11)
-            )
+        fig.add_annotation(
+            text=(
+                f"Assets: {metrics.get('assets', 0)} | "
+                f"Horizon: {metrics.get('forecast_horizon', 0)}"
+            ),
+            x=0.01,
+            y=0.99,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+            font=dict(color="white", size=11)
+        )
 
         # ==================================================
         # LAYOUT
@@ -927,7 +926,6 @@ class ForecastStrategyChart(StrategyChart):
         )
 
         return fig
-
 # ===================================================
 # Industry Momentum Chart
 # ===================================================
@@ -1112,7 +1110,6 @@ class IndustryMomentumChart(StrategyChart):
 
 import pandas as pd
 import plotly.graph_objects as go
-
 class DispersionStrategyChart(StrategyChart):
 
     STATIC_MAP = {
@@ -1121,36 +1118,89 @@ class DispersionStrategyChart(StrategyChart):
             "cross_sectional_window",
             "mean_dispersion",
             "dispersion_volatility",
-            "assets"
+            "assets",
+            "latest_dispersion",
+            "latest_zscore"
         ],
         "chart": [
             "dispersion",
             "ma_63",
+            "dispersion_volatility",
+            "zscore",
+            "momentum",
             "regime_switches"
         ]
     }
 
     # ==================================================
+    # CORE FIX: CLEAN TIME INDEX (1970 REMOVAL)
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except Exception:
+            return None
+
+        s = pd.to_numeric(
+            s,
+            errors="coerce"
+        ).dropna()
+
+        # Force datetime index
+        s.index = pd.to_datetime(
+            s.index,
+            errors="coerce"
+        )
+
+        # Remove invalid timestamps
+        s = s[s.index.notna()]
+
+        # Remove epoch/garbage dates
+        s = s[
+            s.index > pd.Timestamp("2000-01-01")
+        ]
+
+        # Sort and deduplicate
+        s = s.sort_index()
+
+        s = s[
+            ~s.index.duplicated(
+                keep="last"
+            )
+        ]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
     # LINE PLOT HELPER
     # ==================================================
     @staticmethod
-    def _plot_series(fig, series, name, color=None, dashed=False, opacity=1.0):
+    def _plot_series(
+        fig,
+        series,
+        name,
+        color=None,
+        dashed=False,
+        opacity=1.0
+    ):
 
-        if series is None:
-            return False
+        s = DispersionStrategyChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 opacity=opacity,
@@ -1166,31 +1216,32 @@ class DispersionStrategyChart(StrategyChart):
         return True
 
     # ==================================================
-    # STEP SIGNAL HELPER (for regime switches)
+    # STEP REGIME HELPER
     # ==================================================
     @staticmethod
-    def _plot_step(fig, series, name, color=None):
+    def _plot_step(
+        fig,
+        series,
+        name,
+        color=None
+    ):
 
-        if series is None:
-            return False
+        s = DispersionStrategyChart._clean(series)
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
-                name=name,
                 line_shape="hv",
+                name=name,
                 opacity=0.6,
-                line=dict(color=color) if color else None
+                line=dict(
+                    color=color
+                ) if color else None
             )
         )
 
@@ -1204,20 +1255,52 @@ class DispersionStrategyChart(StrategyChart):
 
         fig = go.Figure()
 
-        signals = getattr(item, "signals", {}) or {}
-        metrics = getattr(item, "metrics", {}) or {}
+        signals = getattr(
+            item,
+            "signals",
+            {}
+        ) or {}
 
-        dispersion = signals.get("dispersion")
-        ma_63 = signals.get("ma_63")
-        regime_switches = signals.get("regime_switches")
+        metrics = getattr(
+            item,
+            "metrics",
+            {}
+        ) or {}
 
         # ==================================================
-        # DISPERSION (MAIN SIGNAL)
+        # SIGNALS
+        # ==================================================
+        dispersion = signals.get(
+            "dispersion"
+        )
+
+        ma_63 = signals.get(
+            "ma_63"
+        )
+
+        dispersion_vol = signals.get(
+            "dispersion_volatility"
+        )
+
+        zscore = signals.get(
+            "zscore"
+        )
+
+        momentum = signals.get(
+            "momentum"
+        )
+
+        regime_switches = signals.get(
+            "regime_switches"
+        )
+
+        # ==================================================
+        # DISPERSION
         # ==================================================
         DispersionStrategyChart._plot_series(
             fig,
             dispersion,
-            "Cross-sectional Dispersion",
+            "Cross-Sectional Dispersion",
             color="steelblue"
         )
 
@@ -1227,13 +1310,43 @@ class DispersionStrategyChart(StrategyChart):
         DispersionStrategyChart._plot_series(
             fig,
             ma_63,
-            "MA (Lookback)",
+            "Dispersion MA",
             color="orange",
             dashed=True
         )
 
         # ==================================================
-        # REGIME SWITCHES
+        # VOLATILITY
+        # ==================================================
+        DispersionStrategyChart._plot_series(
+            fig,
+            dispersion_vol,
+            "Dispersion Volatility",
+            color="yellow"
+        )
+
+        # ==================================================
+        # Z-SCORE
+        # ==================================================
+        DispersionStrategyChart._plot_series(
+            fig,
+            zscore,
+            "Dispersion Z-Score",
+            color="white"
+        )
+
+        # ==================================================
+        # MOMENTUM
+        # ==================================================
+        DispersionStrategyChart._plot_series(
+            fig,
+            momentum,
+            "Dispersion Momentum",
+            color="cyan"
+        )
+
+        # ==================================================
+        # REGIME
         # ==================================================
         DispersionStrategyChart._plot_step(
             fig,
@@ -1243,17 +1356,64 @@ class DispersionStrategyChart(StrategyChart):
         )
 
         # ==================================================
-        # OPTIONAL THRESHOLD LINE (MEAN)
+        # MEAN DISPERSION LINE
         # ==================================================
-        mean_disp = metrics.get("mean_dispersion")
+        mean_dispersion = metrics.get(
+            "mean_dispersion"
+        )
 
-        if mean_disp is not None:
+        if mean_dispersion is not None:
 
             fig.add_hline(
-                y=mean_disp,
+                y=mean_dispersion,
                 line_dash="dot",
                 line_color="red",
-                annotation_text=f"Mean Dispersion {round(mean_disp, 4)}"
+                annotation_text=(
+                    f"Mean Dispersion "
+                    f"{round(mean_dispersion, 4)}"
+                )
+            )
+
+        # ==================================================
+        # LATEST DISPERSION
+        # ==================================================
+        latest_dispersion = metrics.get(
+            "latest_dispersion"
+        )
+
+        if latest_dispersion is not None:
+
+            fig.add_annotation(
+                text=(
+                    f"Latest Dispersion: "
+                    f"{latest_dispersion:.4f}"
+                ),
+                x=0.01,
+                y=0.99,
+                xref="paper",
+                yref="paper",
+                showarrow=False
+            )
+
+        # ==================================================
+        # LATEST ZSCORE
+        # ==================================================
+        latest_zscore = metrics.get(
+            "latest_zscore"
+        )
+
+        if latest_zscore is not None:
+
+            fig.add_annotation(
+                text=(
+                    f"Latest Z-Score: "
+                    f"{latest_zscore:.2f}"
+                ),
+                x=0.01,
+                y=0.94,
+                xref="paper",
+                yref="paper",
+                showarrow=False
             )
 
         # ==================================================
@@ -1261,9 +1421,13 @@ class DispersionStrategyChart(StrategyChart):
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
-            title=getattr(item, "name", "Dispersion Strategy"),
+            title=getattr(
+                item,
+                "name",
+                "Dispersion Strategy"
+            ),
             xaxis_title="Date",
-            yaxis_title="Cross-sectional Dispersion",
+            yaxis_title="Dispersion",
             legend_title="Series",
             hovermode="x unified"
         )
@@ -1276,48 +1440,106 @@ class DispersionStrategyChart(StrategyChart):
 import pandas as pd
 import plotly.graph_objects as go
 
-
 class VolatilityStrategyChart(StrategyChart):
 
     STATIC_MAP = {
         "metrics": [
+            "lookback",
             "vol_window",
-            "target_vol"
+            "target_vol",
+            "symbols",
+            "valid_symbols"
         ],
         "chart": [
-            "volatility",
-            "target_vol",
+            "vol_series",
             "vol_signal"
         ]
     }
 
     # ==================================================
-    # LINE PLOT HELPER
+    # CORE FIX: REMOVE 1970 / BAD INDEXES
     # ==================================================
     @staticmethod
-    def _plot_series(fig, series, name, color=None, dashed=False):
+    def _clean(series):
 
         if series is None:
-            return False
+            return None
 
         try:
-            series = pd.Series(series).dropna()
+            s = pd.Series(series).copy()
         except Exception:
-            return False
+            return None
 
-        if series.empty:
+        s = pd.to_numeric(
+            s,
+            errors="coerce"
+        ).dropna()
+
+        try:
+
+            s.index = pd.to_datetime(
+                s.index,
+                errors="coerce"
+            )
+
+        except Exception:
+            return None
+
+        s = s[
+            s.index.notna()
+        ]
+
+        s = s[
+            s.index >
+            pd.Timestamp("2000-01-01")
+        ]
+
+        s = s.sort_index()
+
+        s = s[
+            ~s.index.duplicated(
+                keep="last"
+            )
+        ]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
+    # LINE HELPER
+    # ==================================================
+    @staticmethod
+    def _plot_series(
+        fig,
+        series,
+        name,
+        color=None,
+        dashed=False,
+        opacity=1.0
+    ):
+
+        s = VolatilityStrategyChart._clean(
+            series
+        )
+
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
+                opacity=opacity,
                 line=dict(
                     color=color,
                     dash="dash" if dashed else None
-                ) if color else dict(dash="dash" if dashed else None)
+                ) if color else dict(
+                    dash="dash" if dashed else None
+                )
             )
         )
 
@@ -1331,40 +1553,64 @@ class VolatilityStrategyChart(StrategyChart):
 
         fig = go.Figure()
 
-        signals = getattr(item, "signals", {}) or {}
-        metrics = getattr(item, "metrics", {}) or {}
+        signals = getattr(
+            item,
+            "signals",
+            {}
+        ) or {}
 
-        vol_series = signals.get("vol_series", {})
-        vol_signals = signals.get("vol_signal", {})
+        metrics = getattr(
+            item,
+            "metrics",
+            {}
+        ) or {}
+
+        vol_series = signals.get(
+            "vol_series",
+            {}
+        )
+
+        vol_signals = signals.get(
+            "vol_signal",
+            {}
+        )
 
         # ==================================================
-        # VOLATILITY CURVES PER SYMBOL
+        # VOLATILITY
         # ==================================================
         for sym, data in vol_series.items():
 
-            if not isinstance(data, dict):
+            if not isinstance(
+                data,
+                dict
+            ):
                 continue
 
-            volatility = data.get("volatility")
-            target_vol = data.get("target_vol")
+            volatility = data.get(
+                "volatility"
+            )
+
+            target_vol = data.get(
+                "target_vol"
+            )
 
             VolatilityStrategyChart._plot_series(
                 fig,
                 volatility,
-                f"{sym} Realized Volatility",
+                f"{sym} Realized Vol",
                 color="steelblue"
             )
 
             VolatilityStrategyChart._plot_series(
                 fig,
                 target_vol,
-                f"{sym} Target Volatility",
+                f"{sym} Target Vol",
                 color="orange",
                 dashed=True
             )
 
         # ==================================================
-        # VOLATILITY SIGNAL (POSITION SCALING)
+        # VOL SIGNALS
         # ==================================================
         for sym, signal in vol_signals.items():
 
@@ -1376,9 +1622,11 @@ class VolatilityStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # TARGET LINE FROM METRICS (GLOBAL)
+        # GLOBAL TARGET VOL
         # ==================================================
-        target_vol = metrics.get("target_vol")
+        target_vol = metrics.get(
+            "target_vol"
+        )
 
         if target_vol is not None:
 
@@ -1386,27 +1634,47 @@ class VolatilityStrategyChart(StrategyChart):
                 y=target_vol,
                 line_dash="dash",
                 line_color="red",
-                annotation_text=f"Target Vol {target_vol}"
+                annotation_text=(
+                    f"Target Vol "
+                    f"{target_vol:.2f}"
+                )
             )
+
+        # ==================================================
+        # SUMMARY
+        # ==================================================
+        fig.add_annotation(
+            text=(
+                f"Assets: "
+                f"{metrics.get('valid_symbols',0)}"
+            ),
+            x=0.01,
+            y=0.99,
+            xref="paper",
+            yref="paper",
+            showarrow=False
+        )
 
         # ==================================================
         # LAYOUT
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
-            title=getattr(item, "name", "Volatility Strategy"),
+            title=getattr(
+                item,
+                "name",
+                "Volatility Strategy"
+            ),
             xaxis_title="Date",
             yaxis_title="Volatility / Signal",
             legend_title="Series",
             hovermode="x unified"
         )
 
-        return fig
-
-
-# ====================================================
+        return fig# ====================================================
 # Correlation Chart
 # ====================================================
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -1434,33 +1702,51 @@ class CorrelationStrategyChart(StrategyChart):
     }
 
     # ==================================================
+    #  CORE FIX: CLEAN TIME INDEX (1970 REMOVAL)
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).copy()
+        except:
+            return None
+
+        s = pd.to_numeric(s, errors="coerce").dropna()
+
+        # FORCE DATETIME INDEX
+        s.index = pd.to_datetime(s.index, errors="coerce")
+
+        # REMOVE BAD DATES (1970 / NaT)
+        s = s[s.index.notna()]
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+
+        # SORT + CLEAN
+        s = s.sort_index()
+        s = s[~s.index.duplicated(keep="last")]
+
+        if len(s) < 2:
+            return None
+
+        return s
+
+    # ==================================================
     # LINE PLOT HELPER
     # ==================================================
     @staticmethod
-    def _plot_series(
-        fig,
-        series,
-        name,
-        color=None,
-        dashed=False,
-        opacity=1.0
-    ):
+    def _plot_series(fig, series, name, color=None, dashed=False, opacity=1.0):
 
-        if series is None:
-            return False
-
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        s = CorrelationStrategyChart._clean(series)
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 opacity=opacity,
@@ -1481,21 +1767,14 @@ class CorrelationStrategyChart(StrategyChart):
     @staticmethod
     def _plot_regime(fig, series, name):
 
-        if series is None:
-            return False
-
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        s = CorrelationStrategyChart._clean(series)
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 line_shape="hv",
                 name=name,
@@ -1519,15 +1798,13 @@ class CorrelationStrategyChart(StrategyChart):
         avg_corr = signals.get("avg_correlation")
         rolling_mean = signals.get("rolling_mean_corr")
         corr_vol = signals.get("correlation_volatility")
-
         spread = signals.get("spread")
         zscore = signals.get("zscore")
         momentum = signals.get("momentum")
-
         regime_series = signals.get("regime_series")
 
         # ==================================================
-        # CORRELATION
+        # CORRELATION LAYER
         # ==================================================
         CorrelationStrategyChart._plot_series(
             fig,
@@ -1585,7 +1862,7 @@ class CorrelationStrategyChart(StrategyChart):
         )
 
         # ==================================================
-        # REGIME
+        # REGIME (STEP)
         # ==================================================
         CorrelationStrategyChart._plot_regime(
             fig,
@@ -1594,12 +1871,11 @@ class CorrelationStrategyChart(StrategyChart):
         )
 
         # ==================================================
-        # THRESHOLD
+        # THRESHOLD LINE
         # ==================================================
         threshold = metrics.get("signal_threshold")
 
         if threshold is not None:
-
             fig.add_hline(
                 y=threshold,
                 line_dash="dash",
@@ -1608,12 +1884,11 @@ class CorrelationStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # MEAN CORRELATION
+        # MEAN LINE
         # ==================================================
         mean_corr = metrics.get("mean_corr")
 
         if mean_corr is not None:
-
             fig.add_hline(
                 y=mean_corr,
                 line_dash="dot",
@@ -1622,12 +1897,11 @@ class CorrelationStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # REGIME ANNOTATION
+        # REGIME LABEL
         # ==================================================
         regime = signals.get("regime")
 
         if regime:
-
             fig.add_annotation(
                 text=f"Regime: {regime}",
                 x=0.01,
@@ -1638,7 +1912,7 @@ class CorrelationStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # LAYOUT
+        # LAYOUT (UNCHANGED)
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
@@ -1650,13 +1924,13 @@ class CorrelationStrategyChart(StrategyChart):
         )
 
         return fig
-#
+
+# ==========================================================
 # Breadth Chart
-#
+# ==========================================================
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-
 
 class BreadthStrategyChart(StrategyChart):
 
@@ -1677,115 +1951,118 @@ class BreadthStrategyChart(StrategyChart):
     }
 
     # ==================================================
+    #  HARD CLEAN (CRITICAL FIX - SAME AS PAIRTRADING)
+    # ==================================================
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+            s = pd.Series(series).dropna()
+        except:
+            return None
+
+        # FORCE NUMERIC SAFETY
+        s = pd.to_numeric(s, errors="coerce").dropna()
+
+        # FORCE DATETIME INDEX
+        s.index = pd.to_datetime(s.index, errors="coerce")
+
+        # REMOVE BAD DATES (THIS KILLS 1970 ISSUE)
+        s = s[s.index.notna()]
+        s = s[s.index > pd.Timestamp("2000-01-01")]
+
+        # SORT + DEDUPE
+        s = s.sort_index()
+        s = s[~s.index.duplicated(keep="last")]
+
+        if len(s) < 5:
+            return None
+
+        return s
+
+    # ==================================================
     # SERIES PLOT
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None):
 
-        if series is None:
-            return False
-
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        s = BreadthStrategyChart._clean(series)
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
                 line=dict(color=color) if color else None
             )
         )
-
         return True
 
     # ==================================================
-    # RESOLVE SERIES (signals → fallback chartdata)
+    # RESOLVE SERIES (SAFE ONLY)
     # ==================================================
     @staticmethod
     def _resolve_series(item, key):
 
-      signals = getattr(item, "signals", None) or {}
+        signals = getattr(item, "signals", None) or {}
+        chart = getattr(item, "chart", None)
 
-      chart = getattr(item, "chart", None)
+        chartdata = None
+
+        if isinstance(chart, dict):
+            chartdata = chart.get("chartdata", None)
+        else:
+            chartdata = getattr(chart, "chartdata", None)
+
+        # priority 1: signals
+        if isinstance(signals, dict) and key in signals:
+            return signals.get(key)
+
+        # priority 2: chartdata dict
+        if isinstance(chartdata, dict):
+            return chartdata.get(key)
+
+        # priority 3: DataFrame
+        if isinstance(chartdata, pd.DataFrame):
+            if key in chartdata.columns:
+                return chartdata[key]
+
+        return None
 
     # ==================================================
-    # SAFE NORMALIZATION OF chart
+    # MARKERS (SAFE)
     # ==================================================
-      if isinstance(chart, dict):
-        chartdata = chart.get("chartdata", None)
-      else:
-        chartdata = getattr(chart, "chartdata", None)
-
-    # fallback safety
-      if chartdata is None:
-        chartdata = {}
-
-    # ==================================================
-    # PRIORITY 1: signals
-    # ==================================================
-      if isinstance(signals, dict) and key in signals:
-        return signals.get(key)
-
-    # ==================================================
-    # PRIORITY 2: chartdata (matrix)
-    # ==================================================
-      if isinstance(chartdata, dict):
-        return chartdata.get(key)
-
-      if isinstance(chartdata, pd.DataFrame):
-        if key in chartdata.columns:
-            return chartdata[key]
-
-      return None
-
     @staticmethod
     def _plot_markers(fig, series, label):
 
-        if series is None:
-           return False
-
-        try:
-           series = pd.Series(series).dropna()
-        except Exception:
-           return False
-
-    # ==================================================
-    # FORCE NUMERIC CLEANUP (CRITICAL FIX)
-    # ==================================================
-        series = pd.to_numeric(series, errors="coerce").dropna()
-
-        if series.empty:
+        s = BreadthStrategyChart._clean(series)
+        if s is None:
             return False
 
-        values = series.values.astype(float)
-
-        std = values.std()
-        if std == 0 or np.isnan(std):
-            return False
-
-        spikes = np.where(np.abs(values / (std + 1e-8)) > 2.0)[0]
+        z = (s - s.mean()) / (s.std() + 1e-8)
+        spikes = np.where(np.abs(z) > 2.0)[0]
 
         if len(spikes) == 0:
-           return False
+            return False
 
         fig.add_trace(
             go.Scatter(
-            x=series.index[spikes],
-            y=series.iloc[spikes],
-            mode="markers",
-            name=label,
-            marker=dict(size=6)
+                x=s.index[spikes],
+                y=s.iloc[spikes],
+                mode="markers",
+                name=label,
+                marker=dict(size=6)
             )
         )
 
         return True
+
     # ==================================================
     # RENDER
     # ==================================================
@@ -1794,23 +2071,17 @@ class BreadthStrategyChart(StrategyChart):
 
         fig = go.Figure()
 
-        # ==================================================
-        # USE STATIC_MAP (THIS WAS MISSING BEFORE)
-        # ==================================================
         series_keys = BreadthStrategyChart.STATIC_MAP.get("chart", [])
 
         color_map = {
             "breadth": "blue",
             "ma_short": "green",
             "ma_long": "red",
-            "breadth_spread": "purple",
-            "signals": "pink"
+            "breadth_spread": "purple"
         }
 
-        signals = getattr(item, "signals", None)
-        BreadthStrategyChart._plot_markers(fig, signals, "Breadth Signals")     
         # ==================================================
-        # PLOT ALL SERIES FROM CONTRACT
+        # PLOT SERIES (1970-PROOF)
         # ==================================================
         for key in series_keys:
 
@@ -1824,23 +2095,23 @@ class BreadthStrategyChart(StrategyChart):
             )
 
         # ==================================================
-        # MARKERS (optional enrichment)
+        # EXTREME ZONES (SAFE)
         # ==================================================
         breadth = BreadthStrategyChart._resolve_series(item, "breadth")
+        breadth = BreadthStrategyChart._clean(breadth)
 
         if breadth is not None:
-            series = pd.Series(breadth).dropna()
 
-            spikes_high = np.where(series.values > 0.8)[0]
-            spikes_low = np.where(series.values < 0.2)[0]
+            spikes_high = np.where(breadth.values > 0.8)[0]
+            spikes_low = np.where(breadth.values < 0.2)[0]
 
             spikes = np.unique(np.concatenate([spikes_high, spikes_low]))
 
             if len(spikes) > 0:
                 fig.add_trace(
                     go.Scatter(
-                        x=series.index[spikes],
-                        y=series.iloc[spikes],
+                        x=breadth.index[spikes],
+                        y=breadth.iloc[spikes],
                         mode="markers",
                         name="Extreme Breadth Zones",
                         marker=dict(size=6, color="orange")
@@ -1848,23 +2119,24 @@ class BreadthStrategyChart(StrategyChart):
                 )
 
         # ==================================================
-        # LAYOUT
+        # LAYOUT (NO RANGE GUESSING = NO 1970)
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
             title=getattr(item, "name", "Market Breadth & Participation Strength"),
             xaxis_title="Date",
             yaxis_title="Breadth (0–1)",
-            legend_title="Series",
             hovermode="x unified"
         )
 
         return fig
+
 # ===========================================================
 # Pair Trading Chart
 # ===========================================================
 import pandas as pd
 import plotly.graph_objects as go
+
 
 class PairTradingChart(StrategyChart):
 
@@ -1882,7 +2154,32 @@ class PairTradingChart(StrategyChart):
     }
 
     # ==================================================
-    # LINE PLOT HELPER
+    # SAFE X-AXIS RESOLVER (CORE FIX)
+    # ==================================================
+    @staticmethod
+    def _resolve_xaxis(index, length):
+
+        # Case 1: proper datetime index
+        if isinstance(index, pd.DatetimeIndex):
+            return index
+
+        # Case 2: pandas datetime dtype
+        if pd.api.types.is_datetime64_any_dtype(index):
+            return index
+
+        # Case 3: try coercion safely (ONLY if strings)
+        if pd.api.types.is_object_dtype(index):
+            try:
+                x = pd.to_datetime(index, errors="raise")
+                return x
+            except Exception:
+                pass
+
+        # Case 4: fallback numeric (IMPORTANT FIX)
+        return list(range(length))
+
+    # ==================================================
+    # LINE SERIES PLOT
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None):
@@ -1898,10 +2195,13 @@ class PairTradingChart(StrategyChart):
         if series.empty:
             return False
 
+        x = PairTradingChart._resolve_xaxis(series.index, len(series))
+        y = series.values
+
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=x,
+                y=y,
                 mode="lines",
                 name=name,
                 line=dict(color=color) if color else None
@@ -1911,7 +2211,7 @@ class PairTradingChart(StrategyChart):
         return True
 
     # ==================================================
-    # STEP SIGNAL HELPER
+    # STEP SIGNAL PLOT
     # ==================================================
     @staticmethod
     def _plot_signal(fig, series, name):
@@ -1927,10 +2227,13 @@ class PairTradingChart(StrategyChart):
         if series.empty:
             return False
 
+        x = PairTradingChart._resolve_xaxis(series.index, len(series))
+        y = series.values
+
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=x,
+                y=y,
                 mode="lines",
                 line_shape="hv",
                 name=name,
@@ -1955,32 +2258,29 @@ class PairTradingChart(StrategyChart):
         trade_signals = signals.get("signal", {})
 
         # ==================================================
-        # SPREADS / ZSCORES
+        # SPREAD + ZSCORE
         # ==================================================
         for pair, pair_data in spreads.items():
 
             if not isinstance(pair_data, dict):
                 continue
 
-            spread = pair_data.get("spread")
-            zscore = pair_data.get("zscore")
-
             PairTradingChart._plot_series(
                 fig,
-                spread,
+                pair_data.get("spread"),
                 f"{pair} Spread",
                 "steelblue"
             )
 
             PairTradingChart._plot_series(
                 fig,
-                zscore,
+                pair_data.get("zscore"),
                 f"{pair} Z-Score",
                 "orange"
             )
 
         # ==================================================
-        # TRADE SIGNALS
+        # SIGNALS
         # ==================================================
         for pair, signal in trade_signals.items():
 
@@ -1991,7 +2291,7 @@ class PairTradingChart(StrategyChart):
             )
 
         # ==================================================
-        # ENTRY / EXIT THRESHOLDS
+        # THRESHOLDS
         # ==================================================
         entry_z = metrics.get("entry_z")
         exit_z = metrics.get("exit_z")
@@ -2034,13 +2334,14 @@ class PairTradingChart(StrategyChart):
         fig.update_layout(
             template="plotly_dark",
             title=getattr(item, "name", "Pairs Trading"),
-            xaxis_title="Date",
+            xaxis_title="Time",
             yaxis_title="Spread / Z-Score",
             legend_title="Series",
             hovermode="x unified"
         )
 
         return fig
+
 # ==================================================
 # Intraday Reversal chart
 # ==================================================
@@ -2305,6 +2606,7 @@ class STREVReversalChart(StrategyChart):
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+
 class TimeSeriesMomentumChart(StrategyChart):
 
     STATIC_MAP = {
@@ -2384,7 +2686,7 @@ class TimeSeriesMomentumChart(StrategyChart):
 
         fig = go.Figure()
 
-        data = getattr(item, "data", {}) or {}
+        data = getattr(getattr(item, "chart", {}), "chartdata", {}) or {}
         metrics = getattr(item, "metrics", {}) or {}
 
         # ==================================================
@@ -2421,6 +2723,8 @@ class TimeSeriesMomentumChart(StrategyChart):
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+
+
 class UMDMomentumChart(StrategyChart):
 
     STATIC_MAP = {
@@ -2535,7 +2839,7 @@ class UMDMomentumChart(StrategyChart):
 
         fig = go.Figure()
 
-        data = getattr(item, "data", {}) or {}
+        data = getattr(getattr(item, "chart", {}),"chartdata", {}) or {}
         metrics = getattr(item, "metrics", {}) or {}
 
         # ==================================================
@@ -2576,53 +2880,72 @@ import plotly.graph_objects as go
 class BetaNeutralStrategyChart(StrategyChart):
 
     STATIC_MAP = {
-        "metrics": ["beta_stats", "assets","beta_window"],
+        "metrics": ["beta_stats", "assets", "beta_window"],
         "chart": ["bn_returns"]
     }
 
     # ==================================================
-    # HELPERS
+    # CLEAN (NO RECREATION OF TIME)
     # ==================================================
     @staticmethod
-    def _plot_series(fig, series, name):
+    def _clean(series):
 
         if series is None:
-            return False
+            return None
 
         try:
-            if isinstance(series, dict):
-                series = pd.Series(series)
+            s = pd.Series(series)
+        except:
+            return None
 
-            series = pd.Series(series)
-        except Exception:
+        s = s.dropna()
+
+        # 🔥 ONLY CLEAN INDEX, DO NOT REBUILD TIME
+        s.index = pd.to_datetime(s.index, errors="coerce")
+        s = s[s.index.notna()]
+        s = s.sort_index()
+
+        if len(s) < 5:
+            return None
+
+        return s
+
+    # ==================================================
+    @staticmethod
+    def _plot(fig, series, name):
+
+        s = BetaNeutralStrategyChart._clean(series)
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name
             )
         )
         return True
 
+    # ==================================================
     @staticmethod
     def _plot_markers(fig, series, label):
 
-        if series is None:
+        s = BetaNeutralStrategyChart._clean(series)
+        if s is None:
             return
 
-        if isinstance(series, dict):
-            series = pd.Series(series)
+        z = (s - s.mean()) / (s.std() + 1e-8)
+        spikes = np.where(np.abs(z) > 2.0)[0]
 
-        series = pd.Series(series)
-
-        spikes = np.where(np.abs(series / (series.std() + 1e-8)) > 2.0)[0]
+        if len(spikes) == 0:
+            return
 
         fig.add_trace(
             go.Scatter(
-                x=spikes,
-                y=series.iloc[spikes],
+                x=s.index[spikes],
+                y=s.iloc[spikes],
                 mode="markers",
                 name=label,
                 marker=dict(size=6)
@@ -2630,86 +2953,47 @@ class BetaNeutralStrategyChart(StrategyChart):
         )
 
     # ==================================================
-    # MAIN RENDER
-    # ==================================================
     @staticmethod
     def render(item):
 
         fig = go.Figure()
 
-        # -----------------------
-        # DATA CONTRACT
-        # -----------------------
         data = getattr(item, "data", {}) or {}
         metrics = getattr(item, "metrics", {}) or {}
 
         pnl = data.get("pnl")
-        benchmark_key = None
 
-        # extract benchmark dynamically (SPY or config-defined)
-        for k in data.keys():
-            if k != "pnl":
-                benchmark_key = k
-
+        benchmark_key = next((k for k in data.keys() if k != "pnl"), None)
         benchmark = data.get(benchmark_key) if benchmark_key else None
 
-        # -----------------------
-        # SERIES (CONFIG DRIVEN)
-        # -----------------------
-        BetaNeutralStrategyChart._plot_series(fig, pnl, "Beta-Neutral PnL")
+        # ==================================================
+        # PLOT (NO 1970 POSSIBLE)
+        # ==================================================
+        BetaNeutralStrategyChart._plot(fig, pnl, "Beta-Neutral PnL")
 
         if benchmark is not None:
-            BetaNeutralStrategyChart._plot_series(fig, benchmark, benchmark_key)
+            BetaNeutralStrategyChart._plot(fig, benchmark, benchmark_key)
 
-        # -----------------------
-        # METRICS-DRIVEN MARKERS
-        # -----------------------
-        beta_stats = metrics.get("beta_stats", {})
-
-        if isinstance(beta_stats, dict):
-
-            instability_events = []
-
-            for asset, stats in beta_stats.items():
-
-                beta_vol = stats.get("beta_vol", 0)
-
-                if beta_vol > 0.3:
-                    instability_events.append((asset, beta_vol))
-
-            if instability_events:
-                fig.add_trace(
-                    go.Scatter(
-                        x=list(range(len(instability_events))),
-                        y=[v for _, v in instability_events],
-                        mode="markers",
-                        name="Beta Instability",
-                        marker=dict(size=10, color="red")
-                    )
-                )
-
-        # -----------------------
-        # OPTIONAL: SIGNAL SPIKES (FROM STRATEGY OUTPUT)
-        # -----------------------
+        # ==================================================
+        # SIGNALS
+        # ==================================================
         signals = getattr(item, "signals", {}) or {}
 
-        if isinstance(signals, dict):
-            for sym, sig in signals.items():
-                BetaNeutralStrategyChart._plot_markers(fig, sig, f"{sym} spikes")
+        for sym, sig in signals.items():
+            BetaNeutralStrategyChart._plot_markers(fig, sig, f"{sym} spikes")
 
-        # -----------------------
-        # LAYOUT (CONFIG ALIGNED)
-        # -----------------------
+        # ==================================================
+        # FINAL LAYOUT (NO TIME GUESSING)
+        # ==================================================
         fig.update_layout(
             template="plotly_dark",
             title="Beta Neutral Strategy (4Y Performance)",
             xaxis_title="Time",
             yaxis_title="Normalized Value",
-            showlegend=True
+            hovermode="x unified"
         )
 
         return fig
-
 # ==================================================
 # DASHBOARD
 # ==================================================

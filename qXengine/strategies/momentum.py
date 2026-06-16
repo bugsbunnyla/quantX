@@ -26,6 +26,38 @@ import pandas as pd
 #  return	dot(weights, returns)
 #  chart	cumulative sum/product
 # Now UMD rt = Sigma wi,tri,t
+
+import pandas as pd
+import numpy as np
+
+from ..StrategyResult import StrategyResult
+from ..strategies.BaseStrategy import BaseStrategy
+
+import numpy as np
+import pandas as pd
+
+# UMD - winners and losers, quantile based and not raw scores trading 
+# cross sectional ranking Timestamp
+# rank top 20% long, bottom 20% short middle flat
+# institutional data driven
+# implementation = rank assets each day → pick top 20% long / bottom 20% short
+#Correct UMD math (fully fixed) wi,t={+1/nL	​−1/nS	​winners	​losers	,​rt​=∑wi,t * ​ri,t  ,	​Ct​=∏(1+rt​)
+# 1 Cross-sectional return input For each asset i at time t: ri,t(k)	​=Pi,t/Pi,t−k ​−1 In UMD you typically use 12–1 momentum: momentumi,t=ri,t252 −ri,t21
+# 2 Cross-sectional ranking Convert raw momentum into percentile ranks: ranki,t​ = ​ rank(momentumi,t/Nt)  Where:Nt = number of assets at time t rank is ascending order
+# So: 1.0 = best performer 0.0 = worst performer
+#3 Portfolio selection rule  Define thresholds: qhigh=1−0.2=0.8 qlow	​=0.2 Then: Long set Lt={i:ranki,t	​≥qhigh	​}  Short set St={i:ranki,t	​≤qlow	​}
+#4 Position assignment Basic equal-weight version: wi,t	​=⎩⎨⎧	​+1/∣Lt​∣,  1/−∣St∣	​​,0,	​i∈Lt	​i∈St	​otherwise	​
+#5 Daily portfolio return Let ri,t+1	 be next-day return:  rtUMD	​=i=1∑N	​wi,t *	​⋅ri,t+1 This is the true factor return series.
+#6 Optional volatility scaling (recommended)  To stabilize equity curve:r~t	​=rt/σt	​	​or target volatility:rtscaled	​=rt⋅σ∗/σt	​	​
+#7 Cumulative 4-year curve (what you plot) This is what your chart should use:Ct	​=k=1∏t	​(1+rkUMD)  or log form:     Ct	​=k=1∑t	​log(1+rk)
+# Concept	Code equivalent
+#  rank		rank(axis=1, pct=True)
+#  top 20%	>= 0.8
+#  bottom 20%	<= 0.2
+#  weights	equal-weight long/short
+#  return	dot(weights, returns)
+#  chart	cumulative sum/product
+# Now UMD rt = Sigma wi,tri,t
 class UMDMomentum(BaseStrategy):
 
     def run(self):
@@ -162,7 +194,7 @@ class UMDMomentum(BaseStrategy):
         return StrategyResult(
             name="UMDMomentum",
 
-            data=chartdata,
+            data=self.data,
 
             metrics=metrics,
 
@@ -170,6 +202,7 @@ class UMDMomentum(BaseStrategy):
 
             chart=chart
         )
+
 # strategies/time_series_momentum.py
 # Trend Signal - timeseries TSMOM
 # risk normalization and volatility targeting
@@ -301,12 +334,12 @@ class TimeSeriesMomentum(BaseStrategy):
         # ==================================================
         return StrategyResult(
             name="TimeSeriesMomentum",
-
-            data=chartdata,
+            data = self.data,
+            #data=chartdata,
 
             metrics=metrics,
-
-            signals=signals,
-
+        
+            signals=chartdata,
+            #signals=signals,
             chart=chart
         )
