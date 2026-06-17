@@ -340,9 +340,9 @@ class IndustryMomentumStrategy(BaseStrategy):
         }).sort_index()
 
         # 🚨 DEBUG (CRITICAL)
-        print("\n[DEBUG] prices.index (FINAL SOURCE):")
-        print(prices.index[:5])
-        print("dtype:", prices.index.dtype)
+        #print("\n[DEBUG] prices.index (FINAL SOURCE):")
+        #print(prices.index[:5])
+        #print("dtype:", prices.index.dtype)
 
         if prices.empty or prices.shape[1] < 2:
             return StrategyResult(

@@ -75,9 +75,9 @@ class STREV(BaseStrategy):
             for sym, df in clean.items()
         }).sort_index()
 
-        print("\n[DEBUG STREV prices.index]")
-        print(prices.index[:5])
-        print("dtype:", prices.index.dtype)
+        #print("\n[DEBUG STREV prices.index]")
+        #print(prices.index[:5])
+        #print("dtype:", prices.index.dtype)
 
         if prices.empty:
             return StrategyResult(
@@ -180,9 +180,9 @@ class STREV(BaseStrategy):
         # ==================================================
         #  DEBUG BEFORE CHARTDATA
         # ==================================================
-        print("\n[DEBUG STREV BEFORE CHARTDATA]")
-        print("portfolio_curve:", portfolio_curve.index[:5])
-        print("signal_curve:", signal_curve.index[:5])
+        #print("\n[DEBUG STREV BEFORE CHARTDATA]")
+        #print("portfolio_curve:", portfolio_curve.index[:5])
+        #print("signal_curve:", signal_curve.index[:5])
 
         # ==================================================
         # CHARTDATA (CRITICAL FIX)
@@ -196,9 +196,9 @@ class STREV(BaseStrategy):
 
         chartdata = chartdata.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        print("\n[DEBUG FINAL STREV chartdata]")
-        print(chartdata.index[:5])
-        print("dtype:", chartdata.index.dtype)
+        #print("\n[DEBUG FINAL STREV chartdata]")
+        #print(chartdata.index[:5])
+        #print("dtype:", chartdata.index.dtype)
 
         # ==================================================
         # CHART

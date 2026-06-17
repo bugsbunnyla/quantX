@@ -950,20 +950,20 @@ class IndustryMomentumChart(StrategyChart):
         ],
         "signals": [
             "stock_signal",
-            "industry_signal"
+            "industry_signal",
+            "rebalance_events"
         ],
         "chart": [
             "portfolio_momentum",
             "industry_strength",
             "momentum_ma",
             "stock_momentum",
-            "benchmark",
-            "rebalance_events"
+            "benchmark"
         ]
     }
 
     # ==================================================
-    # SAFE SERIES PLOT
+    # STANDARD SERIES
     # ==================================================
     @staticmethod
     def _plot_series(fig, series, name, color=None):
@@ -985,37 +985,117 @@ class IndustryMomentumChart(StrategyChart):
                 y=series.values,
                 mode="lines",
                 name=name,
-                line=dict(color=color) if color else None
+                line=dict(color=color, width=2)
+                if color else dict(width=2)
             )
         )
+
         return True
 
+    @staticmethod
+    def _to_series(x):
+
+        if x is None:
+            return None
+
+        if isinstance(x, pd.DataFrame):
+            x = x.iloc[:, 0]
+
+        if isinstance(x, pd.Series):
+            return x.copy()
+
+        return pd.Series(x)
+
     # ==================================================
-    # STEP SIGNAL (rebalance events)
+    # SAFE MARKERS 
     # ==================================================
     @staticmethod
-    def _plot_step(fig, series, name, color=None):
+    def _plot_markers(fig, signal, label, ref, color, symbol):
 
-        if series is None:
+        signal = IndustryMomentumChart._to_series(signal)
+        ref = IndustryMomentumChart._to_series(ref)
+
+        if signal is None or ref is None:
             return False
 
-        try:
-            series = pd.Series(series).fillna(0)
-        except Exception:
+        signal = signal.astype(float).fillna(0)
+        ref = ref.astype(float)
+
+        active = signal[signal > 0]
+
+        if active.empty:
+            return False
+
+        # safe alignment (NEVER produces 2D)
+        ref_aligned = ref.reindex(active.index)
+
+        # FINAL HARD SAFETY
+        x = ref_aligned.index.astype(str).tolist()
+        y = np.asarray(ref_aligned.values).reshape(-1)
+
+        if len(x) == 0 or len(y) == 0:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
-                mode="lines",
-                line_shape="hv",
-                name=name,
-                opacity=0.5,
-                line=dict(color=color) if color else None
+                x=x,
+                y=y,
+                mode="markers",
+                name=label,
+                marker=dict(
+                    size=12,
+                    color=color,
+                    symbol=symbol,
+                    line=dict(width=1, color="white")
+                )
             )
         )
+
         return True
+
+
+    # ==================================================
+    # REBALANCE EVENTS
+    # ==================================================
+    @staticmethod
+    def _plot_rebalance(fig, rebalance, ref):
+
+        rebalance = IndustryMomentumChart._to_series(rebalance)
+        ref = IndustryMomentumChart._to_series(ref)
+
+        if rebalance is None or ref is None:
+            return False
+
+        rebalance = rebalance.fillna(0)
+
+        active = rebalance[rebalance > 0]
+
+        if active.empty:
+            return False
+
+        ref_aligned = ref.reindex(active.index)
+
+        x = ref_aligned.index.astype(str).tolist()
+        y = np.asarray(ref_aligned.values).reshape(-1)
+
+        fig.add_trace(
+            go.Scatter(
+                x=x,
+                y=y,
+                mode="markers",
+                name="Rebalance Events",
+                marker=dict(
+                    size=12,
+                    color="hotpink",
+                    symbol="x",
+                    line=dict(width=1, color="white")
+                )
+            )
+        )
+
+        return True
+
+
 
     # ==================================================
     # MAIN RENDER
@@ -1025,68 +1105,122 @@ class IndustryMomentumChart(StrategyChart):
 
         fig = go.Figure()
 
-        signals = getattr(item, "signals", None) 
-        metrics = getattr(item, "metrics", None) 
-        chart =getattr(item, "chart", None)
-        chartdata = getattr(chart,"chartdata", None)
+        signals = getattr(item, "signals", None)
+        metrics = getattr(item, "metrics", None)
+        chart = getattr(item, "chart", None)
+
+        chartdata = getattr(chart, "chartdata", None)
+
         if chartdata is None:
-           chartdata = pd.DataFrame()
+            chartdata = pd.DataFrame()
+
         if signals is None:
-           signals = pd.DataFrame()
+            signals = pd.DataFrame()
+
         if metrics is None:
-           metrics = pd.DataFrame()
-        print("[CHART] chartdata", chartdata.__dict__)
+            metrics = pd.DataFrame()
+
         # ==================================================
-        # CORE SERIES
+        # SIGNALS
         # ==================================================
-        portfolio_momentum = chartdata.get("portfolio_momentum")
-        industry_strength= chartdata.get("industry_strength")
-        momentum_ma = chartdata.get("momentum_na")
-        stock_momentum = chartdata.get("stock_momentum")
-        benchmark = chartdata.get("benchmark")
+        stock_signal = signals.get("stock_signal")
+        industry_signal = signals.get("industry_signal")
         rebalance = signals.get("rebalance_events")
 
         # ==================================================
-        # PLOT: INDUSTRY MOMENTUM PORTFOLIO
+        # CHART DATA
+        # ==================================================
+        portfolio_momentum = chartdata.get("portfolio_momentum")
+        industry_strength = chartdata.get("industry_strength")
+
+        # FIXED TYPO
+        momentum_ma = chartdata.get("momentum_ma")
+
+        stock_momentum = chartdata.get("stock_momentum")
+        benchmark = chartdata.get("benchmark")
+        print("[DASHBOARD] ss=", stock_signal, "is=", industry_signal,  "rebalance" , rebalance)
+        # ==================================================
+        # METADATA
+        # ==================================================
+        formation = metrics.get("formation")
+        holding = metrics.get("holding")
+        top_quantile = metrics.get("top_quantile")
+
+        stocks = metrics.get("stocks")
+        industries = metrics.get("industries")
+
+        best = metrics.get("best_industry")
+        worst = metrics.get("worst_industry")
+
+        # ==================================================
+        # LEGEND LABELS
+        # ==================================================
+        portfolio_label = (
+            f"Portfolio "
+            f"(F={formation}, H={holding}, Q={top_quantile})"
+        )
+
+        industry_label = (
+            f"Industry Strength "
+            f"({industries} Industries)"
+        )
+
+        stock_label = (
+            f"Stock Momentum "
+            f"({stocks} Stocks)"
+        )
+        momentum_ma_label = (
+            f"Smooth Momentum MA "
+            f"({stocks} Stocks)"
+        )
+
+        industry_label = (
+            f"Benchmark "
+            f"SPY"
+        )
+
+        # ==================================================
+        # PORTFOLIO
         # ==================================================
         IndustryMomentumChart._plot_series(
             fig,
             portfolio_momentum,
-            "Industry Momentum Portfolio",
+            portfolio_label,
             "cyan"
         )
 
         # ==================================================
-        # PLOT: INDUSTRY STRENGTH INDEX
+        # INDUSTRY STRENGTH
         # ==================================================
         IndustryMomentumChart._plot_series(
             fig,
             industry_strength,
-            "Industry Strength Index",
+            industry_label,
             "orange"
         )
 
         # ==================================================
-        # PLOT: Smoothed Momentum
+        # MOMENTUM MA
         # ==================================================
         IndustryMomentumChart._plot_series(
             fig,
             momentum_ma,
-            "Smoothed Momentum",
+            "Momentum MA",
             "yellow"
         )
 
         # ==================================================
-        # PLOT: STOCK MOMENTUM PORTFOLIO
+        # STOCK MOMENTUM
         # ==================================================
         IndustryMomentumChart._plot_series(
             fig,
             stock_momentum,
-            "Stock Momentum Portfolio",
+            stock_label,
             "crimson"
         )
+
         # ==================================================
-        # PLOT: BENCHMARK (SPY)
+        # BENCHMARK
         # ==================================================
         IndustryMomentumChart._plot_series(
             fig,
@@ -1096,29 +1230,56 @@ class IndustryMomentumChart(StrategyChart):
         )
 
         # ==================================================
-        # PLOT: REBALANCE EVENTS
+        # SIGNALS
         # ==================================================
-        IndustryMomentumChart._plot_step(
+        IndustryMomentumChart._plot_markers(
             fig,
-            rebalance,
-            "Rebalance Events",
-            "pink"
+            industry_signal,
+            "Industry Signal",
+            portfolio_momentum,
+            color="violet",
+            symbol="triangle-up"
+        )
+
+        IndustryMomentumChart._plot_markers(
+            fig,
+            stock_signal,
+            "Stock Signal",
+            portfolio_momentum,
+            color="lime",
+            symbol="circle"
         )
 
         # ==================================================
-        # METRICS ANNOTATION
+        # REBALANCES
         # ==================================================
-        best = metrics.get("best_industry")
-        worst = metrics.get("worst_industry")
+        IndustryMomentumChart._plot_rebalance(
 
-        if best or worst:
+            fig,
+            rebalance,
+            portfolio_momentum
+        )
+
+        # ==================================================
+        # ANNOTATION
+        # ==================================================
+        if best is not None or worst is not None:
+
             fig.add_annotation(
-                text=f"Best: {best} | Worst: {worst}",
+                text=(
+                    f"<b>Best Industry:</b> {best}"
+                    f"<br>"
+                    f"<b>Worst Industry:</b> {worst}"
+                ),
                 x=0.01,
-                y=1.08,
+                y=1.10,
                 xref="paper",
                 yref="paper",
-                showarrow=False
+                showarrow=False,
+                align="left",
+                bgcolor="rgba(30,30,30,0.8)",
+                bordercolor="gray",
+                borderwidth=1
             )
 
         # ==================================================
@@ -1126,11 +1287,17 @@ class IndustryMomentumChart(StrategyChart):
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
-            title=getattr(item, "name", "Industry Momentum Strategy"),
+            title=getattr(
+                item,
+                "name",
+                "Industry Momentum Strategy"
+            ),
             xaxis_title="Date",
             yaxis_title="Normalized Performance",
-            legend_title="Series",
-            hovermode="x unified"
+            legend_title="Series / Signals",
+            hovermode="x unified",
+            showlegend=True,
+            margin=dict(r=220)
         )
 
         return fig
@@ -2909,8 +3076,6 @@ class STREVReversalChart(StrategyChart):
         if metrics is None:
             metrics = {}
 
-        print("[Chart] chartdata:", type(data))
-
         portfolio_curve = data.get("portfolio_curve")
         signal_curve = data.get("signal_curve")
         benchmark_curve = data.get("benchmark")
@@ -3063,7 +3228,7 @@ class TimeSeriesMomentumChart(StrategyChart):
         metrics = getattr(item, "metrics", None) 
         if metrics is None:
            metrics = pd.DataFrame()
-        print("[Chart] chartdata " , data.__dict__)
+
 
         # ==================================================
         # CORE SERIES (FROM STRATEGYRESULT)
@@ -3224,7 +3389,7 @@ class UMDMomentumChart(StrategyChart):
         metrics = getattr(item, "metrics", None) 
         if metrics is None:
            metrics = pd.DataFrame()
-        print("[Chart] chartdata " , data.__dict__)
+
 
         # ==================================================
         # CORE SERIES (FROM STRATEGYRESULT)
@@ -3423,7 +3588,7 @@ class QXDashboardXXX:
         }.get(tab, self.strats)
 
         target.append(obj)
-        print(" strats ", len(self.strats),
+        print("[DASHBOARD] ", len(self.strats),
            " moms ", len(self.moms),
            " revs ", len(self.revs),
            " inst ", len(self.inst))
@@ -3458,7 +3623,7 @@ class QXDashboardXXX:
 
                 name = getattr(item, "name", None)
                 cls = self.STRATEGY_REGISTRY.get(name)
-                print(" processing ", name, cls)
+                print("[DASHBOARD] processing ", name, cls)
                 if cls is None:
                     continue
                 
@@ -3468,8 +3633,8 @@ class QXDashboardXXX:
                 tab_figs.append(fig)
 
             figures[tab_name] = tab_figs
-        for k, v in figures.items():
-            print(k, len(v))
+        #for k, v in figures.items():
+        #    print(k, len(v))
         return figures
 
 

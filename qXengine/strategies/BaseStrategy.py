@@ -165,13 +165,7 @@ class BaseStrategy:
 
             tab = self.cfg.get("tab")
 
-            print(
-                "sr add",
-                self.cfg.get(
-                    "title",
-                    self.__class__.__name__
-                )
-            )
+            #print("sr add", self.cfg.get("title", self.__class__.__name__))
 
             sr.add(tab)
 
