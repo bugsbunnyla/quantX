@@ -991,7 +991,141 @@ STRATEGY_CONFIG = {
       "normalize": False,
       "benchmark": {}
     }
-  },
+  },"PortfolioConstruction": {
+
+    "enabled": False,
+
+    "formation": 252,
+    "rebalance": 21,
+
+    "benchmark": "SPY",
+
+    "plot_enabled": True,
+    "tab": "portfolio",
+    "title": "Portfolio Construction Engine",
+    "description": "Multi-model portfolio optimization framework",
+
+    "merge_mode": "overlay",
+    "output_mode": "merged",
+
+    "models": {
+
+        "risk_parity": { "enabled": True },
+        "minimum_variance": { "enabled": True },
+        "maximum_sharpe": { "enabled": True },
+        "mean_variance": { "enabled": True },
+        "black_litterman": { "enabled": True },
+        "factor_portfolio": { "enabled": True },
+        "quant_finance": { "enabled": True }
+    },
+
+    "chart": [
+
+        {
+            "name": "risk_parity",
+            "enabled": True,
+            "title": "Risk Parity Portfolio",
+            "type": "line",
+
+            "xaxis": {
+                "source": "date",
+                "type": "datetime"
+            },
+
+            "yaxis": {
+                "label": "Cumulative Return",
+                "scale": "linear"
+            },
+
+            "series": [
+                {
+                    "name": "Risk Parity",
+                    "source": "risk_parity",
+                    "style": "line"
+                }
+            ],
+
+            "markers": {
+                "enabled": False
+            },
+
+            "normalize": False
+        },
+
+        {
+            "name": "minimum_variance",
+            "enabled": True,
+            "title": "Minimum Variance Portfolio",
+            "type": "line",
+
+            "xaxis": {
+                "source": "date",
+                "type": "datetime"
+            },
+
+            "yaxis": {
+                "label": "Cumulative Return",
+                "scale": "linear"
+            },
+
+            "series": [
+                {
+                    "name": "Min Variance",
+                    "source": "minimum_variance",
+                    "style": "line"
+                }
+            ],
+
+            "markers": {
+                "enabled": False
+            },
+
+            "normalize": False
+        },
+
+        {
+            "name": "maximum_sharpe",
+            "enabled": True,
+            "title": "Maximum Sharpe Portfolio",
+
+            "type": "line",
+
+            "xaxis": {
+                "source": "date",
+                "type": "datetime"
+            },
+
+            "yaxis": {
+                "label": "Cumulative Return",
+                "scale": "linear"
+            },
+
+            "series": [
+                {
+                    "name": "Max Sharpe",
+                    "source": "maximum_sharpe",
+                    "style": "line"
+                }
+            ]
+        },
+
+        {
+            "name": "benchmark",
+            "enabled": True,
+            "title": "Benchmark",
+
+            "type": "line",
+
+            "series": [
+                {
+                    "name": "SPY",
+                    "source": "benchmark",
+                    "style": "line"
+                }
+            ]
+        }
+    ]
+},
      "InstitutionEngine": {
     "enabled": False,
     "plot_enabled": True,
@@ -1036,6 +1170,5 @@ STRATEGY_CONFIG = {
         "benchmark": "SPY"
     }
 }
-}
-    
+}   
 }

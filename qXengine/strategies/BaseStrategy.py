@@ -177,6 +177,68 @@ class BaseStrategy:
 
         return sr
 
+    def _clip_4y(self, df: pd.DataFrame):
+       df = df.copy()
+
+       df.index = pd.to_datetime(df.index, errors="coerce")
+       df = df[~df.index.isna()]
+
+       df = df.sort_index()
+
+       end = df.index.max()
+       start = end - pd.DateOffset(years=4)
+
+       return df.loc[df.index >= start]
+
+    def _build_chartdata(self, data_dict: dict):
+             """
+                Enforces:
+               index = datetime (x-axis)
+               columns = y-series only
+               no 'date' column allowed
+               no 1970 fallback risk
+               see if we need to replace with this 
+               def _build_chartdata(self, data_dict: dict):
+
+                df = pd.DataFrame(data_dict)
+
+               # -----------------------------
+               #  1. FORCE datetime index (X-AXIS)
+               # -----------------------------
+               df.index = pd.to_datetime(df.index, errors="coerce")
+               df = df[~df.index.isna()]
+               df = df.sort_index()
+
+               # -----------------------------
+               # 2. REMOVE invalid columns
+               # -----------------------------
+               df = df.drop(columns=["date"], errors="ignore")
+
+               # -----------------------------
+               # 3. CLIP TO LAST 4 YEARS (CRITICAL)
+               # -----------------------------
+                end = df.index.max()
+                start = end - pd.DateOffset(years=4)
+
+                df = df.loc[df.index >= start]
+
+                 return df
+
+
+             """
+
+             df = pd.DataFrame(data_dict)
+
+             # FORCE datetime index safety
+             df.index = pd.to_datetime(df.index, errors="coerce")
+             df = df[~df.index.isna()]
+             df = df.sort_index()
+
+             # REMOVE accidental date columns if any
+             df = df.drop(columns=["date"], errors="ignore")
+
+             return df
+
     # =====================================================
     # REQUIRED OVERRIDE
     # =====================================================

@@ -58,151 +58,302 @@ import pandas as pd
 #  return	dot(weights, returns)
 #  chart	cumulative sum/product
 # Now UMD rt = Sigma wi,tri,t
+import numpy as np
+import pandas as pd
+
+from .BaseStrategy import BaseStrategy
+from ..StrategyResult import StrategyResult
+
+
+import numpy as np
+import pandas as pd
+
+from .BaseStrategy import BaseStrategy
+from ..StrategyResult import StrategyResult
+
+
 class UMDMomentum(BaseStrategy):
 
+    # =========================================================
+    # PRICE MATRIX BUILDER (CRITICAL FIX)
+    # =========================================================
+    def _build_prices(self):
+
+        frames = {}
+
+        for sym, df in self.data.items():
+
+            if "close" not in df.columns:
+                continue
+
+            tmp = df.copy()
+
+            if "date" in tmp.columns:
+
+                tmp["date"] = pd.to_datetime(
+                    tmp["date"],
+                    errors="coerce"
+                )
+
+                tmp = tmp.dropna(subset=["date"])
+
+                tmp = tmp[
+                    tmp["date"] > pd.Timestamp("2000-01-01")
+                ]
+
+                tmp = tmp.sort_values("date")
+
+                tmp = tmp.set_index("date")
+
+            elif not isinstance(
+                tmp.index,
+                pd.DatetimeIndex
+            ):
+                continue
+
+            frames[sym] = tmp["close"]
+
+        if not frames:
+            return pd.DataFrame()
+
+        prices = pd.concat(
+            frames,
+            axis=1
+        )
+
+        prices = prices.sort_index()
+
+        end = prices.index.max()
+        start = end - pd.DateOffset(years=4)
+
+        prices = prices.loc[start:end]
+
+        return prices
+
+
+    # =========================================================
+    # CHARTDATA BUILDER
+    # =========================================================
+    def _build_chartdata(self, data_dict):
+
+        df = pd.DataFrame(data_dict)
+
+        if not isinstance(
+            df.index,
+            pd.DatetimeIndex
+        ):
+            raise ValueError(
+                "chartdata index must be DatetimeIndex"
+            )
+
+        df = df.sort_index()
+
+        df = df.replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
+
+        return df
+
+
+    # =========================================================
+    # MAIN RUN
+    # =========================================================
     def run(self):
 
-        # ==================================================
-        # CONFIG
-        # ==================================================
-        formation = self.cfg.get("formation", 252)
-        skip = self.cfg.get("skip_month", 21)
-        holding = self.cfg.get("holding", 21)
+        formation = self.cfg.get(
+            "formation",
+            252
+        )
 
-        top_q = self.cfg.get("top_quantile", 0.2)
-        bottom_q = self.cfg.get("bottom_quantile", 0.2)
+        skip = self.cfg.get(
+            "skip_month",
+            21
+        )
 
-        chart_cfg = self.get_cfg("chart", {})
-        series_cfg = chart_cfg.get("series", [])
+        top_q = self.cfg.get(
+            "top_quantile",
+            0.20
+        )
 
-        # ==================================================
-        # PRICE MATRIX
-        # ==================================================
-        prices = pd.DataFrame({
-            sym: df["close"]
-            for sym, df in self.data.items()
-            if "close" in df.columns
-        })
+        bottom_q = self.cfg.get(
+            "bottom_quantile",
+            0.20
+        )
 
-        if prices.empty:
+        prices = self._build_prices()
+
+        if (
+            prices.empty
+            or len(prices) < formation
+        ):
             return StrategyResult(
                 name="UMDMomentum",
-                data={},
-                metrics={"error": "no price data"},
+                data=self.data,
+                metrics={
+                    "error":
+                    "insufficient data"
+                },
                 signals={},
                 chart=None
             )
 
-        returns = prices.pct_change().fillna(0)
+        returns = (
+            prices
+            .pct_change()
+            .fillna(0)
+        )
 
-        # ==================================================
-        # MOMENTUM (12-1 STYLE)
-        # ==================================================
-        formation_ret = prices.pct_change(formation)
-        skip_ret = prices.pct_change(skip)
+        formation_ret = (
+            prices
+            .pct_change(formation)
+        )
 
-        raw_momentum = formation_ret - skip_ret
+        skip_ret = (
+            prices
+            .pct_change(skip)
+        )
 
-        # ==================================================
-        # CROSS-SECTIONAL RANKING
-        # ==================================================
-        ranks = raw_momentum.rank(axis=1, pct=True)
+        raw_momentum = (
+            formation_ret
+            - skip_ret
+        )
 
-        # ==================================================
-        # PORTFOLIO BUILD
-        # ==================================================
+        ranks = raw_momentum.rank(
+            axis=1,
+            pct=True
+        )
+
         portfolio_returns = []
-        signals = {}
 
-        for t in ranks.index:
+        for t in prices.index:
+
+            if t not in ranks.index:
+                portfolio_returns.append(0)
+                continue
 
             row_rank = ranks.loc[t]
             row_ret = returns.loc[t]
 
-            long_mask = row_rank >= (1 - top_q)
-            short_mask = row_rank <= bottom_q
+            long_mask = (
+                row_rank >=
+                (1 - top_q)
+            )
+
+            short_mask = (
+                row_rank <=
+                bottom_q
+            )
 
             n_long = long_mask.sum()
             n_short = short_mask.sum()
 
-            if n_long == 0 or n_short == 0:
-                portfolio_returns.append(0.0)
+            if (
+                n_long == 0
+                or n_short == 0
+            ):
+                portfolio_returns.append(0)
                 continue
 
-            weights = pd.Series(0.0, index=row_rank.index)
-            weights[long_mask] = 1.0 / n_long
-            weights[short_mask] = -1.0 / n_short
+            w = pd.Series(
+                0.0,
+                index=row_rank.index
+            )
 
-            signals[t] = weights
+            w[long_mask] = (
+                1.0 / n_long
+            )
 
-            portfolio_returns.append((weights * row_ret).sum())
+            w[short_mask] = (
+                -1.0 / n_short
+            )
+
+            portfolio_returns.append(
+                (w * row_ret).sum()
+            )
 
         portfolio_returns = pd.Series(
             portfolio_returns,
-            index=ranks.index
-        ).fillna(0.0)
-
-        # ==================================================
-        # EQUITY CURVE (4Y)
-        # ==================================================
-        portfolio_curve = (1 + portfolio_returns).cumprod()
-
-        # ==================================================
-        # BENCHMARK (SPY)
-        # ==================================================
-        benchmark_curve = None
-        if "SPY" in prices.columns:
-            spy_ret = prices["SPY"].pct_change().fillna(0)
-            benchmark_curve = (1 + spy_ret).cumprod()
-            benchmark_curve = benchmark_curve.reindex(portfolio_curve.index).ffill()
-
-        # ==================================================
-        # CHARTDATA (SOURCE OF TRUTH FOR CHART)
-        # ==================================================
-        chartdata = {
-            "portfolio": portfolio_curve,
-            "benchmark": benchmark_curve
-        }
-
-        # ==================================================
-        # BUILD CHART OBJECT (CRITICAL FIX)
-        # ==================================================
-        chart = self.build_chart(
-            charttype=chart_cfg.get("type", "line"),
-            chartmode="line+markers",
-            title=chart_cfg.get("title", "UMD Momentum Strategy"),
-            chartdata=chartdata,
-            series=series_cfg
+            index=prices.index
         )
 
-        # ==================================================
-        # METRICS
-        # ==================================================
+        portfolio_curve = (
+            1 + portfolio_returns
+        ).cumprod()
+
+        benchmark = None
+
+        if "SPY" in prices.columns:
+
+            benchmark = (
+                1
+                + prices["SPY"]
+                .pct_change()
+                .fillna(0)
+            ).cumprod()
+
+            benchmark = benchmark.reindex(
+                portfolio_curve.index
+            ).ffill()
+
+        chartdata = self._build_chartdata({
+
+            "portfolio":
+                portfolio_curve,
+
+            "benchmark":
+                benchmark
+
+        })
+
+        chart = self.build_chart(
+
+            chartdata=chartdata,
+
+            series=self.cfg["chart"]["series"],
+
+            title=self.cfg["title"],
+
+            charttype=self.cfg["chart"]["type"],
+
+            chartmode="line"
+        )
+
         metrics = {
-            "formation": formation,
-            "skip_month": skip,
-            "holding": holding,
-            "top_quantile": top_q,
-            "bottom_quantile": bottom_q,
-            "assets": len(prices.columns),
-            "total_return": float(portfolio_curve.iloc[-1] - 1)
+
+            "formation":
+                formation,
+
+            "skip_month":
+                skip,
+
+            "top_quantile":
+                top_q,
+
+            "bottom_quantile":
+                bottom_q,
+
+            "assets":
+                len(prices.columns),
+
+            "return":
+                float(
+                    portfolio_curve.iloc[-1] - 1
+                )
         }
 
-        # ==================================================
-        # FINAL RESULT (NOW INCLUDES CHART OBJECT)
-        # ==================================================
         return StrategyResult(
+
             name="UMDMomentum",
 
             data=self.data,
 
             metrics=metrics,
 
-            signals=signals,
+            signals={},
 
             chart=chart
         )
-
 # strategies/time_series_momentum.py
 # Trend Signal - timeseries TSMOM
 # risk normalization and volatility targeting
@@ -242,104 +393,236 @@ import pandas as pd
 from .BaseStrategy import BaseStrategy
 from ..StrategyResult import StrategyResult
 
+import numpy as np
+import pandas as pd
+
+from .BaseStrategy import BaseStrategy
+from ..StrategyResult import StrategyResult
+
 
 class TimeSeriesMomentum(BaseStrategy):
 
+    # =========================================================
+    # PRICE CLEANER
+    # =========================================================
+    def _prepare_symbol(self, df):
+
+        tmp = df.copy()
+
+        if "date" in tmp.columns:
+
+            tmp["date"] = pd.to_datetime(
+                tmp["date"],
+                errors="coerce"
+            )
+
+            tmp = tmp.dropna(
+                subset=["date"]
+            )
+
+            tmp = tmp[
+                tmp["date"] >
+                pd.Timestamp("2000-01-01")
+            ]
+
+            tmp = tmp.sort_values(
+                "date"
+            )
+
+            tmp = tmp.set_index(
+                "date"
+            )
+
+        tmp = tmp.sort_index()
+
+        return tmp
+
+
+    # =========================================================
+    # CHARTDATA
+    # =========================================================
+    def _build_chartdata(self, data_dict):
+
+        df = pd.DataFrame(data_dict)
+
+        if not isinstance(
+            df.index,
+            pd.DatetimeIndex
+        ):
+            raise ValueError(
+                "chartdata index must be DatetimeIndex"
+            )
+
+        df = df.sort_index()
+
+        df = df.replace(
+            [np.inf, -np.inf],
+            np.nan
+        )
+
+        return df
+
+
+    # =========================================================
+    # MAIN RUN
+    # =========================================================
     def run(self):
 
-        formation = self.cfg.get("formation", 252)
-        vol_target = self.cfg.get("vol_target", 0.15)
-        lookback_vol = self.cfg.get("lookback_vol", 63)
+        formation = self.cfg.get(
+            "formation",
+            252
+        )
 
-        chart_cfg = self.get_cfg("chart", {})
-        series_cfg = chart_cfg.get("series", [])
+        vol_target = self.cfg.get(
+            "vol_target",
+            0.15
+        )
+
+        lookback_vol = self.cfg.get(
+            "lookback_vol",
+            63
+        )
 
         signals = {}
-        regime_switches = {}
 
-        # ==================================================
-        # BUILD SIGNALS
-        # ==================================================
         for sym, df in self.data.items():
 
             if "close" not in df.columns:
                 continue
 
-            df = df.copy()
-            df["ret"] = df["close"].pct_change()
+            df = self._prepare_symbol(df)
 
-            momentum = df["close"].pct_change(formation)
-            vol = df["ret"].rolling(lookback_vol).std()
+            ret = (
+                df["close"]
+                .pct_change()
+            )
 
-            signal = (momentum / (vol + 1e-8)) * vol_target
+            mom = (
+                df["close"]
+                .pct_change(
+                    formation
+                )
+            )
+
+            vol = (
+                ret
+                .rolling(
+                    lookback_vol
+                )
+                .std()
+            )
+
+            signal = (
+                mom /
+                (vol + 1e-8)
+            ) * vol_target
 
             signal = signal.fillna(0)
 
             signals[sym] = signal
 
-            # regime detection (optional markers)
-            regime_switches[sym] = (np.sign(signal).diff().fillna(0) != 0).astype(int)
+        if not signals:
 
-        # ==================================================
-        # PORTFOLIO AGGREGATION (IMPORTANT FIX)
-        # ==================================================
-        signal_df = pd.DataFrame(signals).fillna(0)
+            return StrategyResult(
+                name="TimeSeriesMomentum",
+                data=self.data,
+                metrics={
+                    "error":
+                    "no signals"
+                },
+                signals={},
+                chart=None
+            )
 
-        portfolio_signal = signal_df.mean(axis=1)
+        signal_df = pd.DataFrame(
+            signals
+        ).fillna(0)
 
-        # ==================================================
-        # BENCHMARK (SPY)
-        # ==================================================
-        benchmark = self.get_cfg(
-            "benchmark",
-            self.runtime_cfg.get("benchmark", "SPY")
+        signal_df = signal_df.sort_index()
+
+        end = signal_df.index.max()
+        start = end - pd.DateOffset(
+            years=4
         )
 
-        benchmark_series = None
-        if benchmark in self.data:
-            benchmark_series = self.data[benchmark]["close"].pct_change().cumsum()
+        signal_df = signal_df.loc[
+            start:end
+        ]
 
-        # ==================================================
-        # CHARTDATA (CFG DRIVEN)
-        # ==================================================
-        chartdata = {
-            "signal": portfolio_signal,
-            "benchmark": benchmark_series,
-            "regime_switches": pd.Series(portfolio_signal).diff().fillna(0)
-        }
+        portfolio_signal = (
+            signal_df.mean(axis=1)
+        )
 
-        # ==================================================
-        # CHART OBJECT (REQUIRED)
-        # ==================================================
+        benchmark = None
+
+        if "SPY" in self.data:
+
+            spy = self._prepare_symbol(
+                self.data["SPY"]
+            )
+
+            benchmark = (
+                spy["close"]
+                .pct_change()
+                .cumsum()
+            )
+
+            benchmark = benchmark.reindex(
+                portfolio_signal.index
+            ).ffill()
+
+        chartdata = self._build_chartdata({
+
+            "signal":
+                portfolio_signal,
+
+            "benchmark":
+                benchmark,
+
+            "regime_switches":
+                portfolio_signal
+                .diff()
+                .fillna(0)
+
+        })
+
         chart = self.build_chart(
-            charttype=chart_cfg.get("type", "time_series"),
-            chartmode="line+markers",
-            title=chart_cfg.get("title"),
+
             chartdata=chartdata,
-            series=series_cfg
+
+            series=self.cfg["chart"]["series"],
+
+            title=self.cfg["title"],
+
+            charttype=self.cfg["chart"]["type"],
+
+            chartmode="line"
         )
 
-        # ==================================================
-        # METRICS
-        # ==================================================
         metrics = {
-            "formation": formation,
-            "vol_target": vol_target,
-            "lookback_vol": lookback_vol,
-            "assets": len(signals)
+
+            "formation":
+                formation,
+
+            "vol_target":
+                vol_target,
+
+            "lookback_vol":
+                lookback_vol,
+
+            "assets":
+                len(signals)
         }
 
-        # ==================================================
-        # RESULT
-        # ==================================================
         return StrategyResult(
+
             name="TimeSeriesMomentum",
-            data = self.data,
-            #data=chartdata,
+
+            data=self.data,
 
             metrics=metrics,
-        
-            signals=chartdata,
-            #signals=signals,
+
+            signals=signals,
+
             chart=chart
         )

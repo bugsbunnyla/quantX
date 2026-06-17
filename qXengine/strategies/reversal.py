@@ -17,8 +17,32 @@ import pandas as pd
 #4.z-Score Zt​=σt​Rt​−μt​​
 #5.Reversal signal = Signalt​=−Zt​ Positive signal: oversold → buy Negative signal: overbought → short
 #6.Portfolio Curve Portfoliot​=i∑​Signali,t ​× Returni,t+5	​then Curvet​=∏(1+Portfoliot​)
+
 class STREV(BaseStrategy):
 
+    # ==================================================
+    # SAFE NORMALIZER (CRITICAL FIX)
+    # ==================================================
+    def _normalize_df(self, df):
+
+        df = df.copy()
+
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
+            df = df.set_index("date")
+        else:
+            df.index = pd.to_datetime(df.index, errors="coerce")
+
+        df = df[~df.index.isna()]
+        df = df.sort_index()
+
+        return df
+
+
+    # ==================================================
+    # MAIN
+    # ==================================================
     def run(self):
 
         lookback = self.cfg.get("lookback", 20)
@@ -33,77 +57,85 @@ class STREV(BaseStrategy):
             self.runtime_cfg.get("benchmark", "SPY")
         )
 
-        signals = {}
-        zscores = {}
+        # ==================================================
+        # STEP 1: NORMALIZE ALL INPUT DATA
+        # ==================================================
+        clean = {}
 
-        # ==========================================
-        # BUILD SIGNALS
-        # ==========================================
         for sym, df in self.data.items():
-
             if "close" not in df.columns:
                 continue
+            clean[sym] = self._normalize_df(df)
 
-            df = df.copy()
+        # ==================================================
+        # STEP 2: MASTER PRICE MATRIX (CRITICAL FIX)
+        # ==================================================
+        prices = pd.DataFrame({
+            sym: df["close"]
+            for sym, df in clean.items()
+        }).sort_index()
 
-            df["ret"] = df["close"].pct_change()
+        print("\n[DEBUG STREV prices.index]")
+        print(prices.index[:5])
+        print("dtype:", prices.index.dtype)
 
-            #
-            # STREV RETURN
-            #
-            reversal_return = df["close"].pct_change(lookback)
-
-            #
-            # TRUE Z-SCORE
-            #
-            mean_ret = reversal_return.rolling(zscore_window).mean()
-            std_ret = reversal_return.rolling(zscore_window).std()
-
-            zscore = (
-                (reversal_return - mean_ret)
-                /
-                (std_ret + 1e-8)
-            )
-
-            #
-            # CONTRARIAN SIGNAL
-            #
-            signal = -zscore
-
-            signals[sym] = signal.fillna(0)
-            zscores[sym] = zscore.fillna(0)
-
-        if not signals:
-
+        if prices.empty:
             return StrategyResult(
                 name="STREV",
                 data={},
-                metrics={"error": "No signals"},
+                metrics={"error": "No data"},
                 signals={},
                 chart=None
             )
 
-        # ==========================================
-        # PORTFOLIO
-        # ==========================================
+        # ==================================================
+        # RETURNS
+        # ==================================================
+        returns = prices.pct_change()
+
+        # ==================================================
+        # SIGNAL STORAGE
+        # ==================================================
+        signals = {}
+        zscores = {}
+
+        # ==================================================
+        # BUILD SIGNALS (UNCHANGED LOGIC)
+        # ==================================================
+        for sym, df in clean.items():
+
+            df = df.reindex(prices.index).ffill()
+
+            reversal_return = df["close"].pct_change(lookback)
+
+            mean_ret = reversal_return.rolling(zscore_window).mean()
+            std_ret = reversal_return.rolling(zscore_window).std()
+
+            zscore = (reversal_return - mean_ret) / (std_ret + 1e-8)
+
+            signal = -zscore.fillna(0)
+
+            signals[sym] = signal
+            zscores[sym] = zscore.fillna(0)
+
+        # ==================================================
+        # SIGNAL MATRIX (FIXED INDEX)
+        # ==================================================
         signal_df = pd.DataFrame(signals).fillna(0)
+        signal_df = signal_df.reindex(prices.index).fillna(0)
 
         signal_curve = signal_df.mean(axis=1)
 
-        #
-        # Forward returns
-        #
+        # ==================================================
+        # PORTFOLIO RETURNS
+        # ==================================================
         portfolio_returns = []
 
-        common_index = signal_curve.index
-
-        for dt in common_index:
+        for dt in prices.index:
 
             pnl = []
 
-            for sym in signals:
-
-                df = self.data[sym]
+            for sym, df in clean.items():
 
                 if dt not in df.index:
                     continue
@@ -115,105 +147,82 @@ class STREV(BaseStrategy):
 
                 future_ret = (
                     df["close"].iloc[loc + holding]
-                    /
-                    df["close"].iloc[loc]
+                    / df["close"].iloc[loc]
                     - 1
                 )
 
-                pnl.append(
-                    signals[sym].loc[dt] * future_ret
-                )
+                pnl.append(signals[sym].loc[dt] * future_ret)
 
-            portfolio_returns.append(
-                np.mean(pnl) if pnl else 0
-            )
+            portfolio_returns.append(np.mean(pnl) if pnl else 0)
 
         portfolio_returns = pd.Series(
             portfolio_returns,
-            index=common_index
+            index=prices.index
         )
 
-        portfolio_curve = (
-            1 + portfolio_returns.fillna(0)
-        ).cumprod()
+        portfolio_curve = (1 + portfolio_returns.fillna(0)).cumprod()
 
-        # ==========================================
+        # ==================================================
         # BENCHMARK
-        # ==========================================
+        # ==================================================
         benchmark_curve = None
 
-        if benchmark in self.data:
+        if benchmark in prices.columns:
 
-            benchmark_curve = (
-                1
-                +
-                self.data[benchmark]["close"]
-                .pct_change()
-                .fillna(0)
-            ).cumprod()
+            benchmark_curve = (1 + prices[benchmark].pct_change().fillna(0)).cumprod()
+            benchmark_curve = benchmark_curve.reindex(prices.index).ffill()
 
-            benchmark_curve = benchmark_curve.reindex(
-                portfolio_curve.index
-            ).ffill()
+        # ==================================================
+        # ENTRY/EXIT EVENTS
+        # ==================================================
+        entry_exit_events = np.sign(signal_curve).diff().fillna(0)
 
-        # ==========================================
-        # ENTRY / EXIT EVENTS
-        # ==========================================
-        entry_exit_events = (
-            np.sign(signal_curve)
-            .diff()
-            .fillna(0)
-        )
+        # ==================================================
+        #  DEBUG BEFORE CHARTDATA
+        # ==================================================
+        print("\n[DEBUG STREV BEFORE CHARTDATA]")
+        print("portfolio_curve:", portfolio_curve.index[:5])
+        print("signal_curve:", signal_curve.index[:5])
 
-        # ==========================================
-        # CHART DATA
-        # ==========================================
-        chartdata = {
-            "portfolio_curve": portfolio_curve,
-            "signal_curve": signal_curve,
-            "benchmark": benchmark_curve,
-            "entry_exit_events": entry_exit_events
-        }
+        # ==================================================
+        # CHARTDATA (CRITICAL FIX)
+        # ==================================================
+        chartdata = pd.DataFrame(index=prices.index)
 
+        chartdata["portfolio_curve"] = portfolio_curve
+        chartdata["signal_curve"] = signal_curve
+        chartdata["benchmark"] = benchmark_curve
+        chartdata["entry_exit_events"] = entry_exit_events
+
+        chartdata = chartdata.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+        print("\n[DEBUG FINAL STREV chartdata]")
+        print(chartdata.index[:5])
+        print("dtype:", chartdata.index.dtype)
+
+        # ==================================================
+        # CHART
+        # ==================================================
         chart = self.build_chart(
-            charttype=chart_cfg.get(
-                "type",
-                "time_series"
-            ),
-            chartmode=chart_cfg.get(
-                "mode",
-                "line+markers"
-            ),
-            title=chart_cfg.get(
-                "title",
-                "STREV Mean Reversion"
-            ),
             chartdata=chartdata,
-            series=series_cfg
+            series=series_cfg,
+            title=self.cfg.get("title"),
+            charttype=chart_cfg.get("type", "time_series"),
+            chartmode=chart_cfg.get("mode", "line+markers")
         )
-
-        metrics = {
-            "lookback": lookback,
-            "zscore_window": zscore_window,
-            "holding": holding,
-            "assets": len(signals),
-            "total_return": float(
-                portfolio_curve.iloc[-1] - 1
-            )
-        }
 
         return StrategyResult(
             name="STREV",
-
-            data=chartdata,
-
-            metrics=metrics,
-
+            data=self.data,
+            metrics={
+                "lookback": lookback,
+                "zscore_window": zscore_window,
+                "holding": holding
+            },
             signals=signals,
-
             chart=chart
         )
-       
+
 # strategies/intraday_reversal.py
 
 import numpy as np
@@ -281,13 +290,25 @@ import pandas as pd
 
 from ..StrategyResult import StrategyResult
 from ..strategies.BaseStrategy import BaseStrategy
-
-
 class IntradayReversal(BaseStrategy):
 
-    # =========================================================
-    # BUILD CHART (STRICT CONTRACT)
-    # =========================================================
+    def _safe_datetime_index(self, index):
+
+        index = pd.Index(index)
+
+        if isinstance(index, pd.RangeIndex) or np.issubdtype(index.dtype, np.integer):
+            return pd.date_range(
+                end=pd.Timestamp.today(),
+                periods=len(index),
+                freq="D"
+            )
+
+        index = pd.to_datetime(index, errors="coerce")
+        index = index[~pd.isna(index)]
+        index = index[index > pd.Timestamp("2000-01-01")]
+
+        return index.sort_values()
+
     def build_chart(
         self,
         chartdata=None,
@@ -296,43 +317,33 @@ class IntradayReversal(BaseStrategy):
         title=None,
         xaxis=None,
         yaxis=None,
-        series=None
+        series=None,
+        chartcfg=None
     ):
-
-        chart_cfg = self.cfg.get("chart", [])
-        chart_cfg = chart_cfg[0] if isinstance(chart_cfg, list) and chart_cfg else chart_cfg
 
         return StrategyChart(
             charttype=charttype,
             chartmode=chartmode,
             title=title,
-            xaxis=xaxis or chart_cfg.get("xaxis", {}).get("source", "date"),
-            yaxis=yaxis or chart_cfg.get("yaxis", {}).get("label", "value"),
+            xaxis=xaxis,
+            yaxis=yaxis,
             chartdata=chartdata,
             series=series or []
         )
 
-    # =========================================================
-    # MAIN STRATEGY
-    # =========================================================
     def run(self):
 
         cfg = self.cfg
-
-        charts = cfg["chart"]
-        active_charts = [c for c in charts if c.get("enabled", False)]
-
-        chartcfg = self.get_cfg("chart", [])
 
         lookback = cfg["lookback"]
         vol_window = cfg["volume_window"]
         threshold = cfg["threshold"]
 
-        # =========================================================
-        # BASE DATA OUTPUT (PER SYMBOL MERGED LATER)
-        # =========================================================
+        charts = cfg.get("chart", [])
+        active_charts = [c for c in charts if c.get("enabled", False)]
+
         frames = []
-        signals = {}
+        signal_map = {}
 
         for sym, df in self.data.items():
 
@@ -340,12 +351,18 @@ class IntradayReversal(BaseStrategy):
                 continue
 
             df = df.copy()
-            df["symbol"] = sym
+
+            df.index = self._safe_datetime_index(df.index)
 
             df["ret"] = df["close"].pct_change()
 
             reversal = -df["close"].pct_change(lookback)
-            volatility = df["ret"].rolling(vol_window).std()
+
+            volatility = (
+                df["ret"]
+                .rolling(vol_window)
+                .std()
+            )
 
             volume_z = (
                 (df["volume"] - df["volume"].rolling(vol_window).mean())
@@ -355,63 +372,72 @@ class IntradayReversal(BaseStrategy):
             z_vol = reversal / (volatility + 1e-8)
             z_volume = reversal * volume_z
 
-            # =====================================================
-            # FULL FEATURE SPACE (ALWAYS COMPLETE)
-            # =====================================================
+            # REQUIRED BY CONFIG
+            df["volatility"] = volatility
             df["z_vol"] = z_vol
             df["z_volume"] = z_volume
-            df["volatility"] = volatility
 
             df["reversal_event_vol"] = np.abs(z_vol) > threshold
             df["reversal_event_volume"] = np.abs(z_volume) > threshold
 
             frames.append(df)
 
-            # signal per symbol
-            signals[sym] = pd.Series(
-                np.sign(z_vol.fillna(0) + z_volume.fillna(0)),
-                index=df.index
+            signal_map[sym] = np.sign(
+                z_vol.fillna(0)
             )
 
-        # =========================================================
-        # MERGE ALL SYMBOLS INTO SINGLE CHART SPACE
-        # =========================================================
+        if not frames:
+            return StrategyResult(
+                name=self.__class__.__name__,
+                data=self.data
+            )
+
         merged_df = pd.concat(frames)
 
-        # =========================================================
-        # SERIES (UNION OF ENABLED CHARTS)
-        # =========================================================
+        merged_df = merged_df[
+            ~merged_df.index.duplicated(keep="last")
+        ]
+
+        merged_df = merged_df.sort_index()
+
+        master_index = pd.to_datetime(
+            merged_df.index
+        )
+
+        merged_df = merged_df.reindex(
+            master_index,
+            method="ffill"
+        )
+
+        # unique configured series
+        seen = set()
         series = []
+
         for c in active_charts:
-            series.extend(c.get("series", []))
 
-        # =========================================================
-        # AXIS RESOLUTION (SAFE)
-        # =========================================================
-        def resolve_axis(key, default):
-            vals = [c.get(key) for c in active_charts if c.get(key)]
-            if not vals:
-                return default
-            return vals[0] if all(v == vals[0] for v in vals) else default
+            for s in c.get("series", []):
 
-        # =========================================================
-        # BUILD FINAL CHART
-        # =========================================================
+                source = s.get("source")
+
+                if source in seen:
+                    continue
+
+                seen.add(source)
+                series.append(s)
+
         chart = self.build_chart(
-            charttype=chartcfg[0]["type"] if chartcfg else "line",
-            chartmode="lines+markers",
-            title=cfg.get("title", "Intraday Reversal"),
-
-            xaxis=resolve_axis("xaxis", "date"),
-            yaxis=resolve_axis("yaxis", "value"),
-
+            charttype="line",
+            chartmode="lines",
+            title=cfg.get(
+                "title",
+                "Intraday Reversal"
+            ),
+            xaxis="date",
+            yaxis="value",
             chartdata=merged_df,
             series=series
         )
 
-        # =========================================================
-        # RETURN RESULT
-        # =========================================================
         return StrategyResult(
             name=self.__class__.__name__,
             data=self.data,
@@ -419,8 +445,8 @@ class IntradayReversal(BaseStrategy):
                 "lookback": lookback,
                 "volume_window": vol_window,
                 "threshold": threshold,
-                "active_charts": [c["name"] for c in active_charts]
+                "symbols": len(self.data)
             },
-            signals=signals,
+            signals=signal_map,
             chart=chart
         )
