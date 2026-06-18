@@ -366,7 +366,13 @@ STRATEGY_CONFIG = {
             "name": "Rolling Volatility",
             "source": "volatility",
             "style": "line"
+          },
+          {
+            "name": "Reversal Event Volatility",
+            "source": "reversal_event_vol",
+            "style": "triangle-down"
           }
+
         ],
 
         "markers": {
@@ -406,13 +412,18 @@ STRATEGY_CONFIG = {
             "name": "Rolling Volatility",
             "source": "volatility",
             "style": "line"
+          },
+          {
+            "name": "Reversal Event Volume",
+            "source": "reversal_event_volume",
+            "style": "triangle-up"
           }
         ],
 
         "markers": {
           "enabled": True,
           "source": "reversal_event_volume",
-          "style": "triangle-down"
+          "style": "triangle-up"
         },
 
         "normalize": False

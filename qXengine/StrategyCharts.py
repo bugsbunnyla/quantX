@@ -1138,7 +1138,7 @@ class IndustryMomentumChart(StrategyChart):
 
         stock_momentum = chartdata.get("stock_momentum")
         benchmark = chartdata.get("benchmark")
-        print("[DASHBOARD] ss=", stock_signal, "is=", industry_signal,  "rebalance" , rebalance)
+        
         # ==================================================
         # METADATA
         # ==================================================
@@ -2550,7 +2550,9 @@ class IntradayReversalChart(StrategyChart):
         "chart": [
             "z_vol",
             "z_volume",
-            "volatility"
+            "volatility",
+            "reversal_event_vol",
+            "reversal_event_volume"
         ],
         "metrics": [
             "lookback",
@@ -2706,51 +2708,51 @@ class IntradayReversalChart(StrategyChart):
 
         # =====================================================
         # PASS 1
-        # STATIC_MAP FALLBACK VALUES
+        # STATIC CHART ATTRIBUTES
         # =====================================================
 
-        for field in IntradayReversalChart.STATIC_MAP.get(
-            "chart",
-            []
-        ):
+        #for field in IntradayReversalChart.STATIC_MAP.get(
+        #    "chart",
+        #    []
+        #):
 
-            value = IntradayReversalChart.get_attr_or_key(
-                chart,
-                field
-            )
+        #    value = IntradayReversalChart.get_attr_or_key(
+        #        chart,
+        #        field
+        #    )
 
-            if value is None:
-                continue
+        #    if value is None:
+        #        continue
 
-            if isinstance(value, dict):
+        #    if isinstance(value, dict):
 
-                IntradayReversalChart._plot_dict(
-                    fig,
-                    value,
-                    field
-                )
+        #        IntradayReversalChart._plot_dict(
+        #            fig,
+        #            value,
+        #            field
+        #        )
 
-                continue
+        #        continue
 
-            if isinstance(
-                value,
-                (
-                    list,
-                    tuple,
-                    np.ndarray,
-                    pd.Series
-                )
-            ):
+        #    if isinstance(
+        #        value,
+        #        (
+        #            list,
+        #            tuple,
+        #            np.ndarray,
+        #            pd.Series
+        #        )
+        #    ):
 
-                IntradayReversalChart._plot_series(
-                    fig,
-                    value,
-                    field
-                )
+        #        IntradayReversalChart._plot_series(
+        #            fig,
+        #            value,
+        #            field
+        #        )
 
         # =====================================================
         # PASS 2
-        # CONFIG-DRIVEN DATAFRAME SERIES
+        # DATAFRAME SERIES
         # =====================================================
 
         df = getattr(chart, "chartdata", None)
@@ -2765,93 +2767,107 @@ class IntradayReversalChart(StrategyChart):
                 )
             )
 
-            for s in getattr(chart, "series", []):
+            # ---------------------------------------------
+            # Normal indicator series
+            # ---------------------------------------------
 
-                source = s.get("source")
+            series_map = {
+                "z_vol": "Z Volatility Reversal",
+                "z_volume": "Z Volume Reversal",
+                "volatility": "Rolling Volatility"
+            }
 
-                if not source:
+            for col, label in series_map.items():
+
+                if col not in df.columns:
                     continue
 
-                if source not in df.columns:
+                fig.add_trace(
+                    go.Scatter(
+                        x=xbase,
+                        y=df[col],
+                        mode="lines",
+                        name=label
+                    )
+                )
+
+            # ---------------------------------------------
+            # Event series as visible legend traces
+            # ---------------------------------------------
+
+            event_map = {
+                "reversal_event_vol":
+                    (
+                        "Volatility Reversal Events",
+                        "red"
+                    ),
+                "reversal_event_volume":
+                    (
+                        "Volume Reversal Events",
+                        "orange"
+                    )
+            }
+
+            for event_col, (
+                label,
+                color
+            ) in event_map.items():
+
+                if event_col not in df.columns:
                     continue
 
-                name = s.get(
-                    "name",
-                    source
+                event_values = (
+                    df[event_col]
+                    .fillna(False)
+                    .astype(int)
                 )
 
-                style = s.get(
-                    "style",
-                    "line"
+                fig.add_trace(
+                    go.Scatter(
+                        x=xbase,
+                        y=event_values,
+                        mode="markers",
+                        line=dict(
+                            dash="dot",
+                            color=color
+                        ),
+                        name=label
+                    )
                 )
 
-                dash = None
+            # ---------------------------------------------
+            # Actual event markers
+            # ---------------------------------------------
 
-                if style == "dash":
-                    dash = "dash"
+            marker_map = {
+                "reversal_event_vol":
+                    (
+                        "z_vol",
+                        "Volatility Event Marker",
+                        "red"
+                    ),
+                "reversal_event_volume":
+                    (
+                        "z_volume",
+                        "Volume Event Marker",
+                        "orange"
+                    )
+            }
 
-                IntradayReversalChart._plot_dataframe_series(
-                    fig,
-                    xbase,
-                    df[source],
-                    name,
-                    dash=dash
-                )
+            for event_col, (
+                target_col,
+                marker_name,
+                marker_color
+            ) in marker_map.items():
 
-            # =================================================
-            # EVENT MARKERS
-            # =================================================
-
-            chart_cfg = getattr(
-                chart,
-                "cfg",
-                []
-            )
-
-            for cfg in chart_cfg:
-
-                marker_cfg = cfg.get(
-                    "markers",
-                    {}
-                )
-
-                if not marker_cfg.get(
-                    "enabled",
-                    False
-                ):
+                if event_col not in df.columns:
                     continue
 
-                event_source = marker_cfg.get(
-                    "source"
-                )
-
-                if (
-                    not event_source
-                    or event_source not in df.columns
-                ):
-                    continue
-
-                series_cfg = cfg.get(
-                    "series",
-                    []
-                )
-
-                if not series_cfg:
-                    continue
-
-                target_source = (
-                    series_cfg[0]
-                    .get("source")
-                )
-
-                if (
-                    not target_source
-                    or target_source not in df.columns
-                ):
+                if target_col not in df.columns:
                     continue
 
                 mask = (
-                    df[event_source]
+                    df[event_col]
                     .fillna(False)
                     .astype(bool)
                 )
@@ -2864,16 +2880,61 @@ class IntradayReversalChart(StrategyChart):
                         x=df.index[mask],
                         y=df.loc[
                             mask,
-                            target_source
+                            target_col
                         ],
                         mode="markers",
                         marker=dict(
-                            size=9,
-                            color="red",
-                            symbol="triangle-down"
+                            size=10,
+                            color=marker_color,
+                            symbol="diamond"
                         ),
-                        name=f"{cfg.get('name')} Events"
+                        name=marker_name
                     )
+                )
+
+            # ---------------------------------------------
+            # Config-driven series (optional)
+            # ---------------------------------------------
+
+            plotted = {
+                "z_vol",
+                "z_volume",
+                "volatility"
+            }
+
+            for s in getattr(chart, "series", []):
+
+                source = s.get("source")
+
+                if (
+                    not source
+                    or source not in df.columns
+                    or source in plotted
+                ):
+                    continue
+
+                name = s.get(
+                    "name",
+                    source
+                )
+
+                style = s.get(
+                    "style",
+                    "line"
+                )
+
+                dash = (
+                    "dash"
+                    if style == "dash"
+                    else None
+                )
+
+                IntradayReversalChart._plot_dataframe_series(
+                    fig,
+                    xbase,
+                    df[source],
+                    name,
+                    dash=dash
                 )
 
         # =====================================================
@@ -2910,9 +2971,9 @@ class IntradayReversalChart(StrategyChart):
                     go.Scatter(
                         x=x,
                         y=sig.values,
-                        mode="lines",
+                        mode="markers",
                         line=dict(
-                            color="orange",
+                            color="green",
                             dash="dot"
                         ),
                         opacity=0.6,
@@ -2921,7 +2982,7 @@ class IntradayReversalChart(StrategyChart):
                 )
 
         # =====================================================
-        # RESPONSIVE IFRAME LAYOUT
+        # LAYOUT
         # =====================================================
 
         fig.update_layout(
@@ -2934,10 +2995,6 @@ class IntradayReversalChart(StrategyChart):
                 "Intraday Reversal"
             ),
 
-            hovermode="x unified",
-
-            autosize=True,
-
             xaxis=dict(
                 title="Time",
                 automargin=True
@@ -2948,36 +3005,18 @@ class IntradayReversalChart(StrategyChart):
                 automargin=True
             ),
 
-            legend=dict(
+            legend_title="Series / Signals",
 
-                orientation="v",
+            hovermode="x unified",
 
-                x=0.995,
-                y=0.995,
-
-                xanchor="right",
-                yanchor="top",
-
-                bgcolor="rgba(0,0,0,0.60)",
-
-                bordercolor="rgba(255,255,255,0.20)",
-                borderwidth=1,
-
-                font=dict(
-                    size=10
-                )
-            ),
+            showlegend=True,
 
             margin=dict(
-                l=40,
-                r=40,
-                t=60,
-                b=40
+                r=220
             )
         )
 
         return fig
-
 # =======================================================
 # STREV chart
 # =======================================================
@@ -3084,9 +3123,25 @@ class STREVReversalChart(StrategyChart):
         # ==================================================
         # SERIES
         # ==================================================
-        STREVReversalChart._plot_series(fig, portfolio_curve, "STREV Portfolio")
-        STREVReversalChart._plot_series(fig, benchmark_curve, "SPY Benchmark")
-        STREVReversalChart._plot_series(fig, signal_curve, "Signal Strength")
+        portfolio_label = (
+            f" Portfolio "
+            f"(S={portfolio_curve})"
+        )
+
+        benchmark_label = (
+            f"Benchmark "
+            f"(b={benchmark_curve})"
+        )
+
+        signalstrength_label = (
+            f"Signal Strength "
+            f"(s={signal_curve})"
+        )
+
+ 
+        STREVReversalChart._plot_series(fig, portfolio_curve, portfolio_label)
+        STREVReversalChart._plot_series(fig, benchmark_curve, benchmark_label)
+        STREVReversalChart._plot_series(fig, signal_curve, signalstrength_label)
 
         # ==================================================
         # MARKERS
@@ -3105,37 +3160,14 @@ class STREVReversalChart(StrategyChart):
 
             xaxis_title="Date",
             yaxis_title="Value",
-
+            legend_title="Series / Signals",
             hovermode="x unified",
-
-            # ==========================
-            # RIGHT SIDE LEGEND FIX
-            # ==========================
-            legend=dict(
-                orientation="v",
-                x=1.02,
-                y=1,
-                xanchor="left",
-                yanchor="top",
-                bgcolor="rgba(0,0,0,0.35)",
-                bordercolor="rgba(255,255,255,0.2)",
-                borderwidth=1,
-                traceorder="normal",
-                itemsizing="constant"
-            ),
-
-            # ==========================
-            # SPACE FOR LEGEND
-            # ==========================
-            margin=dict(
-                r=200,
-                l=60,
-                t=60,
-                b=50
-            )
+            showlegend=True,
+            margin=dict(r=220)
         )
-
         return fig
+
+
 # ====================================================
 # Time Series Momentum Chart
 # ====================================================
@@ -3235,9 +3267,21 @@ class TimeSeriesMomentumChart(StrategyChart):
         # ==================================================
         signal = data.get("signal")
         benchmark = data.get("benchmark")
+        # ==================================================
+        # LEGEND LABELS
+        # ==================================================
+        signal_label = (
+            f"Trend Signal "
+            f"(S={signal})"
+        )
 
-        TimeSeriesMomentumChart._plot_series(fig, signal, "Trend Signal")
-        TimeSeriesMomentumChart._plot_series(fig, benchmark, "SPY Benchmark")
+        benchmark_label = (
+            f"Benchmark "
+            f"SPY"
+        )
+
+        TimeSeriesMomentumChart._plot_series(fig, signal, signal_label)
+        TimeSeriesMomentumChart._plot_series(fig, benchmark, benchmark_label)
 
         # ==================================================
         # OPTIONAL MARKERS
@@ -3252,7 +3296,11 @@ class TimeSeriesMomentumChart(StrategyChart):
             template="plotly_dark",
             title=getattr(item, "name", "Time Series Momentum"),
             xaxis_title="Date",
-            yaxis_title="Signal Strength"
+            yaxis_title="Signal Strength",
+            legend_title="Series / Signals",
+            hovermode="x unified",
+            showlegend=True,
+            margin=dict(r=220)
         )
 
         return fig
@@ -3396,9 +3444,17 @@ class UMDMomentumChart(StrategyChart):
         # ==================================================
         portfolio = data.get("portfolio")
         benchmark = data.get("benchmark")
+        portfolio_label = (
+            f"UMD Portfolio "
+            f"(S={portfolio})"
+        )
 
-        UMDMomentumChart._plot_series(fig, portfolio, "UMD Portfolio")
-        UMDMomentumChart._plot_series(fig, benchmark, "SPY Benchmark")
+        benchmark_label = (
+            f"Benchmark "
+            f"SPY"
+        )
+        UMDMomentumChart._plot_series(fig, portfolio, portfolio_label)
+        UMDMomentumChart._plot_series(fig, benchmark, benchmark_label)
 
         # ==================================================
         # OPTIONAL SIGNAL MARKERS
@@ -3413,7 +3469,11 @@ class UMDMomentumChart(StrategyChart):
             template="plotly_dark",
             title=getattr(item, "name", "UMD Momentum Strategy"),
             xaxis_title="Date",
-            yaxis_title="Cumulative Return"
+            yaxis_title="Cumulative Return",
+            legend_title="Series / Signals",
+            hovermode="x unified",
+            showlegend=True,
+            margin=dict(r=220)
         )
 
         return fig
