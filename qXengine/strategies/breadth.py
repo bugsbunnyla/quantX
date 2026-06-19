@@ -58,7 +58,7 @@ class BreadthStrategy(BaseStrategy):
         ma_long = self.get_cfg("ma_long", 50)
 
         # =====================================================
-        # CLEAN UNIVERSE (🔥 FIX HERE)
+        # CLEAN UNIVERSE 
         # =====================================================
         rets = self._prepare_returns()
 

@@ -54,7 +54,7 @@ class PairTrading(BaseStrategy):
         min_half_life = cfg.get("min_half_life", 5)
 
         # ==================================================
-        # 🔥 ONLY FIX: DATE → INDEX (NO OTHER CHANGES)
+        # FIX: DATE → INDEX
         # ==================================================
         cleaned = {}
 
@@ -69,7 +69,7 @@ class PairTrading(BaseStrategy):
             tmp = tmp.dropna(subset=["date"])
             tmp = tmp.sort_values("date")
 
-            # 🔥 KEY FIX
+            # KEY FIX
             tmp = tmp.set_index("date")
 
             cleaned[sym] = tmp
@@ -157,7 +157,7 @@ class PairTrading(BaseStrategy):
                 else:
                     signal = 0
 
-                # 🔥 NOW VALID BECAUSE INDEX IS DATETIME
+                # NOW VALID BECAUSE INDEX IS DATETIME
                 t = prices.index[i]
 
                 time_index.append(t)
@@ -187,7 +187,7 @@ class PairTrading(BaseStrategy):
             signals_out[key] = signal_series
 
         # ==================================================
-        # 🔥 ORIGINAL CHART IS COMPLETELY PRESERVED
+        # BUILD CHART
         # ==================================================
         chart = self.build_chart(
             series=self.cfg.get("chart").get("series"),

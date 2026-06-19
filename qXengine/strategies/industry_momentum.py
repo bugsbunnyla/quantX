@@ -242,8 +242,10 @@ class IndustryMomentumStrategyBase(BaseStrategy):
         )
 
 
-#======= INDUSTRY and STOCK ======
-#
+#====================================================== 
+# INDUSTRY and STOCK 
+#======================================================
+
 import numpy as np
 import pandas as pd
 

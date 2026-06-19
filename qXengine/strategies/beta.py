@@ -146,7 +146,7 @@ class BetaNeutralStrategy(BaseStrategy):
                 bn_series.append(y.iloc[i] - beta * x.iloc[i])
 
             # ==================================================
-            # 🔥 KEY FIX: PRESERVE TRUE TIME INDEX
+            # PRESERVE TRUE TIME INDEX
             # ==================================================
             idx = y.iloc[beta_window:].index
 

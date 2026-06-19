@@ -3780,7 +3780,7 @@ class QXDashboard1:
                     continue
 
                 try:
-                    # 🔥 IMPORTANT: registry-driven render per item
+                    # IMPORTANT: registry-driven render per item
                     fig = cls.render(item)
 
                     chart_html = pio.to_html(
@@ -4192,7 +4192,7 @@ class QXDashboard:
         return tmp.name
 
     # ==================================================
-    # 🚀 FRAME-BASED DASHBOARD (SAFE FIG.SHOW EQUIVALENT)
+    #  FRAME-BASED DASHBOARD (SAFE FIG.SHOW EQUIVALENT)
     # ==================================================
     def displayFrame(self):
 
@@ -4232,7 +4232,7 @@ class QXDashboard:
                     suffix=".html"
                 )
 
-                # 🔥 KEY: this is EXACT fig.show equivalent output
+                # KEY: this is EXACT fig.show equivalent output
                 safe_fig.write_html(
                     tmp_file.name,
                     include_plotlyjs="cdn",

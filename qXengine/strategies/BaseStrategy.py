@@ -1,6 +1,6 @@
 from ..StrategyResult import StrategyResult
 from ..StrategyCharts import StrategyChart
-
+from .FormulaOutput import FormulaOutput
 import numpy as np
 import pandas as pd
 
@@ -22,7 +22,9 @@ class BaseStrategy:
         self.runtime_cfg = context.runtime_cfg
         self.factor_engine = context.factor_engine
         self.logger = context.logger
-
+        ##### qX base data structure #####
+        self.formulaOutput = FormulaOutput(self.data)
+        print("[BASE] structured data ", self.formulaOutput)
     # =====================================================
     # CONFIG HELPERS
     # =====================================================

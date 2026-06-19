@@ -1,0 +1,197 @@
+
+=================================================
+ QUANT XPERT X INPUT CONFIGURATION
+=================================================
+
+
+             Enter symbols separated by commas
+             (default = SCHD,VOO,VOOG,VTI,IONQ,RGTI,MU,PL)
+
+Symbols:
+
+Enter trade capital
+(default = 100.0)
+
+Capital:
+
+Choose output mode:
+    horizontal
+    vertical
+    both
+
+(default = both)
+
+View:
+
+=================================================
+[MAIN] QUANT XPERT X STARTING
+=================================================
+
+Capital: 100.0
+View: both
+
+=================================================
+[MAIN] HORIZONTAL MULTIINDEX VIEW
+=================================================
+
+    market                        ...     intel  decision       
+    symbol       price    return  ...        ic     score signal
+0  BTCUSDT  63019.9800 -0.000214  ... -0.028785  0.000327   HOLD
+1  ETHUSDT   1710.6100  0.000000  ...  0.006292  0.062921   HOLD
+2  XRPUSDT      1.1489 -0.000609  ...  0.008371  0.026205   HOLD
+3  BCHUSDT    199.1000  0.000000  ... -0.035434  0.004955   HOLD
+4  LTCUSDT     43.9100  0.000000  ...  0.013130  0.077785   HOLD
+5  BNBUSDT    581.2900 -0.000980  ... -0.004447  0.031143   HOLD
+
+[6 rows x 32 columns]
+
+=================================================
+[MAIN] VERTICAL STACKED VIEW
+=================================================
+
+                                       0           1  ...           4         5
+market           symbol          BTCUSDT     ETHUSDT  ...     LTCUSDT   BNBUSDT
+                 price          63019.98     1710.61  ...       43.91    581.29
+                 return        -0.000214         0.0  ...         0.0  -0.00098
+                 volume          0.00385      0.0295  ...         0.0     0.207
+alpha            ts            -0.000083    -0.00049  ...   -0.000227 -0.000326
+                 xs             0.000087      0.0003  ...      0.0003 -0.000679
+                 pure          -0.000083    -0.00049  ...   -0.000227 -0.000326
+                 beta           0.777014    1.055124  ...     1.00562  0.755598
+                 residual            0.0        -0.0  ...        -0.0       0.0
+risk             volatility     0.000142    0.000793  ...    0.000372  0.000488
+                 sharpe         0.031072    0.060235  ...    0.067323  0.036322
+                 drawdown      -0.003144   -0.004979  ...   -0.002725 -0.002009
+                 cvar          -0.001195   -0.001366  ...   -0.000047  -0.00128
+                 decorrelation  3.374135    3.374135  ...    3.374135  3.374135
+                 wiggle        -0.007979   -0.007979  ...   -0.007979 -0.007979
+transform        rank               77.0       242.0  ...       245.0      22.0
+                 zscore        -0.487021   -0.060174  ...   -0.067256 -1.865269
+                 winsor        -0.000214         0.0  ...         0.0 -0.000834
+                 tanh          -0.000214         0.0  ...         0.0  -0.00098
+                 detrend       -0.000131     0.00049  ...    0.000227 -0.000653
+portfolio        weight              1.0         1.0  ...         1.0       1.0
+                 risk_parity         1.0         1.0  ...         1.0       1.0
+                 kelly          66.36679  100.098152  ...  124.320749  67.88202
+                 entropy            -0.0        -0.0  ...        -0.0      -0.0
+market_structure regime         HIGH_VOL    HIGH_VOL  ...    HIGH_VOL  HIGH_VOL
+                 liq_adj_vol    0.034459    0.001899  ...    0.001534  0.003483
+execution        slippage       0.000002    0.000002  ...    0.000002  0.000002
+                 impact           0.0001      0.0001  ...      0.0001    0.0001
+                 turnover           0.01        0.01  ...        0.01      0.01
+intel            ic            -0.028785    0.006292  ...     0.01313 -0.004447
+decision         score          0.000327    0.062921  ...    0.077785  0.031143
+                 signal             HOLD        HOLD  ...        HOLD      HOLD
+
+[32 rows x 6 columns]
+
+=================================================
+[MAIN] SIGNAL SUMMARY
+=================================================
+
+0    HOLD
+1    HOLD
+2    HOLD
+3    HOLD
+4    HOLD
+5    HOLD
+Name: (decision, signal), dtype: str
+
+=================================================
+[MAIN] ANALYSIS COMPLETE
+=================================================
+
+[DATA] Loaded BTCUSDT (1461 rows)
+[DATA] Loaded ETHUSDT (1461 rows)
+[DATA] Loaded SOLUSDT (1461 rows)
+[DATA] Loaded BNBUSDT (1461 rows)
+[DATA] Loaded XRPUSDT (1461 rows)
+[DATA] Loaded DOGEUSDT (1461 rows)
+[DATA] Loaded SPY (1004 rows)
+[DATA] Loaded QQQ (1004 rows)
+[DATA] Loaded IWM (1004 rows)
+[DATA] Loaded TLT (1004 rows)
+[DATA] Loaded GLD (1004 rows)
+[DATA] Assets: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'DOGEUSDT', 'SPY', 'QQQ', 'IWM', 'TLT', 'GLD']
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D0018EA50>
+[QuantX] IntradayStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D000C20D0>
+[QuantX] AlphaStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D000C39D0>
+[QuantX] BetaNeutralStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D000E69E0>
+[QuantX] UMDMomentum OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D000E6B10>
+[QuantX] TimeSeriesMomentum OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D000E28D0>
+[QuantX] STREV OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D016B4160>
+[QuantX] IntradayReversal OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D016B4380>
+[QuantX] PairTrading OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D01648850>
+[QuantX] BreadthStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D01648950>
+[QuantX] CorrelationStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D001D9310>
+[QuantX] DispersionStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D001D9D60>
+[QuantX] VolatilityStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D00177930>
+[QuantX] ForecastStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D00177850>
+[QuantX] IndustryMomentumStrategy OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D01735980>
+[QuantX] PairTradingFallback OK
+[BASE] structured data  <qXengine.strategies.FormulaOutput.FormulaOutput object at 0x0000027D001BAC90>
+[QuantX] CorrelationFallback OK
+[ENGINE] Strategies: 16
+[ENGINE] Valid strategies: 16
+[DASHBOARD] render tab  strategies
+[DASHBOARD] render  IntradayStrategy  completed 
+[DASHBOARD] render  AlphaStrategy  completed 
+[DASHBOARD] render  BetaNeutralStrategy  completed 
+[DASHBOARD] render  PairTrading  completed 
+[DASHBOARD] render  BreadthStrategy  completed 
+[DASHBOARD] render  CorrelationStrategy  completed 
+[DASHBOARD] render  DispersionStrategy  completed 
+[DASHBOARD] render  VolatilityStrategy  completed 
+[DASHBOARD] render  ForecastStrategy  completed 
+[DASHBOARD] render  PairTradingFallback  completed 
+[DASHBOARD] render  CorrelationFallback  completed 
+[DASHBOARD] render tab  momentum
+[DASHBOARD] render  UMDMomentum  completed 
+[DASHBOARD] render  TimeSeriesMomentum  completed 
+[DASHBOARD] render  IndustryMomentumStrategy  completed 
+[DASHBOARD] render tab  reversal
+[DASHBOARD] render  STREV  completed 
+[DASHBOARD] render  IntradayReversal  completed 
+[DASHBOARD] render tab  institution
+[DASHBOARD] Total tabs :  4
+[DASHBOARD] Loading  IntradayStrategy
+[DASHBOARD] Loading  AlphaStrategy
+[DASHBOARD] Loading  Beta Neutral Strategy (4Y Performance)
+[DASHBOARD] Loading  PairTrading
+[DASHBOARD] Loading  BreadthStrategy
+[DASHBOARD] Loading  CorrelationStrategy
+[DASHBOARD] Loading  DispersionStrategy
+[DASHBOARD] Loading  VolatilityStrategy
+[DASHBOARD] Loading  ForecastStrategy
+[DASHBOARD] Loading  PairTradingFallback
+[DASHBOARD] Loading  CorrelationFallback
+[DASHBOARD] Loading  UMDMomentum
+[DASHBOARD] Loading  TimeSeriesMomentum
+[DASHBOARD] Loading  IndustryMomentumStrategy
+[DASHBOARD] Loading  STREV Mean Reversion (Return=0.00%)
+[DASHBOARD] Loading  Intraday Overreaction Reversal
+
+=================================================
+[MAIN] SYSTEM SUMMARY
+=================================================
+
+Strategies: 16
+
+=================================================
+[MAIN] COMPLETE
+=================================================
+

@@ -38,7 +38,7 @@ class AlphaBeta:
         cov = ((x - x_mean) * (y - y_mean)).mean()
         var = ((x - x_mean) ** 2).mean()
 
-        # 🔥 SAFE VAR PROTECTION
+        # SAFE VAR PROTECTION
         if not np.isfinite(var) or var < eps:
             beta = 0.0
             alpha = y_mean

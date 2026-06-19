@@ -49,7 +49,7 @@ class IntradayStrategy(BaseStrategy):
         return (df["close"] - vwap) / (vwap + 1e-8)
 
     # -------------------------------------------------
-    # 🔥 STRICT TIME CLEANER (CORE FIX)
+    # INDEX
     # -------------------------------------------------
     def _ensure_datetime_index(self, df):
 
@@ -131,7 +131,7 @@ class IntradayStrategy(BaseStrategy):
             dislocation_events_out[sym] = (norm_signal.abs() > threshold).astype(int)
 
             # =================================================
-            # 🔥 FINAL GUARANTEE: FORCE DATETIME INDEX
+            # FORCE DATETIME INDEX
             # =================================================
             norm_signal.index = pd.to_datetime(norm_signal.index, errors="coerce")
             norm_signal = norm_signal[norm_signal.index.notna()]

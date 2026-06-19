@@ -13,7 +13,7 @@ class Transform:
     TANH:
         squash nonlinear
 
-    DETERND:
+    DETREND:
         x - rolling_mean
     """
 
