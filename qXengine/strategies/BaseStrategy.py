@@ -24,7 +24,7 @@ class BaseStrategy:
         self.logger = context.logger
         ##### qX base data structure #####
         self.formulaOutput = FormulaOutput(self.data)
-        print("[BASE] structured data ", self.formulaOutput)
+        print("[BASE] structured data ", self.formulaOutput.assemble())
     # =====================================================
     # CONFIG HELPERS
     # =====================================================

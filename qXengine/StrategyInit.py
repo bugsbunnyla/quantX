@@ -15,11 +15,23 @@ SYMBOLS = [
     "BNBUSDT.pkl",
     "XRPUSDT.pkl",
     "DOGEUSDT.pkl",
+    "AAPL.pkl", 
+    "MSFT.pkl", 
+    "NVDA.pkl", 
+    "AMD.pkl",
     "SPY.pkl",
     "QQQ.pkl",
     "IWM.pkl",
     "TLT.pkl",
-    "GLD.pkl"
+    "GLD.pkl",
+    "SCHD.pkl",
+    "VOO.pkl",
+    "VOOG.pkl",
+    "VTI.pkl",
+    "IONQ.pkl",
+    "RGTI.pkl",
+    "MU.pkl",
+    "PL.pkl"
 ]
 
 
