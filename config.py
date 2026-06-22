@@ -82,9 +82,63 @@ ENVIRONMENTS = {
             },
 
             "crypto": {
+
                 "provider": "binance",
-                "allow_api": True,
-                "allow_cache": True
+
+                # =========================
+                # BINANCE (existing)
+                # =========================
+                "binance": {
+                    "provider": "binance",
+                    "url": "https://api.binance.com/api/v3/klines",
+                    "api_keys": {
+                        "api_key": "",
+                        "api_secret": ""
+                    },
+                    "allow_api": True,
+                    "allow_cache": True
+                },
+
+                # =========================
+                # KRAKEN (NEW)
+                # =========================
+                "kraken": {
+                    "provider": "kraken",
+                    "url": "https://api.kraken.com/0/public/OHLC",
+                    "api_keys": {
+                        "api_key": "",
+                        "api_secret": ""
+                    },
+                    "allow_api": True,
+                    "allow_cache": True
+                },
+
+                # =========================
+                # COINBASE (NEW)
+                # =========================
+                "coinbase": {
+                    "provider": "coinbase",
+                    "url": "https://api.exchange.coinbase.com/products",
+                    "api_keys": {
+                        "api_key": "",
+                        "api_secret": ""
+                    },
+                    "allow_api": True,
+                    "allow_cache": True
+                },
+
+                # =========================
+                # COINGECKO (NEW)
+                # =========================
+                "coingecko": {
+                    "provider": "coingecko",
+                    "url": "https://api.coingecko.com/api/v3/coins",
+                    "api_keys": {
+                        "api_key": ""
+                    },
+                    "allow_api": True,
+                    "allow_cache": True
+                }
             }
         }
     },

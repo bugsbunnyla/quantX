@@ -10,7 +10,6 @@ from datetime import datetime
 
 from config import ENVIRONMENTS, DEFAULT_SYMBOLS
 
-
 class PickleDataManager:
 
     # =========================================================
@@ -22,17 +21,13 @@ class PickleDataManager:
             raise ValueError(f"Invalid run_option: {run_option}")
 
         self.run_option = run_option
-
         self.env = ENVIRONMENTS[run_option]
 
-        # cache path from config
         self.path = self.env["cache_path"]
         os.makedirs(self.path, exist_ok=True)
 
-        # provider config
         self.market_data = self.env.get("market_data", {})
 
-        # default lookback (safe fallback)
         self.lookback_years = 4
 
     # =========================================================
@@ -42,22 +37,19 @@ class PickleDataManager:
         return datetime.now().strftime("%Y%m%d")
 
     # =========================================================
-    # FILE PATH (SNAPSHOT)
+    # FILE PATH
     # =========================================================
     def _file_path(self, symbol: str):
-        return os.path.join(
-            self.path,
-            f"{symbol}.{self._today()}.pkl"
-        )
+        return os.path.join(self.path, f"{symbol}.{self._today()}.pkl")
 
     # =========================================================
-    # SYMBOL UNIVERSE (SINGLE SOURCE OF TRUTH)
+    # SYMBOLS
     # =========================================================
     def get_all_symbols(self):
         return DEFAULT_SYMBOLS
 
     # =========================================================
-    # NORMALIZE DATAFRAME
+    # NORMALIZATION
     # =========================================================
     def _normalize_columns(self, df: pd.DataFrame):
 
@@ -70,7 +62,7 @@ class PickleDataManager:
         return df
 
     # =========================================================
-    # SERIES EXTRACTOR
+    # SERIES
     # =========================================================
     def _extract_series(self, df, col):
 
@@ -85,7 +77,7 @@ class PickleDataManager:
         return data
 
     # =========================================================
-    # ASSET TYPE DETECTION
+    # ASSET TYPE
     # =========================================================
     def _asset_type(self, symbol: str):
 
@@ -108,26 +100,32 @@ class PickleDataManager:
         })
 
     # =========================================================
-    # API ROUTER
+    # API ROUTER (SAFE + COMPLETE)
     # =========================================================
     def _fetch_api(self, symbol: str):
 
         cfg = self._provider_config(symbol)
-        provider = cfg["provider"]
+        provider = cfg.get("provider")
 
         if provider == "yahoo":
             return self._fetch_yahoo(symbol)
 
         if provider == "binance":
-            return self._fetch_binance(symbol)
+            return self._fetch_binance(cfg)
+
+        if provider == "kraken":
+            return self._fetch_kraken(cfg)
+
+        if provider == "coinbase":
+            return self._fetch_coinbase(cfg)
 
         if provider == "coingecko":
-            return self._fetch_binance(symbol)
+            return self._fetch_coingecko(cfg)
 
         raise ValueError(f"Unsupported provider: {provider}")
 
     # =========================================================
-    # YAHOO FINANCE
+    # YAHOO (EQUITIES)
     # =========================================================
     def _fetch_yahoo(self, symbol: str):
 
@@ -141,29 +139,141 @@ class PickleDataManager:
             progress=False
         )
 
-        df = df.reset_index()
+        return self._normalize_columns(df.reset_index())
+
+    # =========================================================
+    # BINANCE
+    # =========================================================
+    def _fetch_binance(self, cfg):
+
+        import requests
+
+        if not cfg.get("allow_api", True):
+            raise RuntimeError("API disabled for Binance")
+
+        url = cfg["url"]
+        keys = cfg.get("api_keys", {})
+
+        headers = {}
+        if keys.get("api_key"):
+            headers["X-MBX-APIKEY"] = keys["api_key"]
+
+        params = {
+            "symbol": "BTCUSDT",
+            "interval": "1d",
+            "limit": 1000
+        }
+
+        r = requests.get(url, params=params, headers=headers)
+        data = r.json()
+
+        df = pd.DataFrame(data)
+
         return self._normalize_columns(df)
 
     # =========================================================
-    # CRYPTO FALLBACK (BINANCE STYLE)
+    # KRAKEN
     # =========================================================
-    def _fetch_binance(self, symbol: str):
+    def _fetch_kraken(self, cfg):
 
-        import yfinance as yf
+        import requests
 
-        df = yf.download(
-            symbol.replace("USDT", "-USD"),
-            period=f"{self.lookback_years}y",
-            interval="1d",
-            auto_adjust=False,
-            progress=False
+        if not cfg.get("allow_api", True):
+            raise RuntimeError("API disabled for Kraken")
+
+        url = cfg["url"]
+
+        pair = "BTCUSD"
+
+        r = requests.get(url, params={
+            "pair": pair,
+            "interval": 1440
+        })
+
+        data = r.json()
+
+        if "result" not in data:
+            raise ValueError(f"Kraken error: {data}")
+
+        key = list(data["result"].keys())[0]
+
+        df = pd.DataFrame(data["result"][key], columns=[
+            "time","open","high","low","close","vwap","volume","count"
+        ])
+
+        df["time"] = pd.to_datetime(df["time"], unit="s")
+
+        return self._normalize_columns(df[["time","open","high","low","close","volume"]])
+
+    # =========================================================
+    # COINBASE
+    # =========================================================
+    def _fetch_coinbase(self, cfg):
+
+        import requests
+
+        if not cfg.get("allow_api", True):
+            raise RuntimeError("API disabled for Coinbase")
+
+        base_url = cfg["url"]
+
+        product = "BTC-USD"
+
+        r = requests.get(
+            f"{base_url}/{product}/candles",
+            params={"granularity": 86400}
         )
 
-        df = df.reset_index()
+        data = r.json()
+
+        if not isinstance(data, list):
+            raise ValueError(f"Coinbase error: {data}")
+
+        df = pd.DataFrame(data, columns=[
+            "time","low","high","open","close","volume"
+        ])
+
+        df["time"] = pd.to_datetime(df["time"], unit="s")
+
         return self._normalize_columns(df)
 
     # =========================================================
-    # STORE SNAPSHOT
+    # COINGECKO
+    # =========================================================
+    def _fetch_coingecko(self, cfg):
+
+        import requests
+
+        if not cfg.get("allow_api", True):
+            raise RuntimeError("API disabled for CoinGecko")
+
+        url = cfg["url"]
+
+        r = requests.get(
+            f"{url}/bitcoin/ohlc",
+            params={
+                "vs_currency": "usd",
+                "days": 365
+            }
+        )
+
+        data = r.json()
+
+        if not isinstance(data, list):
+            raise ValueError(f"CoinGecko error: {data}")
+
+        df = pd.DataFrame(data, columns=[
+            "time","open","high","low","close"
+        ])
+
+        df["time"] = pd.to_datetime(df["time"], unit="ms")
+
+        df["volume"] = 0
+
+        return self._normalize_columns(df)
+
+    # =========================================================
+    # STORE
     # =========================================================
     def _store(self, path: str, df: pd.DataFrame):
 
@@ -188,9 +298,9 @@ class PickleDataManager:
         allow_api = cfg.get("allow_api", True)
         allow_cache = cfg.get("allow_cache", True)
 
-        # -----------------------------------------------------
-        # BACKTEST MODE → CACHE ONLY
-        # -----------------------------------------------------
+        # -------------------------
+        # BACKTEST (UNCHANGED)
+        # -------------------------
         if self.run_option == "backtest":
 
             if os.path.exists(path):
@@ -205,9 +315,9 @@ class PickleDataManager:
 
             raise FileNotFoundError(f"[BACKTEST] Missing snapshot: {path}")
 
-        # -----------------------------------------------------
-        # PRODUCTION MODE → CACHE OR API
-        # -----------------------------------------------------
+        # -------------------------
+        # PRODUCTION CACHE FIRST
+        # -------------------------
         if os.path.exists(path) and not force_refresh and allow_cache:
 
             df = pd.read_pickle(path)
@@ -222,7 +332,7 @@ class PickleDataManager:
         if not allow_api:
             raise RuntimeError(f"[PRODUCTION] API disabled for {symbol}")
 
-        print(f"[DATA] Fetching {symbol} via API...")
+        print(f"[DATA] Fetching {symbol} via {cfg.get('provider')}...")
 
         df = self._fetch_api(symbol)
 
@@ -235,7 +345,7 @@ class PickleDataManager:
         return df
 
     # =========================================================
-    # LOAD ALL TODAY FILES ONLY
+    # LOAD ALL
     # =========================================================
     def load_all(self):
 
@@ -256,7 +366,7 @@ class PickleDataManager:
         return data
 
     # =========================================================
-    # BOOTSTRAP ALL SYMBOLS
+    # BOOTSTRAP ALL
     # =========================================================
     def bootstrap_all(self, force_refresh: bool = False):
 
