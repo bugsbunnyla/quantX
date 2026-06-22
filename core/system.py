@@ -1,3 +1,9 @@
+# ===============================================================
+# core/system : core data structures of Quant Xpert
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : initiates the multi index output of data structure
+# ===============================================================
 import numpy as np
 import pandas as pd
 import requests
@@ -758,3 +764,7 @@ class QuantX:
         )
 
         return df
+
+# ==========================================================
+# END of core/system.py
+# ==========================================================

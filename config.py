@@ -1,6 +1,12 @@
+# ===============================================================
+# config : centralized configuration for Quant Xpert
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : drives configurable settings for data
+# ===============================================================
 """
 =========================================================
-🚀 QUANT XPERT X CONFIGURATION
+ QUANT XPERT X CONFIGURATION
 =========================================================
 
 DEFAULT_SYMBOLS:
@@ -28,7 +34,22 @@ DEFAULT_SYMBOLS = [
     "IONQ",
     "RGTI",
     "MU",
-    "PL"
+    "PL",
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "BNBUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "AAPL", 
+    "MSFT", 
+    "NVDA", 
+    "AMD",
+    "SPY",
+    "QQQ",
+    "IWM",
+    "TLT",
+    "GLD",
 ]
 
 # =========================================================
@@ -42,3 +63,53 @@ DEFAULT_CAPITAL = 100.0
 # =========================================================
 
 DEFAULT_VIEW = "both"
+
+# =========================================================
+# ENV
+# =========================================================
+ENVIRONMENTS = {
+
+    "production": {
+
+        "cache_path": "./data/cache/production",
+
+        "market_data": {
+
+            "equities": {
+                "provider": "yahoo",
+                "allow_api": True,
+                "allow_cache": True
+            },
+
+            "crypto": {
+                "provider": "binance",
+                "allow_api": True,
+                "allow_cache": True
+            }
+        }
+    },
+
+    "backtest": {
+
+        "cache_path": "./data/cache/backtest",
+
+        "market_data": {
+
+            "equities": {
+                "provider": "yahoo",
+                "allow_api": False,
+                "allow_cache": True
+            },
+
+            "crypto": {
+                "provider": "coingecko",
+                "allow_api": False,
+                "allow_cache": True
+            }
+        }
+    }
+}
+
+# ========================================================
+# END OF config
+# ========================================================

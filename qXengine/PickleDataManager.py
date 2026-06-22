@@ -1,50 +1,76 @@
-import pandas as pd
+# ===============================================================
+# PickleDataManager : data engine to drive data in Quant Xpert
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : creates, loads, stores data , cache data
+# ===============================================================
 import os
-from .StrategyConfig import STRATEGY_CONFIG
+import pandas as pd
+from datetime import datetime
+
+from config import ENVIRONMENTS, DEFAULT_SYMBOLS
 
 
 class PickleDataManager:
 
-    def __init__(self):
+    # =========================================================
+    # INIT
+    # =========================================================
+    def __init__(self, run_option="production"):
 
-        self.path = "./data/cache/crypto/"
+        if run_option not in ENVIRONMENTS:
+            raise ValueError(f"Invalid run_option: {run_option}")
+
+        self.run_option = run_option
+
+        self.env = ENVIRONMENTS[run_option]
+
+        # cache path from config
+        self.path = self.env["cache_path"]
         os.makedirs(self.path, exist_ok=True)
 
-        self.config = STRATEGY_CONFIG["data"]
-        self.lookback_years = self.config["lookback_years"]
+        # provider config
+        self.market_data = self.env.get("market_data", {})
+
+        # default lookback (safe fallback)
+        self.lookback_years = 4
 
     # =========================================================
-    # SYMBOLS FROM CONFIG
+    # DATE
+    # =========================================================
+    def _today(self):
+        return datetime.now().strftime("%Y%m%d")
+
+    # =========================================================
+    # FILE PATH (SNAPSHOT)
+    # =========================================================
+    def _file_path(self, symbol: str):
+        return os.path.join(
+            self.path,
+            f"{symbol}.{self._today()}.pkl"
+        )
+
+    # =========================================================
+    # SYMBOL UNIVERSE (SINGLE SOURCE OF TRUTH)
     # =========================================================
     def get_all_symbols(self):
-
-        assets = self.config["assets"]
-
-        symbols = []
-        for k in assets:
-            symbols.extend(assets[k])
-
-        return list(set(symbols))
+        return DEFAULT_SYMBOLS
 
     # =========================================================
-    # SAFE COLUMN NORMALIZER (CRITICAL FIX)
+    # NORMALIZE DATAFRAME
     # =========================================================
     def _normalize_columns(self, df: pd.DataFrame):
 
-        # Handle MultiIndex (yfinance issue)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
 
-        # Force string + lowercase
         df.columns = [str(c).lower() for c in df.columns]
-
-        # Remove duplicate columns (VERY IMPORTANT)
         df = df.loc[:, ~df.columns.duplicated()]
 
         return df
 
     # =========================================================
-    # SAFE SERIES EXTRACTOR (FIXES ret BUG)
+    # SERIES EXTRACTOR
     # =========================================================
     def _extract_series(self, df, col):
 
@@ -53,61 +79,57 @@ class PickleDataManager:
 
         data = df[col]
 
-        # If DataFrame (multi-column issue) → take first column
         if isinstance(data, pd.DataFrame):
             return data.iloc[:, 0]
 
         return data
 
     # =========================================================
-    # LOAD SINGLE SYMBOL (CACHE ONLY)
+    # ASSET TYPE DETECTION
     # =========================================================
-    def load_symbol(self, file):
+    def _asset_type(self, symbol: str):
 
-        df = pd.read_pickle(os.path.join(self.path, file))
+        if symbol.endswith("USDT"):
+            return "crypto"
 
-        df = self._normalize_columns(df)
-
-        close = self._extract_series(df, "close")
-
-        if close is not None:
-            df["ret"] = close.pct_change()
-
-        return df
+        return "equities"
 
     # =========================================================
-    # LOAD ALL CACHE
+    # PROVIDER CONFIG
     # =========================================================
-    def load_all(self):
+    def _provider_config(self, symbol: str):
 
-        data = {}
+        asset_type = self._asset_type(symbol)
 
-        for file in os.listdir(self.path):
-
-            if file.endswith(".pkl"):
-
-                symbol = file.replace(".pkl", "")
-
-                df = self.load_symbol(file)
-
-                data[symbol] = df
-
-        return data
+        return self.market_data.get(asset_type, {
+            "provider": "yahoo",
+            "allow_api": True,
+            "allow_cache": True
+        })
 
     # =========================================================
     # API ROUTER
     # =========================================================
     def _fetch_api(self, symbol: str):
 
-        if symbol.endswith("USDT"):
-            return self._fetch_crypto(symbol)
-        else:
-            return self._fetch_yfinance(symbol)
+        cfg = self._provider_config(symbol)
+        provider = cfg["provider"]
+
+        if provider == "yahoo":
+            return self._fetch_yahoo(symbol)
+
+        if provider == "binance":
+            return self._fetch_binance(symbol)
+
+        if provider == "coingecko":
+            return self._fetch_binance(symbol)
+
+        raise ValueError(f"Unsupported provider: {provider}")
 
     # =========================================================
-    # YFINANCE FETCH (SAFE)
+    # YAHOO FINANCE
     # =========================================================
-    def _fetch_yfinance(self, symbol: str):
+    def _fetch_yahoo(self, symbol: str):
 
         import yfinance as yf
 
@@ -120,14 +142,12 @@ class PickleDataManager:
         )
 
         df = df.reset_index()
-        df = self._normalize_columns(df)
-
-        return df
+        return self._normalize_columns(df)
 
     # =========================================================
-    # CRYPTO FETCH (SAFE FALLBACK)
+    # CRYPTO FALLBACK (BINANCE STYLE)
     # =========================================================
-    def _fetch_crypto(self, symbol: str):
+    def _fetch_binance(self, symbol: str):
 
         import yfinance as yf
 
@@ -140,16 +160,12 @@ class PickleDataManager:
         )
 
         df = df.reset_index()
-        df = self._normalize_columns(df)
-
-        return df
+        return self._normalize_columns(df)
 
     # =========================================================
-    # SAFE STORE
+    # STORE SNAPSHOT
     # =========================================================
-    def _store(self, symbol: str, df: pd.DataFrame):
-
-        path = os.path.join(self.path, f"{symbol}.pkl")
+    def _store(self, path: str, df: pd.DataFrame):
 
         df = self._normalize_columns(df)
 
@@ -161,39 +177,83 @@ class PickleDataManager:
         df.to_pickle(path)
 
     # =========================================================
-    # MAIN FETCH + CACHE
+    # FETCH + CACHE LOGIC
     # =========================================================
     def fetch_store(self, symbol: str, force_refresh: bool = False):
 
-        path = os.path.join(self.path, f"{symbol}.pkl")
+        path = self._file_path(symbol)
 
-        # CACHE HIT
-        if os.path.exists(path) and not force_refresh:
+        cfg = self._provider_config(symbol)
+
+        allow_api = cfg.get("allow_api", True)
+        allow_cache = cfg.get("allow_cache", True)
+
+        # -----------------------------------------------------
+        # BACKTEST MODE → CACHE ONLY
+        # -----------------------------------------------------
+        if self.run_option == "backtest":
+
+            if os.path.exists(path):
+                df = pd.read_pickle(path)
+                df = self._normalize_columns(df)
+
+                close = self._extract_series(df, "close")
+                if close is not None:
+                    df["ret"] = close.pct_change()
+
+                return df
+
+            raise FileNotFoundError(f"[BACKTEST] Missing snapshot: {path}")
+
+        # -----------------------------------------------------
+        # PRODUCTION MODE → CACHE OR API
+        # -----------------------------------------------------
+        if os.path.exists(path) and not force_refresh and allow_cache:
 
             df = pd.read_pickle(path)
-
             df = self._normalize_columns(df)
 
             close = self._extract_series(df, "close")
-
             if close is not None:
                 df["ret"] = close.pct_change()
 
             return df
 
-        # CACHE MISS → API
-        print(f"[DATA] Fetching {symbol} from API...")
+        if not allow_api:
+            raise RuntimeError(f"[PRODUCTION] API disabled for {symbol}")
+
+        print(f"[DATA] Fetching {symbol} via API...")
 
         df = self._fetch_api(symbol)
 
         if df is None or df.empty:
-            raise ValueError(f"[DATA] Empty dataset for {symbol}")
+            raise ValueError(f"Empty dataset: {symbol}")
 
-        self._store(symbol, df)
-
-        print(f"[DATA] Cached {symbol}.pkl")
+        if allow_cache:
+            self._store(path, df)
 
         return df
+
+    # =========================================================
+    # LOAD ALL TODAY FILES ONLY
+    # =========================================================
+    def load_all(self):
+
+        data = {}
+        today = self._today()
+
+        for file in os.listdir(self.path):
+
+            if file.endswith(f"{today}.pkl"):
+
+                symbol = file.split(".")[0]
+
+                df = pd.read_pickle(os.path.join(self.path, file))
+                df = self._normalize_columns(df)
+
+                data[symbol] = df
+
+        return data
 
     # =========================================================
     # BOOTSTRAP ALL SYMBOLS
@@ -202,13 +262,14 @@ class PickleDataManager:
 
         dataset = {}
 
-        symbols = self.get_all_symbols()
-
-        for symbol in symbols:
+        for symbol in self.get_all_symbols():
 
             try:
                 df = self.fetch_store(symbol, force_refresh)
-                dataset[symbol] = df
+
+                if df is not None and not df.empty:
+                    dataset[symbol] = df
+                    print(f"[DATA] Loaded {symbol} ({len(df)})")
 
             except Exception as e:
                 print(f"[DATA] Failed {symbol}: {e}")
@@ -216,3 +277,7 @@ class PickleDataManager:
         print(f"[DATA] Bootstrap complete: {len(dataset)} assets")
 
         return dataset
+
+# ================================================================
+# END OF PICKLEDATAMANAGER
+# ================================================================

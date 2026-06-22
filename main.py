@@ -1,11 +1,9 @@
-
-import argparse
-import sys
-
-from core.system import QuantX
-from config import DEFAULT_SYMBOLS, DEFAULT_CAPITAL
-from qXengine.StrategyInit import StrategyInit
-
+# ===============================================================
+# Main class defines the QuantXpert Solution driver
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : execute pipeline for processing Quant Xpert portfolio
+# ===============================================================
 """
 =========================================================
  QUANT X
@@ -137,11 +135,18 @@ HOLD:
 =========================================================
 """
 
+import argparse
+import sys
+
+from core.system import QuantX
+from config import DEFAULT_SYMBOLS, DEFAULT_CAPITAL
+from qXengine.StrategyInit import StrategyInit
+from qXengine.PortfolioConstruct import PortfolioConstruct
+
 
 # =========================================================
 # CLI ARGUMENTS
 # =========================================================
-
 def parse_args():
 
     parser = argparse.ArgumentParser()
@@ -165,13 +170,20 @@ def parse_args():
         help="Output display mode"
     )
 
+    parser.add_argument(
+        "--run_option",
+        type=str,
+        choices=["production", "backtest"],
+        default="production",
+        help="Execution mode (data + cache + API routing)"
+    )
+
     return parser.parse_args()
 
 
 # =========================================================
 # INTERACTIVE INPUTS
 # =========================================================
-
 def interactive_inputs(args):
 
     print("\n=================================================")
@@ -181,16 +193,13 @@ def interactive_inputs(args):
     # -----------------------------------------------------
     # SYMBOLS
     # -----------------------------------------------------
-
     if args.symbols:
-        symbols = args.symbols
-
+        symbols = [s.upper() for s in args.symbols]
     else:
-
         user_symbols = input(
             f"""
-             Enter symbols separated by commas
-             (default = {','.join(DEFAULT_SYMBOLS)})
+Enter symbols separated by commas
+(default = {','.join(DEFAULT_SYMBOLS)})
 
 Symbols:
 """
@@ -198,23 +207,15 @@ Symbols:
 
         if user_symbols == "":
             symbols = DEFAULT_SYMBOLS
-
         else:
-            symbols = [
-                s.strip().upper()
-                for s in user_symbols.split(",")
-            ]
+            symbols = [s.strip().upper() for s in user_symbols.split(",")]
 
-    symbols = None
     # -----------------------------------------------------
     # CAPITAL
     # -----------------------------------------------------
-
-    if args.capital:
+    if args.capital is not None:
         capital = args.capital
-
     else:
-
         user_capital = input(
             f"""
 Enter trade capital
@@ -226,19 +227,15 @@ Capital:
 
         if user_capital == "":
             capital = DEFAULT_CAPITAL
-
         else:
             capital = float(user_capital)
 
     # -----------------------------------------------------
-    # VIEW MODE
+    # VIEW
     # -----------------------------------------------------
-
     if args.view:
         view = args.view
-
     else:
-
         user_view = input(
             """
 Choose output mode:
@@ -254,9 +251,12 @@ View:
 
         if user_view == "":
             view = "both"
-
         else:
             view = user_view
+
+    # safety
+    if not symbols:
+        symbols = DEFAULT_SYMBOLS
 
     return symbols, capital, view
 
@@ -264,7 +264,6 @@ View:
 # =========================================================
 # MAIN EXECUTION
 # =========================================================
-
 def main():
 
     args = parse_args()
@@ -275,22 +274,20 @@ def main():
     print("[MAIN] QUANT XPERT X STARTING")
     print("=================================================\n")
 
-    #print("Symbols:", symbols)
+    print("Symbols:", symbols)
     print("Capital:", capital)
     print("View:", view)
+    print("Run Mode:", args.run_option)
 
     # =====================================================
-    # RUN ENGINE
+    # ENGINE
     # =====================================================
-
     engine = QuantX(symbols)
-
     output = engine.run()
 
     # =====================================================
     # HORIZONTAL VIEW
     # =====================================================
-
     if view in ["horizontal", "both"]:
 
         print("\n=================================================")
@@ -302,7 +299,6 @@ def main():
     # =====================================================
     # VERTICAL VIEW
     # =====================================================
-
     if view in ["vertical", "both"]:
 
         print("\n=================================================")
@@ -314,45 +310,40 @@ def main():
     # =====================================================
     # SIGNAL SUMMARY
     # =====================================================
-
     print("\n=================================================")
     print("[MAIN] SIGNAL SUMMARY")
     print("=================================================\n")
 
-    print(
-        output[
-            ("decision", "signal")
-        ]
-    )
+    print(output[("decision", "signal")])
 
     print("\n=================================================")
     print("[MAIN] ANALYSIS COMPLETE")
     print("=================================================\n")
 
-
     # =====================================================
-    # 2. STRATEGY PIPELINE
+    # STRATEGY PIPELINE (NOW RUN_OPTION WIRED)
     # =====================================================
-    result = StrategyInit.run(interval="4y")
+    result = StrategyInit.run(
+        interval="4y",
+        run_option=args.run_option   # IMPORTANT FIX
+    )
 
     dashboard = result["dashboard"]
     strategies = result["strategies"]
 
-    # =====================================================
-    # 3. DASHBOARD (SINGLE SOURCE OF TRUTH)
-    # =====================================================
     dashboard.displayFrame()
 
     # =====================================================
-    # 4. SUMMARY (MINIMAL OUTPUT ONLY)
+    # SUMMARY
     # =====================================================
     print("\n=================================================")
     print("[MAIN] SYSTEM SUMMARY")
     print("=================================================\n")
 
-    #print("Engine output:", getattr(engine_output, "shape", None))
     print("Strategies:", len(strategies))
-    
+
+    pc = PortfolioConstruct(capital=capital)
+    pc.invoke()
 
     print("\n=================================================")
     print("[MAIN] COMPLETE")
@@ -364,3 +355,7 @@ def main():
 # =========================================================
 if __name__ == "__main__":
     main()
+
+# =========================================================
+# END OF MAIN
+# =========================================================

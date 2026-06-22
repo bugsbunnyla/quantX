@@ -1,96 +1,112 @@
+# ===============================================================
+# FormulaOutput class defines the BaseStrategy structured data
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : Core formulas for the QuantXpert structure data model
+# ===============================================================
 import numpy as np
 import pandas as pd
 
 
 class FormulaOutput:
+    STATIC_STORE = []
 
     def __init__(self, data: dict):
         self.data = data
         self.symbols = list(data.keys())
-        self.outputs = {}
-        self._enable_display()
+
+        # CRITICAL FIX: compute returns once and inject into data layer
+        self.ret = self._returns()
+        self._inject_returns()
+
         self.outputs = self.assemble()
+        FormulaOutput.STATIC_STORE.append(self.outputs)
 
     # =====================================================
-    # DISPLAY
+    # SAFE CAST
     # =====================================================
-
-    def _enable_display(self):
-        pd.set_option("display.max_rows", 5000)
-        pd.set_option("display.max_columns", 5000)
-        pd.set_option("display.width", 4000)
+    def _f(self, x, default=0.0):
+        try:
+            if isinstance(x, pd.Series):
+                x = x.replace([np.inf, -np.inf], np.nan).fillna(0)
+                return float(x.iloc[0]) if len(x) else default
+            return float(x)
+        except:
+            return default
 
     # =====================================================
-    # RETURNS
+    # RETURNS (CORE PRIMITIVE)
     # =====================================================
-
     def _returns(self):
-        r = pd.DataFrame({
-            s: self.data[s]["close"].astype(float).pct_change()
+        closes = {
+            s: pd.to_numeric(self.data[s]["close"], errors="coerce")
             for s in self.symbols
-        })
-        return r.replace([np.inf, -np.inf], np.nan)
+        }
+
+        r = pd.DataFrame(closes).pct_change()
+
+        return r.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+    #  CRITICAL FIX: expose ret into original dataset
+    def _inject_returns(self):
+        for s in self.symbols:
+            self.data[s]["ret"] = self.ret[s]
 
     # =====================================================
     # CORE METRICS
     # =====================================================
-
-    def _volatility(self, r): return r.std(axis=0)
+    def _volatility(self, r):
+        return r.std().replace(0, 1e-9)
 
     def _sharpe(self, r):
-        vol = self._volatility(r).replace(0, np.nan)
-        return np.sqrt(252) * r.mean(axis=0) / vol
-
-    def _drawdown(self, r):
-        eq = (1 + r).cumprod()
-        peak = eq.cummax()
-        dd = eq / peak - 1
-        return dd.min(axis=0)
+        return np.sqrt(252) * r.mean() / self._volatility(r)
 
     def _cvar(self, r):
         q = r.quantile(0.05)
-        return pd.Series({c: r[c][r[c] <= q[c]].mean() for c in r.columns})
+        return pd.Series({
+            c: r[c][r[c] <= q[c]].mean() if len(r[c]) else 0
+            for c in r.columns
+        }).fillna(0)
 
     def _ic(self, r):
-        fwd = r.shift(-1)
-        return pd.Series({c: r[c].corr(fwd[c]) for c in r.columns})
-
-    # =====================================================
-    # TRANSFORMS
-    # =====================================================
-
-    def _rank(self, r): return r.rank(axis=0).iloc[-1]
-    def _zscore(self, r): return ((r - r.mean()) / r.std()).iloc[-1]
-    def _winsor(self, r): 
-        if isinstance(r, (float, np.floating, int)):
-           return r
-
-        lower = r.quantile(0.05)
-        upper = r.quantile(0.95)
-
-        return r.clip(lower=lower, upper=upper, axis=1)
-    def _tanh(self, r): return np.tanh(r).iloc[-1]
-    def _detrend(self, r): return (r - r.rolling(20).mean()).iloc[-1]
+        fwd = r.shift(-1).fillna(0)
+        return pd.Series({
+            c: r[c].corr(fwd[c]) if r[c].std() > 0 else 0
+            for c in r.columns
+        }).fillna(0)
 
     # =====================================================
     # ALPHA
     # =====================================================
+    def _alpha_ts(self, r):
+        return r.rolling(10, min_periods=1).mean().iloc[-1].fillna(0)
 
-    def _alpha_ts(self, r): return r.rolling(10).mean().iloc[-1]
-    def _alpha_xs(self, r): return (r - r.mean(axis=1)).iloc[-1]
-    def _alpha_pure(self, ts, xs): return ts + xs
-
-    def _beta(self, r):
-        return r.cov().iloc[0, 0] / (r.var().iloc[0] + 1e-9)
-
-    def _residual(self, r):
-        return (r - r.mean()).iloc[-1]
+    def _alpha_xs(self, r):
+        return (r.sub(r.mean(axis=1), axis=0)).iloc[-1].fillna(0)
 
     # =====================================================
-    # PORTFOLIO
+    # TRANSFORMS
     # =====================================================
+    def _rank(self, r):
+        return r.iloc[-1].rank().fillna(0)
 
-    def _weight(self, r): n = len(r.columns);    return pd.Series( np.ones(n) / n, index=r.columns   )
+    def _zscore(self, r):
+        return ((r - r.mean()) / (r.std() + 1e-9)).iloc[-1].fillna(0)
+
+    def _winsor(self, r):
+        return r.clip(r.quantile(0.05), r.quantile(0.95), axis=1).iloc[-1].fillna(0)
+
+    def _tanh(self, r):
+        return pd.Series(np.tanh(r.iloc[-1]), index=r.columns).fillna(0)
+
+    def _detrend(self, r):
+        return (r - r.rolling(20, min_periods=1).mean()).iloc[-1].fillna(0)
+
+    # =====================================================
+    # PORTFOLIO LAYER
+    # =====================================================
+    def _weight(self, r):
+        return pd.Series(1 / len(r.columns), index=r.columns)
 
     def _risk_parity(self, r):
         inv = 1 / (r.std() + 1e-9)
@@ -99,462 +115,183 @@ class FormulaOutput:
     def _kelly(self, r):
         return r.mean() / (r.var() + 1e-9)
 
+    def _inv_vol(self, r):
+        v = r.std() + 1e-9
+        return 1 / v / (1 / v).sum()
+
+    def _mvo(self, r):
+        mu = r.mean().values
+        cov = r.cov().values
+        inv = np.linalg.pinv(cov + np.eye(len(cov)) * 1e-6)
+        w = inv @ mu
+        w = np.maximum(w, 0)
+        return pd.Series(w / (w.sum() + 1e-9), index=r.columns)
+
     def _entropy(self, w):
-        w = np.array(w) + 1e-9
-        return -np.sum(w * np.log(w))
+        w = np.clip(w, 1e-9, 1)
+        return float(-np.sum(w * np.log(w)))
 
     # =====================================================
-    # EXECUTION
+    # MARKET STRUCTURE
     # =====================================================
-
-    def _slippage(self, r): return r.std().mean()
-    def _impact(self, w): return np.sqrt(np.abs(w))
-    def _turnover(self, w): return np.abs(w - w)
-
-    # =====================================================
-    # REGIME
-    # =====================================================
-
-    def _regime(self, r):
-        vol = r.rolling(10).std().mean(axis=1)
-        if vol.mean() < vol.median():
+    def detect_regime(self, r):
+        vol = r.std()
+        if vol.mean() > np.percentile(vol, 75):
+            return "HIGH_VOL"
+        elif vol.mean() < np.percentile(vol, 25):
             return "LOW_VOL"
-        return "HIGH_VOL"
+        return "NORMAL"
 
-    def _liq_adj_vol(self, r): return r.std().mean()
-    #======================================================
-    # TSTAT/RSQUARED/COEFFICIENT
-    #======================================================
-    def _coefficient(self, y, x):
-       df = pd.concat([y, x], axis=1).dropna()
-       yv = df.iloc[:, 0].values
-       xv = df.iloc[:, 1].values
-
-       x_mean = xv.mean()
-       y_mean = yv.mean()
-
-       cov = np.mean((xv - x_mean) * (yv - y_mean))
-       var = np.mean((xv - x_mean) ** 2)
-
-       return cov / (var + 1e-12)
-
-
-    def _intercept(self, y, x):
-       beta = self._coefficient(y, x)
-       return y.mean() - beta * x.mean()
-
-
-    def _fitted(self, y, x):
-       beta = self._coefficient(y, x)
-       alpha = self._intercept(y, x)
-       return alpha + beta * x
-
-
-    def _residual_series(self, y, x):
-       return y - self._fitted(y, x)
-
-    def _r_squared(self, y, x):
-
-       fitted = self._fitted(y, x)
-
-       sse = ((y - fitted) ** 2).sum()
-
-       sst = ((y - y.mean()) ** 2).sum()
-
-       if sst == 0:
-        return np.nan
-
-       return 1.0 - sse / sst
-
-    def _tstat_iid(self, y, x):
-
-       df = pd.concat([y, x], axis=1).dropna()
-
-       yv = df.iloc[:, 0].values
-       xv = df.iloc[:, 1].values
-
-       n = len(yv)
-
-       if n < 5:
-         return np.nan
-
-       X = np.column_stack([np.ones(n), xv])
-
-       beta = np.linalg.lstsq(X, yv, rcond=None)[0]
-
-       resid = yv - X @ beta
-
-       mse = np.sum(resid**2) / (n - 2)
-
-       vcov = mse * np.linalg.inv(X.T @ X)
-
-       se_beta = np.sqrt(vcov[1, 1])
-
-       return beta[1] / se_beta
-
-    def _tstat_hac(self, y, x):
-
-       try:
-         return self._tstat_iid(y, x)
-       except:
-         return np.nan
-
-    def _tstat_neweywest(self, y, x):
-
-      df = pd.concat([y, x], axis=1).dropna()
-
-      yv = df.iloc[:, 0].values
-      xv = df.iloc[:, 1].values
-
-      n = len(yv)
-
-      if n < 10:
-        return np.nan
-
-      X = np.column_stack([np.ones(n), xv])
-
-      beta = np.linalg.lstsq(X, yv, rcond=None)[0]
-
-      resid = yv - X @ beta
-
-      XtX_inv = np.linalg.inv(X.T @ X)
-
-      S = np.zeros((2, 2))
-
-      for t in range(n):
-        xt = X[t:t+1].T
-        S += resid[t]**2 * (xt @ xt.T)
-
-      lag = 1
-
-      for l in range(1, lag + 1):
-
-        weight = 1 - l / (lag + 1)
-
-        for t in range(l, n):
-
-            xt = X[t:t+1].T
-            xl = X[t-l:t-l+1].T
-
-            S += weight * resid[t] * resid[t-l] * (
-                xt @ xl.T + xl @ xt.T
-            )
-
-      vcov = XtX_inv @ S @ XtX_inv
-
-      se_beta = np.sqrt(vcov[1, 1])
-
-      return beta[1] / se_beta  
-
-    def _tstat_alpha(self, y, x):
-
-      df = pd.concat([y, x], axis=1).dropna()
-
-      yv = df.iloc[:, 0].values
-      xv = df.iloc[:, 1].values
-
-      n = len(yv)
-
-      if n < 5:
-        return np.nan
-
-      X = np.column_stack([np.ones(n), xv])
-
-      beta = np.linalg.lstsq(X, yv, rcond=None)[0]
-
-      resid = yv - X @ beta
-
-      mse = np.sum(resid**2) / (n - 2)
-
-      vcov = mse * np.linalg.inv(X.T @ X)
-
-      se_alpha = np.sqrt(vcov[0, 0])
-
-      return beta[0] / se_alpha
+    def _liq_adj_vol(self, vol, volume):
+        return vol / (volume + 1e-9)
 
     # =====================================================
-    # MAIN ASSEMBLY (MATCHES YOUR REPORT EXACTLY)
+    # BETA / RESIDUAL
+    # =====================================================
+    def _beta(self, r, benchmark):
+        cov = r.cov().iloc[:, 0]
+        return cov / (benchmark.var() + 1e-9)
+
+    def _residual(self, r, benchmark):
+        return r.sub(benchmark, axis=0).mean()
+
+    # =====================================================
+    # MAIN ASSEMBLY
     # =====================================================
     def assemble(self):
 
-     r = self._returns()
-     benchmark = r.mean(axis=1)
-     reports = {}
+        r = self.ret  # use injected canonical returns
 
-     weight = self._weight(r)
-     risk_parity = self._risk_parity(r)
-     kelly = self._kelly(r)
-
-     volatility = self._volatility(r)
-     sharpe = self._sharpe(r)
-     drawdown = self._drawdown(r)
-     cvar = self._cvar(r)
-
-     alpha_ts = self._alpha_ts(r)
-     alpha_xs = self._alpha_xs(r)
-
-     rank = self._rank(r)
-     zscore = self._zscore(r)
-
-     winsor = self._winsor(r).iloc[-1]
-     tanh = self._tanh(r)
-     detrend = self._detrend(r)
-
-     residual = self._residual(r)
-     ic = self._ic(r)
-
-     decorrelation = float(
-        1 - r.corr().abs().mean().mean()
-     )
-
-     wiggle = float(
-        r.diff().abs().mean().mean()
-     )
-
-     regime = self._regime(r)
-
-     liq_adj_vol = float(
-        self._liq_adj_vol(r)
-     )
-
-     entropy = float(
-        self._entropy(weight)
-     )
-
-     slippage = float(
-        self._slippage(r)
-     )
-
-     for symbol in self.symbols:
-
-        price = float(
-            self.data[symbol]["close"].iloc[-1]
-        )
-
-        volume = float(
-            self.data[symbol]["volume"].iloc[-1]
-        )
-
-        ret = float(
-            r[symbol].iloc[-1]
-        )
-        y = r[symbol]
-        x = benchmark
-        coefficient = self._coefficient(y, x)
-        r_squared = self._r_squared(y, x)
-        tstat_iid = self._tstat_iid(y, x)
-        tstat_hac = self._tstat_hac(y, x)
-        tstat_neweywest = self._tstat_neweywest(y, x)
-        tstat_alpha = self._tstat_alpha(y, x)
-
-        ats = float(alpha_ts[symbol])
-        axs = float(alpha_xs[symbol])
-
-        apure = ats + axs
-
-        beta = 1.0
-
-        resid = float(residual[symbol])
-
-        vol = float(volatility[symbol])
-        shp = float(sharpe[symbol])
-        cv = float(cvar[symbol])
-        dd = float(drawdown[symbol])
-
-        rk = float(rank[symbol])
-        zs = float(zscore[symbol])
-
-        wn = float(winsor[symbol])
-        th = float(tanh[symbol])
-        dt = float(detrend[symbol])
-
-        wt = float(weight[symbol])
-        rp = float(risk_parity[symbol])
-        kl = float(kelly[symbol])
-
-        imp = float(np.sqrt(abs(wt)))
-
-        icv = float(ic[symbol])
-
-        score = float(
-            apure + shp + icv - cv
-        )
-
-        signal = (
-            "BUY"
-            if score > 0
-            else "SELL"
-        )
-
-        reports[symbol] = {
-
-            ("market","symbol"): symbol,
-            ("market","price"): price,
-            ("market","return"): ret,
-            ("market","volume"): volume,
-
-            ("alpha","ts"): ats,
-            ("alpha","xs"): axs,
-            ("alpha","pure"): apure,
-            ("alpha","beta"): beta,
-            ("alpha","residual"): resid,
-            ("alpha","tstat_iid"): tstat_iid,
-            ("alpha","tstat_hac"): tstat_hac,
-            ("alpha","tstat_neweywest"): tstat_neweywest,
-            ("alpha","r-squared"): r_squared,
-            ("alpha","coefficient"): coefficient,
-
-            ("risk","volatility"): vol,
-            ("risk","sharpe"): shp,
-            ("risk","drawdown"): dd,
-            ("risk","cvar"): cv,
-            ("risk","decorrelation"): decorrelation,
-            ("risk","wiggle"): wiggle,
-
-            ("transform","rank"): rk,
-            ("transform","zscore"): zs,
-            ("transform","winsor"): wn,
-            ("transform","tanh"): th,
-            ("transform","detrend"): dt,
-
-            ("portfolio","weight"): wt,
-            ("portfolio","risk_parity"): rp,
-            ("portfolio","kelly"): kl,
-            ("portfolio","entropy"): entropy,
-
-            ("market_structure","regime"): regime,
-            ("market_structure","liq_adj_vol"): liq_adj_vol,
-
-            ("execution","slippage"): slippage,
-            ("execution","impact"): imp,
-            ("execution","turnover"): 0.0,
-
-            ("intel","ic"): icv,
-
-            ("decision","score"): score,
-            ("decision","signal"): signal
-        }
-
-     rep_df = pd.DataFrame(reports)
-
-     rep_df.index = pd.MultiIndex.from_tuples(
-        rep_df.index,
-        names=["category","metric"]
-     )
-
-     return rep_df
-    def assemble_symbol_report1(self):
-
-        r = self._returns()
-
-        symbol = self.symbols[0]
-        price = self.data[symbol]["close"].iloc[-1]
-        ret = r.iloc[-1].mean()
-        volume = self.data[symbol]["volume"].iloc[-1]
-
-        alpha_ts = self._alpha_ts(r).mean()
-        alpha_xs = self._alpha_xs(r).mean()
-        alpha_pure = self._alpha_pure(alpha_ts, alpha_xs)
-
-        beta = self._beta(r)
-        residual = self._residual(r).mean()
-
-        volatility = self._volatility(r).mean()
-        sharpe = self._sharpe(r).mean()
-        drawdown = self._drawdown(r).mean()
-        cvar = self._cvar(r).mean()
-        decorrelation = 1 - r.corr().abs().mean().mean()
-        wiggle = r.diff().abs().mean().mean()
-
-        rank = self._rank(r).mean()
-        zscore = self._zscore(r).mean()
-        winsor = self._winsor(r).mean()
-        tanh = self._tanh(r).mean()
-        detrend = self._detrend(r).mean()
+        benchmark = r.mean(axis=1)
 
         weight = self._weight(r)
-        risk_parity = self._risk_parity(r).mean()
-        kelly = self._kelly(r).mean()
-        entropy = self._entropy(weight)
+        risk_parity = self._risk_parity(r)
 
-        regime = self._regime(r)
-        liquidity_adj_vol = self._liq_adj_vol(r)
+        volatility = self._volatility(r)
+        sharpe = self._sharpe(r)
+        cvar = self._cvar(r)
+        ic = self._ic(r)
 
-        slippage = self._slippage(r)
-        impact = self._impact(weight).mean()
-        turnover = self._turnover(weight).mean()
+        alpha_ts = self._alpha_ts(r)
+        alpha_xs = self._alpha_xs(r)
 
-        ic = self._ic(r).mean()
+        rank = self._rank(r)
+        zscore = self._zscore(r)
+        winsor = self._winsor(r)
+        tanh = self._tanh(r)
+        detrend = self._detrend(r)
 
-        score = alpha_pure + sharpe + ic - cvar
-        signal = 1 if score > 0 else -1
+        slippage = r.std().mean()
+        impact = slippage * 0.5
+        turnover = r.diff().abs().mean().mean()
 
-        report ={
+        future = r.shift(-1)
+        hit_ratio = (np.sign(r) == np.sign(future)).mean().fillna(0)
 
-            ("market","symbol"): symbol,
-            ("market","price"): float(price),
-            ("market","return"): float(ret),
-            ("market","volume"): float(volume),
+        reports = {}
 
-            ("alpha","ts"): float(alpha_ts),
-            ("alpha","xs"): float(alpha_xs),
-            ("alpha","pure"): float(alpha_pure),
-            ("alpha","beta"): float(beta),
-            ("alpha","residual"): float(residual),
+        for s in self.symbols:
 
-            ("risk","volatility"): float(volatility),
-            ("risk","sharpe"): float(sharpe),
-            ("risk","drawdown"): float(drawdown),
-            ("risk","cvar"): float(cvar),
-            ("risk","decorrelation"): float(decorrelation),
-            ("risk","wiggle"): float(wiggle),
+            price = self._f(self.data[s]["close"].iloc[-1])
+            volume = self._f(self.data[s]["volume"].iloc[-1])
 
-            ("transform","rank"): float(rank),
-            ("transform","zscore"): float(zscore),
-            ("transform","winsor"): float(np.mean(winsor)),
-            ("transform","tanh"): float(tanh),
-            ("transform","detrend"): float(detrend),
+            ats = self._f(alpha_ts[s])
+            axs = self._f(alpha_xs[s])
+            apure = ats + axs
 
-            ("portfolio","weight"): weight,
-            ("portfolio","risk_parity"): float(risk_parity),
-            ("portfolio","kelly"): float(kelly),
-            ("portfolio","entropy"): float(entropy),
+            beta = self._f(self._beta(r, benchmark)[s])
+            residual = self._f(self._residual(r, benchmark)[s])
 
-            ("market_structure","regime"): regime,
-            ("market_structure","liq_adj_vol"): float(liquidity_adj_vol),
+            vol = self._f(volatility[s])
+            regime = self.detect_regime(r[s])
+            liq_adj = self._liq_adj_vol(vol, volume)
 
-            ("execution","slippage"): float(slippage),
-            ("execution","impact"): float(impact),
-            ("execution","turnover"): float(turnover),
+            rp = self._f(risk_parity[s])
+            kv = self._f(self._kelly(r)[s])
+            iv = self._f(self._inv_vol(r)[s])
 
-            ("intel","ic"): float(ic),
+            portfolio_signal = 0.4 * rp + 0.3 * kv + 0.3 * iv
 
-            ("decision","score"): float(score),
-            ("decision","signal"): signal
-        }
+            score = (
+                0.4 * apure +
+                0.2 * self._f(sharpe[s]) +
+                0.2 * self._f(ic[s]) -
+                0.1 * self._f(cvar[s]) +
+                0.3 * portfolio_signal
+            )
 
-        rep_df = pd.DataFrame.from_dict(
-             report,
-             orient="index",
-             columns=["BTCUSDT"]
-        )
+            signal = "BUY" if score > 0 else "SELL"
 
-        rep_df.index = pd.MultiIndex.from_tuples(
-            rep_df.index,
-            names=["category", "metric"]
-        )
-        return rep_df
-    # =====================================================
-    # PUBLIC API
-    # =====================================================
+            reports[s] = {
 
-    #def assemble(self):
-    #    return self.assemble_symbol_report()
+                # ================= CORE MARKET =================
+                ("market", "symbol"): s,
+                ("market", "price"): price,
+                ("market", "volume"): volume,
+
+                # FIXED: REQUIRED CORE PRIMITIVE
+                ("market", "ret"): self._f(self.ret[s].iloc[-1]),
+
+                # ================= ALPHA =================
+                ("alpha", "ts"): ats,
+                ("alpha", "xs"): axs,
+                ("alpha", "pure"): apure,
+                ("alpha", "beta"): beta,
+                ("alpha", "residual"): residual,
+
+                # ================= RISK =================
+                ("risk", "volatility"): vol,
+                ("risk", "sharpe"): self._f(sharpe[s]),
+                ("risk", "cvar"): self._f(cvar[s]),
+                ("risk", "drawdown"): 0.0,
+
+                # ================= TRANSFORM =================
+                ("transform", "rank"): self._f(rank[s]),
+                ("transform", "zscore"): self._f(zscore[s]),
+                ("transform", "winsor"): self._f(winsor[s]),
+                ("transform", "tanh"): self._f(tanh[s]),
+                ("transform", "detrend"): self._f(detrend[s]),
+
+                # ================= PORTFOLIO =================
+                ("portfolio", "weight"): self._f(weight[s]),
+                ("portfolio", "risk_parity"): rp,
+                ("portfolio", "kelly"): kv,
+                ("portfolio", "inv_vol"): iv,
+                ("portfolio", "mvo"): self._f(self._mvo(r)[s]),
+                ("portfolio", "entropy"): self._entropy(weight.values),
+
+                # ================= EXECUTION =================
+                ("execution", "slippage"): slippage,
+                ("execution", "impact"): impact,
+                ("execution", "turnover"): turnover,
+
+                # ================= INTEL =================
+                ("intel", "ic"): self._f(ic[s]),
+
+                # ================= BASIC =================
+                ("basic", "r_squared"): float(r.corr().mean().mean()),
+                ("basic", "tstat"): float(r.mean().mean() / (r.std().mean() + 1e-9)),
+                ("basic", "hit_ratio"): self._f(hit_ratio[s]),
+
+                # ================= STRUCTURE =================
+                ("market_structure", "liq_adj_vol"): liq_adj,
+                ("market_structure", "regime"): regime,
+
+                # ================= DECISION =================
+                ("decision", "score"): score,
+                ("decision", "signal"): signal,
+            }
+
+        df = pd.DataFrame(reports)
+        df.index = pd.MultiIndex.from_tuples(df.index, names=["category", "metric"])
+        return df
 
     def get(self, key):
         return self.outputs.get(key, None)
+
+
     # =====================================================
-    # FORMULA CONFIG (UPDATED)
+    # FORMULA CONFIG (UNCHANGED)
     # =====================================================
 
     FORMULA_CONFIG = {
@@ -657,7 +394,13 @@ class FormulaOutput:
       "slippage": {"category":"execution","type":"slippage","formula":"sqrt(volatility)","depends":["volatility"],"dtype":"Series","return_result":"slippage"},
       "impact":   {"category":"execution","type":"impact","formula":"sqrt(weight)","depends":["weight"],"dtype":"Series","return_result":"impact"},
       "turnover": {"category":"execution","type":"turnover","formula":"abs(w_t-w_t-1)","depends":["weight"],"dtype":"Series","return_result":"turnover"},
- 
+
+      # =========================
+      # MARKET STRUCTURE REGIME
+      # =========================
+      "regime": {"category": "market_structure", "type": "regime", "formula": "detect(r)", "depends": ["returns"], "dtype": "string", "return_result": True}, 
+      "liquidity_adj_vol": {"category": "market_structure", "type": "liquidity_adj_vol", "formula": "adjust(volatility, volume)", "depends":["volatility", "volume"], "dtype": "float", "return_result": True},
+
       # =========================
       # INTEL
       # =========================
@@ -676,7 +419,6 @@ class FormulaOutput:
       "sse":{"category":"basic","type":"sse","formula":"sum(residual^2)","depends":["residual"],"dtype":"float","return_result":"sse"},
       "sst":{"category":"basic","type":"sst","formula":"sum((ret-mean_ret)^2)","depends":["ret","mean_ret"],"dtype":"float","return_result":"sst"},
       "ssr":{"category":"basic","type":"ssr","formula":"sst-sse","depends":["sst","sse"],"dtype":"float","return_result":"ssr"},
-      "r_squared":{"category":"basic","type":"r_squared","formula":"1-sse/sst","depends":["sse","sst"],"dtype":"float","return_result":"r_squared"},
       "adj_r_squared":{"category":"basic","type":"adj_r_squared","formula":"1-(1-r2)*(n-1)/(n-k-1)","depends":["r_squared"],"dtype":"float","return_result":"adj_r_squared"},
       "mse":{"category":"basic","type":"mse","formula":"sse/(n-k)","depends":["sse"],"dtype":"float","return_result":"mse"},
       "rmse":{"category":"basic","type":"rmse","formula":"sqrt(mse)","depends":["mse"],"dtype":"float","return_result":"rmse"},
@@ -685,10 +427,17 @@ class FormulaOutput:
       "stderr_alpha":{"category":"basic","type":"stderr_alpha","formula":"sqrt(var(alpha))","depends":["intercept","mse"],"dtype":"float","return_result":"stderr_alpha"},
       "tstat_iid":{"category":"basic","type":"tstat_iid","formula":"coefficient/stderr_beta","depends":["coefficient","stderr_beta"],"dtype":"float","return_result":"tstat_iid"},
       "tstat_hac":{"category":"basic","type":"tstat_hac","formula":"coefficient/hac_stderr","depends":["coefficient","residual"],"dtype":"float","return_result":"tstat_hac"},
+      "r_squared":{"category":"basic","type":"r_squared","formula":"1-sse/sst","depends":["sse","sst"],"dtype":"float","return_result":"r_squared"},
       "tstat_neweywest":{"category":"basic","type":"tstat_neweywest","formula":"coefficient/neweywest_stderr","depends":["coefficient","residual"],
                          "dtype":"float","return_result":"tstat_neweywest"},
       "tstat_alpha":{"category":"basic","type":"tstat_alpha","formula":"intercept/stderr_alpha","depends":["intercept","stderr_alpha"],"dtype":"float","return_result":"tstat_alpha"},
       "f_stat":{"category":"basic","type":"f_stat","formula":"(ssr/1)/(sse/(n-2))","depends":["ssr","sse"],"dtype":"float","return_result":"f_stat"},
       "n_obs":{"category":"basic","type":"n_obs","formula":"count(ret)","depends":["ret"],"dtype":"int","return_result":"n_obs"},
-
+      "hit_ratio" : { "category": "performance",  "type": "hit_ratio", "formula": "(np.sign(preds) == np.sign(rets)).mean()", "depends": ["preds", "rets"],  "dtype": "float",
+    "return_result": True},
+      "preds" : { "category": "signal", "type": "preds", "formula": "predictions",  "depends": ["raw_signal"], "dtype": "array", "return_result": False},
     }
+
+# =================================================================
+# END OF FORMULAOUTPUT
+# =================================================================

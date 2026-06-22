@@ -1,3 +1,11 @@
+# ===============================================================
+# StrategyInit : Core initialized engine driver
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : initiates pipeline strategy and dashboard
+# ===============================================================
+
+from config import DEFAULT_SYMBOLS
 from .PickleDataManager import PickleDataManager
 from .qxEngine import QuantXEngine
 from .StrategyCharts import QXDashboard
@@ -6,45 +14,14 @@ import pandas as pd
 
 
 # =====================================================
-# SYMBOL UNIVERSE
-# =====================================================
-SYMBOLS = [
-    "BTCUSDT.pkl",
-    "ETHUSDT.pkl",
-    "SOLUSDT.pkl",
-    "BNBUSDT.pkl",
-    "XRPUSDT.pkl",
-    "DOGEUSDT.pkl",
-    "AAPL.pkl", 
-    "MSFT.pkl", 
-    "NVDA.pkl", 
-    "AMD.pkl",
-    "SPY.pkl",
-    "QQQ.pkl",
-    "IWM.pkl",
-    "TLT.pkl",
-    "GLD.pkl",
-    "SCHD.pkl",
-    "VOO.pkl",
-    "VOOG.pkl",
-    "VTI.pkl",
-    "IONQ.pkl",
-    "RGTI.pkl",
-    "MU.pkl",
-    "PL.pkl"
-]
-
-
-# =====================================================
 # DATA LOADER
 # =====================================================
-def strategy_build_universe(dm):
+
+def strategy_build_universe(dm, symbols):
 
     data = {}
 
-    for file_name in SYMBOLS:
-
-        symbol = file_name.replace(".pkl", "")
+    for symbol in symbols:
 
         try:
             df = dm.fetch_store(symbol)
@@ -64,16 +41,26 @@ def strategy_build_universe(dm):
 # =====================================================
 # STRATEGY PIPELINE (CLEAN ORCHESTRATOR ONLY)
 # =====================================================
+
 class StrategyInit:
 
     @staticmethod
-    def run(interval="4y"):
+    def run(interval="4y", run_option="production", symbols=None):
+
+        # =====================================================
+        # USE SINGLE SOURCE OF TRUTH
+        # =====================================================
+
+        if symbols is None:
+            symbols = DEFAULT_SYMBOLS
 
         # -------------------------------------
-        # DATA LOAD
+        # DATA LOAD (ENV-AWARE)
         # -------------------------------------
-        dm = PickleDataManager()
-        data = strategy_build_universe(dm)
+
+        dm = PickleDataManager(run_option=run_option)
+       
+        data = strategy_build_universe(dm, symbols)
 
         if not data:
             raise RuntimeError("[DATA] Universe empty")
@@ -83,6 +70,7 @@ class StrategyInit:
         # -------------------------------------
         # ENGINE EXECUTION
         # -------------------------------------
+
         engine = QuantXEngine()
 
         strategies = engine.qxStrategyList(
@@ -95,6 +83,7 @@ class StrategyInit:
         # -------------------------------------
         # FILTER VALID STRATEGIES ONLY
         # -------------------------------------
+
         valid_strategies = [
             s for s in strategies
             if getattr(s, "signals", None) is not None
@@ -105,16 +94,13 @@ class StrategyInit:
         # -------------------------------------
         # DASHBOARD ONLY (NO RENDERING HERE)
         # -------------------------------------
+
         dashboard = QXDashboard.get()
-
-        # Feed engine outputs into dashboard state
-        #dashboard["strategies"] = valid_strategies
-
-        #print("[DASHBOARD] Updated with strategies")
 
         # -------------------------------------
         # RETURN PIPELINE STATE ONLY
         # -------------------------------------
+
         return {
             "data": data,
             "strategies": strategies,
@@ -126,9 +112,13 @@ class StrategyInit:
 # =====================================================
 # STANDALONE TEST
 # =====================================================
+
 if __name__ == "__main__":
 
-    result = StrategyInit.run(interval="4y")
+    result = StrategyInit.run(
+        interval="4y",
+        run_option="production"
+    )
 
     print(f"\n[COMPLETE] {len(result['strategies'])} strategies")
     print(f"[VALID] {len(result['valid_strategies'])}")
@@ -139,8 +129,11 @@ if __name__ == "__main__":
     print(dashboard.keys())
 
     print("\n========== STRATEGIES ==========")
-    print(len(dashboard.get("strategies", [])))
+    print(len(result["strategies"]))
 
     # ONLY visualization layer now
-    from .StrategyCharts import QXDashboard
     QXDashboard.displayFrame()
+
+# ========================================================
+# END OF STRATEGY INIT
+# ========================================================
