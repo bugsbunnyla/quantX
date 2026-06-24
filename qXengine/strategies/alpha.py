@@ -132,14 +132,38 @@ chart:
 ===========================================================
 """
 class AlphaStrategy(BaseStrategy):
+    # -------------------------------------------------
+    # INDEX
+    # -------------------------------------------------
+    def _ensure_datetime_index(self, df):
 
+        df = df.copy()
+
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
+            df = df[df["date"] > pd.Timestamp("2000-01-01")]
+            df = df.sort_values("date")
+            df = df.set_index("date")
+
+        else:
+            df.index = pd.to_datetime(df.index, errors="coerce")
+            df = df[df.index.notna()]
+            df = df[df.index > pd.Timestamp("2000-01-01")]
+            df = df.sort_index()
+
+        return df
+
+    # -------------------------------------------------
+    # RUN
+    # -------------------------------------------------
     def run(self):
 
         window = self.lookback()
 
         benchmark = self.get_cfg(
             "benchmark",
-            self.runtime_cfg.get("benchmark")
+            self.runtime_cfg.get("benchmark", "SPY")
         )
 
         top_q = self.get_cfg("top_quantile", 0.2)
@@ -154,22 +178,20 @@ class AlphaStrategy(BaseStrategy):
             return self.build_result(
                 signal={},
                 metrics={"error": "Benchmark missing"},
-                chart=self.build_chart(
-                    charttype="bar",
-                    chartdata={}
-                )
+                chart=self.build_chart(charttype="bar", chartdata={})
             )
 
-        benchmark_ret = (
-            self.data[benchmark]["ret"]
-            .dropna()
-        )
+        # ==================================================
+        # NORMALIZED BENCHMARK (MASTER INDEX SAFE)
+        # ==================================================
+        benchmark_df = self._ensure_datetime_index(self.data[benchmark])
+        benchmark_ret = benchmark_df["ret"].dropna()
 
         alpha_scores = {}
         beta_scores = {}
 
         # ==================================================
-        # ALPHA COMPUTATION
+        # FACTOR ESTIMATION
         # ==================================================
         for symbol, df in self.data.items():
 
@@ -178,6 +200,8 @@ class AlphaStrategy(BaseStrategy):
 
             if "ret" not in df.columns:
                 continue
+
+            df = self._ensure_datetime_index(df)
 
             asset_ret = df["ret"].dropna()
 
@@ -222,13 +246,11 @@ class AlphaStrategy(BaseStrategy):
             return self.build_result(
                 signal={},
                 metrics={"error": "No alpha computed"},
-                chart=self.build_chart(charttype="bar")
+                chart=self.build_chart(charttype="bar", chartdata={})
             )
 
         symbols = list(alpha_scores.keys())
-        scores = np.array(list(alpha_scores.values()))
-
-        scores = np.nan_to_num(scores)
+        scores = np.nan_to_num(np.array(list(alpha_scores.values())))
 
         sorted_idx = np.argsort(scores)
 
@@ -240,7 +262,7 @@ class AlphaStrategy(BaseStrategy):
         short_idx = sorted_idx[:n_short]
 
         # ==================================================
-        # SIGNALS (PORTFOLIO WEIGHTS)
+        # SIGNAL
         # ==================================================
         signal = {}
 
@@ -251,33 +273,54 @@ class AlphaStrategy(BaseStrategy):
             signal[symbols[i]] = -1.0 / n_short
 
         # ==================================================
-        # CFG-DRIVEN CHART DATA
+        # SIGNAL CURVE
         # ==================================================
-        series_cfg = chart_cfg.get("series", [])
+        ordered = sorted(alpha_scores.items(), key=lambda x: x[1])
 
+        signal_curve_data = {
+            "x": [k for k, _ in ordered],
+            "y": [v for _, v in ordered],
+            "hover": [{"symbol": k, "alpha": v} for k, v in ordered]
+        }
+
+        # ==================================================
+        # BENCHMARK (FIXED - NO 1970 BUG)
+        # ==================================================
+        bench = benchmark_df["close"].dropna()
+
+        if len(bench) > 0:
+            cutoff = bench.index.max() - pd.DateOffset(years=4)
+            bench = bench.loc[bench.index >= cutoff]
+
+        bench = bench.resample("QE").last()
+
+        benchmark_close = {
+            "x": bench.index.to_pydatetime().tolist(),
+            "y": bench.values.tolist()
+        }
+
+        # ==================================================
+        # CHART DATA
+        # ==================================================
         chartdata = {
-            "signal": alpha_scores,
+            "alpha_scores": alpha_scores,
+            "beta_scores": beta_scores,
             "benchmark": benchmark,
+            "benchmark_close": benchmark_close,
+            "signal": signal,
+            "signal_curve": signal_curve_data,
             "assets": symbols
         }
 
-        # optional enrichment if needed later
-        if benchmark in self.data:
-            chartdata["benchmark_close"] = (
-                self.data[benchmark]["close"].tolist()
-                if "close" in self.data[benchmark]
-                else []
-            )
-
         # ==================================================
-        # CHART (CFG DRIVEN)
+        # CHART
         # ==================================================
         chart = self.build_chart(
             charttype=chart_cfg.get("type", "bar"),
             chartmode="markers",
             title=chart_cfg.get("title", "Alpha Strategy"),
             chartdata=chartdata,
-            series=series_cfg
+            series=chart_cfg.get("series", [])
         )
 
         # ==================================================
@@ -291,9 +334,12 @@ class AlphaStrategy(BaseStrategy):
             "alpha_scores": alpha_scores,
             "beta_scores": beta_scores
         }
-         
+
         return self.build_result(
             signal=signal,
             metrics=metrics,
             chart=chart
         )
+# ===========================================================
+# END OF ALPHA STRATEGY
+# ===========================================================

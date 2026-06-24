@@ -45,7 +45,7 @@ def strategy_build_universe(dm, symbols):
 class StrategyInit:
 
     @staticmethod
-    def run(interval="4y", run_option="production", symbols=None):
+    def run(interval="4y", run_option=None, symbols=None):
 
         # =====================================================
         # USE SINGLE SOURCE OF TRUTH
@@ -58,7 +58,7 @@ class StrategyInit:
         # DATA LOAD (ENV-AWARE)
         # -------------------------------------
 
-        dm = PickleDataManager(run_option=run_option)
+        dm = PickleDataManager(run_option)
        
         data = strategy_build_universe(dm, symbols)
 

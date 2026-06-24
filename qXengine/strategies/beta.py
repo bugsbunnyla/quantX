@@ -173,9 +173,14 @@ class BetaNeutralStrategy(BaseStrategy):
         portfolio = aligned.dot(weights)
         portfolio_curve = self._last_4y(portfolio.cumsum())
 
-        benchmark_series = self._last_4y(
-            benchmark_ret.reindex(portfolio_curve.index).ffill()
-        )
+        benchmark_series = (
+                          benchmark_ret
+                          .reindex(portfolio_curve.index)
+                         .fillna(0)
+                        .cumsum()
+                    )
+
+        benchmark_series = self._last_4y(benchmark_series)
 
         chartdata = {
             "pnl": portfolio_curve,

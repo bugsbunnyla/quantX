@@ -15,7 +15,7 @@ class PickleDataManager:
     # =========================================================
     # INIT
     # =========================================================
-    def __init__(self, run_option="production"):
+    def __init__(self, run_option):
 
         if run_option not in ENVIRONMENTS:
             raise ValueError(f"Invalid run_option: {run_option}")
@@ -90,14 +90,17 @@ class PickleDataManager:
     # PROVIDER CONFIG
     # =========================================================
     def _provider_config(self, symbol: str):
+       asset_type = self._asset_type(symbol)
 
-        asset_type = self._asset_type(symbol)
+       cfg = self.market_data.get(asset_type, {})
 
-        return self.market_data.get(asset_type, {
-            "provider": "yahoo",
-            "allow_api": True,
-            "allow_cache": True
-        })
+       # if nested provider exists (crypto case)
+       provider_name = cfg.get("provider")
+
+       if isinstance(cfg.get(provider_name), dict):
+          return cfg[provider_name]
+
+       return cfg
 
     # =========================================================
     # API ROUTER (SAFE + COMPLETE)
@@ -283,6 +286,7 @@ class PickleDataManager:
 
         if close is not None:
             df["ret"] = close.pct_change()
+        df = df.dropna(subset=["close"])
 
         df.to_pickle(path)
 
@@ -304,16 +308,28 @@ class PickleDataManager:
         if self.run_option == "backtest":
 
             if os.path.exists(path):
-                df = pd.read_pickle(path)
-                df = self._normalize_columns(df)
 
-                close = self._extract_series(df, "close")
-                if close is not None:
-                    df["ret"] = close.pct_change()
+               df = pd.read_pickle(path)
+               df = self._normalize_columns(df)
 
-                return df
+               close = self._extract_series(df, "close")
+               if close is not None:
+                  df["ret"] = close.pct_change()
 
-            raise FileNotFoundError(f"[BACKTEST] Missing snapshot: {path}")
+               return df
+
+            # auto fallback instead of crash
+            print(f"[BACKTEST] Missing cache for {symbol}, falling back to production fetch...")
+
+            df = self._fetch_api(symbol)
+
+            if df is None or df.empty:
+               raise ValueError(f"[BACKTEST] No data for {symbol}")
+
+            # store snapshot so next run is stable
+            self._store(path, df)
+
+            return df
 
         # -------------------------
         # PRODUCTION CACHE FIRST
@@ -384,7 +400,9 @@ class PickleDataManager:
             except Exception as e:
                 print(f"[DATA] Failed {symbol}: {e}")
 
-        print(f"[DATA] Bootstrap complete: {len(dataset)} assets")
+        print(f"[DATA] Bootstrap complete: {len(dataset)} assets")    
+        if len(dataset) == 0:
+           raise RuntimeError(f"[DATA] Universe empty in {self.run_option}")
 
         return dataset
 

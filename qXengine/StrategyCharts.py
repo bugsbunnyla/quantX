@@ -36,112 +36,208 @@ class StrategyChart:
 # ==================================================
 # ALPHA STRATEGY VISUALIZER (PURE FUNCTION STYLE)
 # ==================================================
+
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+
+
 class AlphaStrategyChart(StrategyChart):
 
-    STATIC_MAP = {
-        "series": ["signals", "returns", "metrics"],
-        "chart": ["alpha_scores", "beta_scores"]
-    }
+    # ==================================================
+    # SAFE RESCALE (prevents flat lines)
+    # ==================================================
+    @staticmethod
+    def _safe_scale(y):
+        y = np.asarray(y, dtype=float)
+        if len(y) == 0:
+            return y
 
+        # prevent domination
+        max_val = np.nanmax(np.abs(y))
+        if max_val == 0:
+            return y
+
+        return y / max_val
+
+    # ==================================================
+    # CATEGORICAL SERIES
+    # ==================================================
     @staticmethod
     def _plot_dict(fig, d, name):
-      if d is None:
-        return False
 
-      if not isinstance(d, dict):
-        return False
+        if not isinstance(d, dict) or not d:
+            return False
 
-      if len(d) == 0:
-        return False
+        y = AlphaStrategyChart._safe_scale(list(d.values()))
 
-      fig.add_trace(
-        go.Bar(
+        fig.add_trace(go.Bar(
             x=list(d.keys()),
-            y=list(d.values()),
+            y=y,
             name=name
-        )
-      )
-
-      return True
-    @staticmethod
-    def _plot_series(fig, v, name):
-        if v is None:
-            return False
-
-        try:
-            v = list(v)
-        except Exception:
-            return False
-
-        fig.add_trace(
-            go.Scatter(
-                y=v,
-                mode="lines",
-                name=name
-            )
-        )
+        ))
         return True
 
-    @staticmethod
-    def get_attr_or_key(obj, name, default=None):
-        if isinstance(obj, dict):
-           return obj.get(name, default)
-        return getattr(obj, name, default)
     # ==================================================
-    # MAIN RENDER (FIXED CONTRACT)
+    # SIGNAL
+    # ==================================================
+    @staticmethod
+    def _plot_signal(fig, signal, name="signal"):
+
+        if not signal:
+            return False
+
+        if isinstance(signal, dict) and "x" in signal:
+
+            y = AlphaStrategyChart._safe_scale(signal["y"])
+
+            fig.add_trace(go.Scatter(
+                x=signal["x"],
+                y=y,
+                mode="lines+markers",
+                name=name
+            ))
+            return True
+
+        ordered = sorted(signal.items(), key=lambda x: x[1])
+        y = AlphaStrategyChart._safe_scale([v for _, v in ordered])
+
+        fig.add_trace(go.Bar(
+            x=[k for k, _ in ordered],
+            y=y,
+            name=name
+        ))
+
+        return True
+
+    # ==================================================
+    # BENCHMARK (ONLY TIME SERIES WHEN SOLO)
+    # ==================================================
+    @staticmethod
+    def _plot_benchmark(fig, series, name="benchmark", force_symbol_mode=False):
+
+        if series is None:
+            return False
+
+        if isinstance(series, dict):
+            x = pd.to_datetime(series.get("x", []), errors="coerce")
+            y = series.get("y", [])
+        else:
+            s = pd.Series(series).dropna()
+            x = pd.to_datetime(s.index, errors="coerce")
+            y = s.values
+
+        mask = pd.notna(x)
+
+        y = AlphaStrategyChart._safe_scale(np.asarray(y)[mask])
+
+        if force_symbol_mode:
+            # convert datetime → symbol labels
+            x_plot = pd.Series(x[mask]).dt.strftime("%Y-%m")
+        else:
+            x_plot = x[mask]
+
+        fig.add_trace(go.Scatter(
+            x=x_plot,
+            y=y,
+            mode="lines",
+            name=name
+        ))
+
+        return True
+
+    # ==================================================
+    # PORTFOLIO
+    # ==================================================
+    @staticmethod
+    def _plot_portfolio(fig, port):
+
+        if not port:
+            return False
+
+        s = pd.Series(port)
+        s.index = pd.to_datetime(s.index, errors="coerce")
+        s = s.sort_index()
+
+        mask = pd.notna(s.index)
+
+        y = AlphaStrategyChart._safe_scale(s.values[mask])
+
+        fig.add_trace(go.Scatter(
+            x=s.index[mask].strftime("%Y-%m"),
+            y=y,
+            mode="lines",
+            name="portfolio_curve"
+        ))
+
+        return True
+
+    # ==================================================
+    # RENDER (DECISION ENGINE)
     # ==================================================
     @staticmethod
     def render(item):
 
-      fig = go.Figure()
-      metrics = getattr(item, "metrics", None) or {}
-      series = getattr(item, "series", None) or {}
+        fig = go.Figure()
+        chartdata = getattr(item.chart, "chartdata", {}) or {}
 
-      # normalize safely
-      if hasattr(metrics, "__dict__"):
-          metrics = vars(metrics)
+        has_factors = any([
+            chartdata.get("alpha_scores"),
+            chartdata.get("beta_scores"),
+            chartdata.get("signal_curve")
+        ])
 
-      if hasattr(series, "__dict__"):
-          series = vars(series)
+        has_benchmark = chartdata.get("benchmark_close") is not None
+        has_portfolio = chartdata.get("portfolio_curve") is not None
 
-      # -----------------------
-      # SERIES
-      # -----------------------
-      metrics_series = item.metrics
-            
-      AlphaStrategyChart._plot_series(fig, item.signals, "signals")
-      AlphaStrategyChart._plot_series(fig, metrics.get("returns"), "returns")
-      #f isinstance(metrics_series, dict):
-      #   AlphaStrategyChart._plot_dict(fig, metrics_series, "metrics")
-      # -----------------------
-      # CHART METRICS
-      # -----------------------
-      alpha = metrics.get("alpha_scores")
-      beta = metrics.get("beta_scores")
+        # -------------------------
+        # CASE 1: FACTORS EXIST → FORCE SYMBOL MODE
+        # -------------------------
+        if has_factors:
 
-      #print("[DEBUG] alpha:", type(alpha), alpha is not None)
-      #print("[DEBUG] beta:", type(beta), beta is not None)
+            AlphaStrategyChart._plot_dict(fig, chartdata.get("alpha_scores"), "alpha_scores")
+            AlphaStrategyChart._plot_dict(fig, chartdata.get("beta_scores"), "beta_scores")
+            AlphaStrategyChart._plot_signal(fig, chartdata.get("signal_curve"), "signal_curve")
 
-      # FIX: normalize before plotting
-      if isinstance(alpha, dict):
-          AlphaStrategyChart._plot_dict(fig, alpha, "alpha_scores")
-      elif isinstance(alpha, (list, tuple, np.ndarray, pd.Series)):
-          AlphaStrategyChart._plot_series(fig, alpha, "alpha_scores")
+            if has_benchmark:
+                AlphaStrategyChart._plot_benchmark(
+                    fig,
+                    chartdata.get("benchmark_close"),
+                    force_symbol_mode=True
+                )
 
-      if isinstance(beta, dict):
-          AlphaStrategyChart._plot_dict(fig, beta, "beta_scores")
-      elif isinstance(beta, (list, tuple, np.ndarray, pd.Series)):
-          AlphaStrategyChart._plot_series(fig, beta, "beta_scores")
+            if has_portfolio:
+                AlphaStrategyChart._plot_portfolio(fig, chartdata.get("portfolio_curve"))
 
-      fig.update_layout(
-          template="plotly_dark",
-          barmode="group",
-          title=getattr(item, "name", "AlphaStrategy")
-      )
+            fig.update_layout(
+                template="plotly_dark",
+                barmode="group",
+                hovermode="x unified",
+                legend=dict(orientation="v")
+            )
 
-      return fig
+        # -------------------------
+        # CASE 2: BENCHMARK ONLY → TIME MODE
+        # -------------------------
+        else:
 
+            if has_benchmark:
+                AlphaStrategyChart._plot_benchmark(
+                    fig,
+                    chartdata.get("benchmark_close"),
+                    force_symbol_mode=False
+                )
 
+            if has_portfolio:
+                AlphaStrategyChart._plot_portfolio(fig, chartdata.get("portfolio_curve"))
+
+            fig.update_layout(
+                template="plotly_dark",
+                hovermode="x unified",
+                legend=dict(orientation="v")
+            )
+
+        return fig
 
 # ==================================================
 # STRATEGY CHARTS (UNCHANGED BUT SAFE)
@@ -3578,7 +3674,7 @@ class BetaNeutralStrategyChart(StrategyChart):
         # ==================================================
         # PLOT (NO 1970 POSSIBLE)
         # ==================================================
-        BetaNeutralStrategyChart._plot(fig, pnl, "Beta-Neutral PnL")
+        BetaNeutralStrategyChart._plot(fig, pnl, "Beta-Neutral Residual Return")
 
         if benchmark is not None:
             BetaNeutralStrategyChart._plot(fig, benchmark, benchmark_key)
@@ -3596,9 +3692,9 @@ class BetaNeutralStrategyChart(StrategyChart):
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
-            title="Beta Neutral Strategy (4Y Performance)",
+            title="Beta-Neutral Residual Return",
             xaxis_title="Time",
-            yaxis_title="Normalized Value",
+            yaxis_title= "Cumulative Residual Return",
             hovermode="x unified"
         )
 

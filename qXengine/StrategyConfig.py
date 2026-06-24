@@ -140,7 +140,7 @@ STRATEGY_CONFIG = {
 
         "series": [
             {
-                "name": "Beta-Neutral PnL",
+                "name": "Beta-Neutral Residual Return",
                 "source": "pnl",
                 "style": "line"
             },
