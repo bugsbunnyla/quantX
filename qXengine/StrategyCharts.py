@@ -3903,7 +3903,7 @@ class QXDashboard:
         return json_tabs
 
     # ==================================================
-    # 🚀 NEW SAFE DASHBOARD (LAZY RENDERING)
+    # SAFE DASHBOARD (LAZY RENDERING)
     # ==================================================
     def displayJSON(self):
 
