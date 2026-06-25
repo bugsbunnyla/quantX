@@ -1,3 +1,13 @@
+# ===================================================================================
+# IntradayReversal : intraday mean-reversion, liquidity shock model in Quant Xpert
+# Date: 2026/06/24 
+# Author : bugsbunnyla
+# Comment : volume and volatility with regime as a reversal signal
+# applied strategy processing in Quant Xpert
+# “Has price overextended relative to its short-term equilibrium?”
+# Signal=−zscore(price−MA)×volatility_regime+volume_z
+# ===================================================================================
+
 from ..StrategyResult import StrategyResult
 from ..strategies.BaseStrategy import BaseStrategy
 
@@ -285,30 +295,42 @@ from ..StrategyCharts import StrategyChart
 #Missing data tolerance	High					Low
 #Stability		High					Medium
 #Edge source		Price overshoot				Panic / capitulation
+#
+# Reversal signal: Zreversal=−P−MA/σ
+#  Liquidity adjustment: Liquidity=Zvolume +Zvolatility ​
+#   Final signal: Signal=Zreversal 	​×(1+Liquidity)
+#
 import numpy as np
 import pandas as pd
 
 from ..StrategyResult import StrategyResult
 from ..strategies.BaseStrategy import BaseStrategy
+import numpy as np
+import pandas as pd
+
+
 class IntradayReversal(BaseStrategy):
 
-    def _safe_datetime_index(self, index):
+    # ==================================================
+    # INDEX NORMALIZER (SAFE + INTRADAY CORRECT)
+    # ==================================================
+    def _normalize(self, df):
 
-        index = pd.Index(index)
+        df = df.copy()
 
-        if isinstance(index, pd.RangeIndex) or np.issubdtype(index.dtype, np.integer):
-            return pd.date_range(
-                end=pd.Timestamp.today(),
-                periods=len(index),
-                freq="D"
-            )
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
+            df = df.set_index("date")
+        else:
+            df.index = pd.to_datetime(df.index, errors="coerce")
 
-        index = pd.to_datetime(index, errors="coerce")
-        index = index[~pd.isna(index)]
-        index = index[index > pd.Timestamp("2000-01-01")]
+        df = df[df.index.notna()]
+        return df.sort_index()
 
-        return index.sort_values()
-
+    # ==================================================
+    # CHART BUILDER
+    # ==================================================
     def build_chart(
         self,
         chartdata=None,
@@ -331,6 +353,9 @@ class IntradayReversal(BaseStrategy):
             series=series or []
         )
 
+    # ==================================================
+    # MAIN STRATEGY
+    # ==================================================
     def run(self):
 
         cfg = self.cfg
@@ -342,79 +367,115 @@ class IntradayReversal(BaseStrategy):
         charts = cfg.get("chart", [])
         active_charts = [c for c in charts if c.get("enabled", False)]
 
-        frames = []
         signal_map = {}
 
+        frames = []
+
+        # ==================================================
+        # PER SYMBOL PROCESSING (NO CROSS-LEAKAGE)
+        # ==================================================
         for sym, df in self.data.items():
 
             if "close" not in df.columns:
                 continue
 
-            df = df.copy()
+            df = self._normalize(df)
 
-            df.index = self._safe_datetime_index(df.index)
+            if len(df) < max(lookback, vol_window):
+                continue
 
+            # --------------------------------------------------
+            # RETURNS
+            # --------------------------------------------------
             df["ret"] = df["close"].pct_change()
 
-            reversal = -df["close"].pct_change(lookback)
+            # --------------------------------------------------
+            # TRUE MEAN REVERSION (CORE FIX)
+            # --------------------------------------------------
+            ma = df["close"].rolling(lookback).mean()
+            std = df["close"].rolling(lookback).std()
 
-            volatility = (
-                df["ret"]
-                .rolling(vol_window)
-                .std()
-            )
+            reversal_raw = (df["close"] - ma) / (std + 1e-8)
 
-            volume_z = (
-                (df["volume"] - df["volume"].rolling(vol_window).mean())
-                / (df["volume"].rolling(vol_window).std() + 1e-8)
-            )
+            # invert for mean reversion signal
+            reversal = -reversal_raw
 
-            z_vol = reversal / (volatility + 1e-8)
-            z_volume = reversal * volume_z
+            # --------------------------------------------------
+            # VOLATILITY REGIME (FIXED Z-SCORE)
+            # --------------------------------------------------
+            volatility = df["ret"].rolling(vol_window).std()
 
-            # REQUIRED BY CONFIG
-            df["volatility"] = volatility
+            vol_mean = volatility.rolling(50).mean()
+            vol_std = volatility.rolling(50).std()
+
+            vol_z = (volatility - vol_mean) / (vol_std + 1e-8)
+
+            # volatility acts as regime amplifier (not divisor)
+            vol_regime = 1 + vol_z.fillna(0)
+
+            z_vol = reversal * vol_regime
+
+            # --------------------------------------------------
+            # VOLUME SIGNAL (CLEAN Z-SCORE)
+            # --------------------------------------------------
+            volume_mean = df["volume"].rolling(vol_window).mean()
+            volume_std = df["volume"].rolling(vol_window).std()
+
+            volume_z = (df["volume"] - volume_mean) / (volume_std + 1e-8)
+
+            # combine (stable additive model)
+            z_volume = reversal + volume_z.fillna(0)
+
+            # --------------------------------------------------
+            # FINAL SIGNAL (ROBUST COMBINATION)
+            # --------------------------------------------------
+            final_signal = 0.6 * z_vol + 0.4 * z_volume
+
+            final_signal = final_signal.replace([np.inf, -np.inf], np.nan).fillna(0)
+
+            # --------------------------------------------------
+            # EVENTS (STANDARDIZED THRESHOLDING)
+            # --------------------------------------------------
+            event_score = final_signal / (final_signal.rolling(50).std() + 1e-8)
+
+            df["reversal_event"] = np.abs(event_score) > threshold
+
+            # --------------------------------------------------
+            # OUTPUT SERIES FOR CHARTING
+            # --------------------------------------------------
             df["z_vol"] = z_vol
             df["z_volume"] = z_volume
+            df["volatility"] = volatility
+            df["reversal_event_vol"] = df["reversal_event"]
+            df["reversal_event_volume"] = df["reversal_event"]
 
-            df["reversal_event_vol"] = np.abs(z_vol) > threshold
-            df["reversal_event_volume"] = np.abs(z_volume) > threshold
+            # --------------------------------------------------
+            # SIGNAL MAP (KEEP MAGNITUDE - FIXED)
+            # --------------------------------------------------
+            signal_map[sym] = final_signal.ewm(span=lookback).mean()
 
             frames.append(df)
 
-            signal_map[sym] = np.sign(
-                z_vol.fillna(0)
-            )
-
+        # ==================================================
+        # RETURN EMPTY SAFELY
+        # ==================================================
         if not frames:
             return StrategyResult(
                 name=self.__class__.__name__,
                 data=self.data
             )
 
-        merged_df = pd.concat(frames)
+        # NOTE:
+        # We DO NOT merge across symbols for signal logic
+        # (avoids cross-sectional leakage)
 
-        merged_df = merged_df[
-            ~merged_df.index.duplicated(keep="last")
-        ]
-
-        merged_df = merged_df.sort_index()
-
-        master_index = pd.to_datetime(
-            merged_df.index
-        )
-
-        merged_df = merged_df.reindex(
-            master_index,
-            method="ffill"
-        )
-
-        # unique configured series
+        # ==================================================
+        # CHART SERIES SELECTION
+        # ==================================================
         seen = set()
         series = []
 
         for c in active_charts:
-
             for s in c.get("series", []):
 
                 source = s.get("source")
@@ -425,19 +486,22 @@ class IntradayReversal(BaseStrategy):
                 seen.add(source)
                 series.append(s)
 
+        # ==================================================
+        # BUILD SINGLE CHART (CONFIG DRIVEN)
+        # ==================================================
         chart = self.build_chart(
             charttype="line",
             chartmode="lines",
-            title=cfg.get(
-                "title",
-                "Intraday Reversal"
-            ),
+            title=cfg.get("title", "Intraday Reversal"),
             xaxis="date",
             yaxis="value",
-            chartdata=merged_df,
+            chartdata=pd.concat(frames).sort_index(),
             series=series
         )
 
+        # ==================================================
+        # RESULT
+        # ==================================================
         return StrategyResult(
             name=self.__class__.__name__,
             data=self.data,
@@ -450,3 +514,7 @@ class IntradayReversal(BaseStrategy):
             signals=signal_map,
             chart=chart
         )
+
+# =======================================================================
+# END OF INTRADAY REVERSAL
+# =======================================================================

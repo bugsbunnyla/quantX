@@ -140,7 +140,7 @@ class IndustryMomentumStrategy(BaseStrategy):
         stock_long = (stock_rank > (1 - top_q)).astype(float)
         stock_short = (stock_rank < top_q).astype(float)
 
-        # ✔ correct portfolio construction (FIXED)
+        #  correct portfolio construction (FIXED)
         stock_weights = stock_long - stock_short
 
         stock_port_ret = (returns * stock_weights.shift(1)).mean(axis=1)
@@ -167,7 +167,7 @@ class IndustryMomentumStrategy(BaseStrategy):
 
         ind_returns = pd.DataFrame(ind_returns)
 
-        # ✔ FIX: use cumulative formation return, NOT rolling mean
+        #  FIX: use cumulative formation return, NOT rolling mean
         ind_signal_raw = ind_returns.pct_change(formation).shift(1)
 
         ind_rank = ind_signal_raw.rank(axis=1, pct=True)
@@ -175,7 +175,7 @@ class IndustryMomentumStrategy(BaseStrategy):
         ind_long = (ind_rank > (1 - top_q)).astype(float)
         ind_short = (ind_rank < top_q).astype(float)
 
-        # ✔ correct portfolio construction
+        #  correct portfolio construction
         ind_weights = ind_long - ind_short
 
         ind_port_ret = (ind_returns * ind_weights.shift(1)).mean(axis=1)

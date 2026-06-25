@@ -341,125 +341,131 @@ class StrategyCharts:
 import pandas as pd
 import plotly.graph_objects as go
 
+import pandas as pd
+import plotly.graph_objects as go
+import pandas as pd
+import plotly.graph_objects as go
+
 
 class IntradayStrategyChart(StrategyChart):
 
-    # -------------------------------------------------
+    # ==================================================
+    # CLEAN SERIES (NO INDEX LOSS)
+    # ==================================================
     @staticmethod
     def _clean(series):
 
         if series is None:
             return None
 
-        try:
-            s = pd.Series(series).copy()
-        except:
-            return None
+        s = pd.Series(series)
 
-        s.index = pd.to_datetime(s.index, errors="coerce")
+        if not isinstance(s.index, pd.DatetimeIndex):
+            s.index = pd.to_datetime(s.index, errors="coerce")
+
         s = s[s.index.notna()]
-        s = s[s.index > pd.Timestamp("2000-01-01")]
         s = s.sort_index()
+        s = s[~s.index.duplicated(keep="last")]
 
-        if s.empty:
-            return None
+        return s if len(s) > 1 else None
 
-        return s
-
-    # -------------------------------------------------
+    # ==================================================
+    # PLOT SERIES
+    # ==================================================
     @staticmethod
-    def _plot_series(fig, series, name, color=None):
+    def _plot(fig, s, name, color=None, mode="lines"):
 
-        series = IntradayStrategyChart._clean(series)
-        if series is None:
+        s = IntradayStrategyChart._clean(s)
+
+        if s is None:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
-                mode="lines",
+                x=s.index,
+                y=s.values,
+                mode=mode,
                 name=name,
                 line=dict(color=color) if color else None
             )
         )
+
         return True
 
-    # -------------------------------------------------
-    @staticmethod
-    def _plot_signal(fig, series, name, color=None):
-
-        series = IntradayStrategyChart._clean(series)
-        if series is None:
-            return False
-
-        series = series.fillna(0)
-
-        fig.add_trace(
-            go.Scatter(
-                x=series.index,
-                y=series.values,
-                mode="lines",
-                line_shape="hv",
-                name=name,
-                opacity=0.7,
-                line=dict(color=color) if color else None
-            )
-        )
-        return True
-
-    # -------------------------------------------------
-    @staticmethod
-    def _plot_markers(fig, series, name):
-
-        series = IntradayStrategyChart._clean(series)
-        if series is None:
-            return False
-
-        points = series[series > 0]
-        if points.empty:
-            return False
-
-        fig.add_trace(
-            go.Scatter(
-                x=points.index,
-                y=points.values,
-                mode="markers",
-                name=name,
-                marker=dict(size=6, color="red")
-            )
-        )
-        return True
-
-    # -------------------------------------------------
+    # ==================================================
+    # RENDER (FULL SAFE MULTI SOURCE)
+    # ==================================================
     @staticmethod
     def render(item):
 
         fig = go.Figure()
 
         signals = getattr(item, "signals", {}) or {}
+        chart = getattr(item, "chart", {}) or {}
 
-        signal_map = signals.get("signal", {})
-        volume_map = signals.get("volume_stress", {})
-        event_map = signals.get("dislocation_events", {})
-        score_map = signals.get("score", {})
+        chartdata = chart.get("chartdata", {})
+        series_cfg = chart.get("series", [])
 
-        for sym in signal_map.keys():
+        # ==================================================
+        # 1. SIGNALS PLOTTING (PRIMARY)
+        # ==================================================
+        for sym, sigmap in signals.items():
 
-            IntradayStrategyChart._plot_series(fig, signal_map.get(sym), f"{sym} Signal", "steelblue")
-            IntradayStrategyChart._plot_series(fig, volume_map.get(sym), f"{sym} Volume", "orange")
-            IntradayStrategyChart._plot_series(fig, score_map.get(sym), f"{sym} Score", "gray")
+            for key, series in sigmap.items():
 
-        for sym, events in event_map.items():
-            IntradayStrategyChart._plot_markers(fig, events, f"{sym} Events")
+                mode = "markers" if key == "event" else "lines"
 
+                IntradayStrategyChart._plot(
+                    fig,
+                    series,
+                    f"{sym} {key}",
+                    mode=mode
+                )
+
+        # ==================================================
+        # 2. CHARTDATA FALLBACK (SECONDARY)
+        # ==================================================
+        for sym, df in chartdata.items():
+
+            if not isinstance(df, pd.DataFrame):
+                continue
+
+            for col in df.columns:
+
+                IntradayStrategyChart._plot(
+                    fig,
+                    df[col],
+                    f"{sym} {col}"
+                )
+
+        # ==================================================
+        # 3. CONFIG SERIES OVERRIDE (OPTIONAL)
+        # ==================================================
+        for s in series_cfg:
+
+            source = s.get("source")
+
+            for sym, sigmap in signals.items():
+
+                if source in sigmap:
+
+                    IntradayStrategyChart._plot(
+                        fig,
+                        sigmap[source],
+                        f"{sym} {source}",
+                        mode="markers" if source == "event" else "lines"
+                    )
+
+        # ==================================================
+        # BASELINE
+        # ==================================================
         fig.add_hline(y=0, line_color="gray", opacity=0.4)
 
         fig.update_layout(
             template="plotly_dark",
             title=getattr(item, "name", "Intraday Strategy"),
             xaxis_title="Time",
-            yaxis_title="Signal",
+            yaxis_title="Value",
             hovermode="x unified"
         )
 

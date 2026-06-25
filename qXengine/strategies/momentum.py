@@ -27,15 +27,6 @@ import pandas as pd
 #  chart	cumulative sum/product
 # Now UMD rt = Sigma wi,tri,t
 
-import pandas as pd
-import numpy as np
-
-from ..StrategyResult import StrategyResult
-from ..strategies.BaseStrategy import BaseStrategy
-
-import numpy as np
-import pandas as pd
-
 # UMD - winners and losers, quantile based and not raw scores trading 
 # cross sectional ranking Timestamp
 # rank top 20% long, bottom 20% short middle flat
@@ -58,19 +49,6 @@ import pandas as pd
 #  return	dot(weights, returns)
 #  chart	cumulative sum/product
 # Now UMD rt = Sigma wi,tri,t
-import numpy as np
-import pandas as pd
-
-from .BaseStrategy import BaseStrategy
-from ..StrategyResult import StrategyResult
-
-
-import numpy as np
-import pandas as pd
-
-from .BaseStrategy import BaseStrategy
-from ..StrategyResult import StrategyResult
-
 
 class UMDMomentum(BaseStrategy):
 
@@ -312,7 +290,7 @@ class UMDMomentum(BaseStrategy):
 
             series=self.cfg["chart"]["series"],
 
-            title=self.cfg["title"],
+            title=self.cfg["chart"]["title"],
 
             charttype=self.cfg["chart"]["type"],
 
@@ -592,7 +570,7 @@ class TimeSeriesMomentum(BaseStrategy):
 
             series=self.cfg["chart"]["series"],
 
-            title=self.cfg["title"],
+            title=self.cfg["chart"]["title"],
 
             charttype=self.cfg["chart"]["type"],
 

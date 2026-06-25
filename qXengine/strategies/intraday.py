@@ -1,8 +1,23 @@
+# ===================================================================================
+# IntradayStrategy : intraday liquidity + momentum + VWAP dislocation in Quant Xpert
+# Date: 2026/06/24 
+# Author : bugsbunnyla
+# Comment : volume and volatility with regime as a reversal signal
+# applied strategy processing in Quant Xpert 
+# Signal=(momentum+reversal)×volume_stress+VWAP_deviation
+# “Is price moving abnormally given volume + deviation from fair price (VWAP)?”
+# ===================================================================================
 import numpy as np
 import pandas as pd
 from ..StrategyResult import StrategyResult
 from ..strategies.BaseStrategy import BaseStrategy
-
+#
+# What VWAP actually means (core idea)
+# Instead of a simple average: Mean Price=∑P/N
+# VWAP weights by volume:VWAP=∑(P×V)/∑V
+# So high-volume trades matter more than low-volume trades.
+#
+#
 # F1 momentum and reversal blend = Straw​=Momt​+Revt​ with Mom_t = intraday momentum signal, Rev_t = intraday mean reversion signal
 # pairing quant trend-following + mean-reversion hybrid
 # Volatility normalization (Z-score style) scale rolling volatility
@@ -18,58 +33,79 @@ from ..strategies.BaseStrategy import BaseStrategy
 # Where:\theta = \text{signal_threshold}	​
 # Dual signal - momentum + reversal  with cross asset comparable zscore signal S/σ
 # A volatility- and liquidity-adjusted hybrid momentum–reversion intraday factor with noise gating.
-import numpy as np
-import pandas as pd
-
-from ..StrategyResult import StrategyResult
-from ..strategies.BaseStrategy import BaseStrategy
-
 
 class IntradayStrategy(BaseStrategy):
 
     requires_factor_engine = False
 
-    # -------------------------------------------------
-    def momentum(self, df, window=20):
-        return df["close"].pct_change(window)
+    # ==================================================
+    # SAFE INDEX NORMALIZER (NO INTEGER FALLBACK)
+    # ==================================================
+    def _normalize(self, df):
 
-    # -------------------------------------------------
-    def reversal(self, df, window=5):
-        return -df["close"].pct_change(window)
+        df = df.copy()
 
-    # -------------------------------------------------
-    def vwap_deviation(self, df):
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df.dropna(subset=["date"])
+            df = df.set_index("date")
+        else:
+            df.index = pd.to_datetime(df.index, errors="coerce")
+
+        df = df[df.index.notna()]
+        df = df.sort_index()
+        df = df[~df.index.duplicated(keep="last")]
+
+        return df
+
+    # ==================================================
+    # VWAP (SESSION SAFE)
+    # ==================================================
+    def vwap(self, df):
 
         if "volume" not in df.columns:
             return pd.Series(0.0, index=df.index)
 
+        session = df.index.normalize()
+
         pv = df["close"] * df["volume"]
-        vwap = pv.cumsum() / (df["volume"].cumsum() + 1e-8)
 
-        return (df["close"] - vwap) / (vwap + 1e-8)
+        cum_pv = pv.groupby(session).cumsum()
+        cum_vol = df["volume"].groupby(session).cumsum()
 
-    # -------------------------------------------------
-    # INDEX
-    # -------------------------------------------------
-    def _ensure_datetime_index(self, df):
+        return cum_pv / (cum_vol + 1e-8)
 
-        if "date" in df.columns:
-            df = df.copy()
-            df["date"] = pd.to_datetime(df["date"], errors="coerce")
-            df = df.dropna(subset=["date"])
-            df = df[df["date"] > pd.Timestamp("2000-01-01")]
-            df = df.sort_values("date")
-            df = df.set_index("date")
-        else:
-            df = df.copy()
-            df.index = pd.to_datetime(df.index, errors="coerce")
-            df = df[df.index.notna()]
-            df = df[df.index > pd.Timestamp("2000-01-01")]
-            df = df.sort_index()
+    # ==================================================
+    # REGIME
+    # ==================================================
+    def regime(self, df, lookback=50):
 
-        return df
+        ret = df["close"].pct_change()
+        trend = ret.rolling(lookback).mean()
+        vol = ret.rolling(lookback).std()
 
-    # -------------------------------------------------
+        return (trend.abs() > vol).astype(int)
+
+    # ==================================================
+    # SESSION WEIGHT
+    # ==================================================
+    def session_weight(self, df):
+
+        hour = df.index.hour
+
+        return np.where((hour <= 10) | (hour >= 15), 1.2, 0.85)
+
+    # ==================================================
+    # SAFE SERIES WRAPPER (CRITICAL FIX)
+    # ==================================================
+    def _series(self, values, index):
+        s = pd.Series(values)
+        s.index = index
+        return s
+
+    # ==================================================
+    # MAIN STRATEGY
+    # ==================================================
     def run(self):
 
         cfg = self.cfg
@@ -80,90 +116,144 @@ class IntradayStrategy(BaseStrategy):
         threshold = cfg.get("signal_threshold", 1.5)
 
         signals_out = {}
-        scores_out = {}
-        volume_stress_out = {}
-        dislocation_events_out = {}
+        charts_out = {}
 
-        # =================================================
-        # CLEAN INPUT DATA (CRITICAL)
-        # =================================================
-        cleaned = {
-            sym: self._ensure_datetime_index(df)
-            for sym, df in self.data.items()
-            if "close" in df.columns
-        }
+        # ==================================================
+        # LOOP SYMBOLS
+        # ==================================================
+        for sym, df in self.data.items():
 
-        # -------------------------------------------------
-        for sym, df in cleaned.items():
+            if "close" not in df.columns:
+                continue
+
+            df = self._normalize(df)
 
             if len(df) < max(lookback, vol_window, volume_window):
                 continue
 
-            mom = self.momentum(df, lookback)
-            rev = self.reversal(df, max(2, lookback // 4))
+            # ==================================================
+            # PRICE SIGNAL
+            # ==================================================
+            ma = df["close"].rolling(lookback).mean()
+            std = df["close"].rolling(lookback).std()
 
-            raw_signal = (mom + rev).fillna(0)
+            reversal = -(df["close"] - ma) / (std + 1e-8)
+            momentum = df["close"].pct_change(lookback)
 
-            vol = raw_signal.rolling(vol_window).std().replace(0, np.nan)
-            norm_signal = raw_signal / (vol + 1e-8)
+            price_signal = momentum - reversal
+            price_signal = (price_signal - price_signal.mean()) / (price_signal.std() + 1e-8)
 
-            if "volume" in df.columns:
+            # ==================================================
+            # VWAP SIGNAL
+            # ==================================================
+            vwap = self.vwap(df)
+            vwap_dev = (df["close"] - vwap) / (vwap + 1e-8)
 
-                vol_ma = df["volume"].rolling(volume_window).mean()
-                vol_ratio = df["volume"] / (vol_ma + 1e-8)
+            vwap_z = (vwap_dev - vwap_dev.rolling(50).mean()) / (vwap_dev.rolling(50).std() + 1e-8)
 
-                norm_signal = norm_signal * vol_ratio
-                volume_stress_out[sym] = vol_ratio.fillna(1.0)
+            # ==================================================
+            # VOLUME SIGNAL
+            # ==================================================
+            vol_mean = df["volume"].rolling(volume_window).mean()
+            vol_std = df["volume"].rolling(volume_window).std()
 
-            else:
-                volume_stress_out[sym] = pd.Series(1.0, index=df.index)
+            volume_z = (df["volume"] - vol_mean) / (vol_std + 1e-8)
+            volume_shock = np.tanh(volume_z)
 
-            vwap_dev = self.vwap_deviation(df)
-            norm_signal = norm_signal + 0.5 * vwap_dev
+            # ==================================================
+            # REGIME
+            # ==================================================
+            regime = self.regime(df, lookback)
 
-            norm_signal = norm_signal.replace([np.inf, -np.inf], np.nan).fillna(0)
+            # ==================================================
+            # SESSION WEIGHT
+            # ==================================================
+            sess_w = self.session_weight(df)
 
-            final_score = float(norm_signal.tail(lookback).mean())
+            trend_mode = regime.values
+            meanrev_mode = 1 - trend_mode
 
-            if abs(final_score) < threshold:
-                final_score = 0.0
+            micro = vwap_z + volume_shock
 
-            dislocation_events_out[sym] = (norm_signal.abs() > threshold).astype(int)
+            final_signal = (
+                (0.7 * price_signal + 0.3 * micro) * trend_mode +
+                (0.4 * price_signal + 0.6 * micro) * meanrev_mode
+            )
 
-            # =================================================
-            # FORCE DATETIME INDEX
-            # =================================================
-            norm_signal.index = pd.to_datetime(norm_signal.index, errors="coerce")
-            norm_signal = norm_signal[norm_signal.index.notna()]
-            norm_signal = norm_signal.sort_index()
+            final_signal = final_signal * sess_w
+            final_signal = pd.Series(final_signal, index=df.index).fillna(0)
 
-            signals_out[sym] = norm_signal
-            scores_out[sym] = final_score
+            # ==================================================
+            # EVENTS
+            # ==================================================
+            event_score = final_signal / (final_signal.rolling(50).std() + 1e-8)
+            events = (np.abs(event_score) > threshold).astype(int)
 
-        # -------------------------------------------------
-        chart = self.build_chart(
-            series=self.cfg.get("chart").get("series"),
-            title=self.cfg.get("title"),
-            charttype=self.cfg.get("chart").get("type"),
-            chartmode=self.cfg.get("chart").get("mode"),
-        )
+            # ==================================================
+            # FINAL OUTPUT DF (NO LOSS)
+            # ==================================================
+            out_df = pd.DataFrame(index=df.index)
 
+            out_df["price_signal"] = self._series(price_signal, df.index)
+            out_df["vwap_z"] = self._series(vwap_z, df.index)
+            out_df["volume_shock"] = self._series(volume_shock, df.index)
+            out_df["final_signal"] = self._series(final_signal, df.index)
+            out_df["event"] = events
+
+            charts_out[sym] = out_df
+
+            # ==================================================
+            # SIGNALS (PRESERVE INDEX ALWAYS)
+            # ==================================================
+            signals_out[sym] = {
+                "price_signal": self._series(price_signal, df.index),
+                "vwap_z": self._series(vwap_z, df.index),
+                "volume_shock": self._series(volume_shock, df.index),
+                "final_signal": self._series(final_signal, df.index),
+                "event": events
+            }
+
+        # ==================================================
+        # SAFE CHARTDATA STRUCTURE (NO CONCAT LOSS)
+        # ==================================================
+        chartdata = charts_out
+
+        # ==================================================
+        # RETURN STRATEGY RESULT (FIXED CONTRACT)
+        # ==================================================
         return StrategyResult(
-            name="IntradayStrategy",
+            name=self.__class__.__name__,
             data=self.data,
+
             metrics={
                 "lookback": lookback,
                 "vol_window": vol_window,
                 "volume_window": volume_window,
                 "signal_threshold": threshold,
-                "universe_size": len(signals_out),
-                "average_score": float(np.mean(list(scores_out.values()))) if scores_out else 0.0,
+                "symbols": len(signals_out)
             },
-            signals={
-                "signal": signals_out,
-                "volume_stress": volume_stress_out,
-                "dislocation_events": dislocation_events_out,
-                "score": scores_out
-            },
-            chart=chart
+
+            signals=signals_out,
+
+            chart={
+                "charttype": "line",
+                "chartmode": "lines",
+                "title": "Intraday Strategy - Fixed Contract",
+                "xaxis": "date",
+                "yaxis": "value",
+
+                # IMPORTANT: KEEP STRUCTURE
+                "chartdata": chartdata,
+
+                "series": [
+                    {"name": "Final Signal", "source": "final_signal"},
+                    {"name": "VWAP Z", "source": "vwap_z"},
+                    {"name": "Volume Shock", "source": "volume_shock"},
+                    {"name": "Price Signal", "source": "price_signal"},
+                    {"name": "Event", "source": "event", "style": "markers"}
+                ]
+            }
         )
+# =======================================================================
+# END OF INTRADAY STRATEGY
+# =======================================================================
