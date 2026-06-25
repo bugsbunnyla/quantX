@@ -1,3 +1,9 @@
+# =================================================================
+# StrategyConfig : complete strategy configuration in Quant Xpert
+# Date: 2026/06/22 
+# Author : bugsbunnyla
+# Comment : common configuration for strategy engine based solution
+# =================================================================
 STRATEGY_CONFIG = {
 
     "data": {
@@ -718,26 +724,26 @@ STRATEGY_CONFIG = {
         "normalize": False,
         "benchmark": "SPY"
     }
-},"IndustryMomentumStrategy": {
+},
+"IndustryMomentumStrategy": {
+
     "enabled": True,
 
     "formation": 252,
-    "holding": 21,
     "industry_window": 252,
-    "top_quantile": 0.30,
+    "top_quantile": 0.3,
 
     "plot_enabled": True,
     "tab": "momentum",
 
-    "title": "Industry Momentum - Sector Leadership Persistence",
+    "title": "Stock + Industry Momentum (Jegadeesh & Titman + Moskowitz & Grinblatt)",
 
     "chart": {
 
         "type": "line",
-
         "mode": "overlay",
 
-        "title": "Industry Momentum vs Stock Momentum (4Y)",
+        "title": "Momentum Strategy: Stock vs Industry vs Benchmark",
 
         "xaxis": {
             "source": "date",
@@ -745,39 +751,39 @@ STRATEGY_CONFIG = {
         },
 
         "yaxis": {
-            "label": "Normalized Performance (Base = 1.0)",
+            "label": "Growth of $1 (Equity Curves) / Momentum Factors",
             "scale": "linear"
         },
 
         "series": [
 
             {
-                "name": "Industry Momentum Portfolio",
-                "source": "portfolio_momentum",
+                "name": "SM-Equity",
+                "source": "stock_equity",
                 "style": "line"
             },
 
             {
-                "name": "Industry Strength Index",
-                "source": "industry_strength",
-                "style": "line"
-            },
-
-            {
-                "name": "Smoothed Momentum",
-                "source": "momentum_ma",
-                "style": "line"
-            },
-
-            {
-                "name": "Stock Momentum Portfolio",
-                "source": "stock_momentum",
+                "name": "IM-Equity",
+                "source": "industry_equity",
                 "style": "line"
             },
 
             {
                 "name": "SPY Benchmark",
                 "source": "benchmark",
+                "style": "line"
+            },
+
+            {
+                "name": "SM-Signal",
+                "source": "stock_momentum",
+                "style": "line"
+            },
+
+            {
+                "name": "IM-Signal",
+                "source": "industry_momentum",
                 "style": "line"
             }
         ],
@@ -786,11 +792,7 @@ STRATEGY_CONFIG = {
             "enabled": True,
             "source": "rebalance_events",
             "style": "circle"
-        },
-
-        "normalize": True,
-
-        "benchmark": "SPY"
+        }
     }
 },
 "IndustryMomentumStrategyBase": {
@@ -1183,3 +1185,7 @@ STRATEGY_CONFIG = {
 }
 }   
 }
+
+# ===============================================================
+# END OF STRATEGY CONFIG
+# ===============================================================

@@ -151,13 +151,13 @@ ENVIRONMENTS = {
 
             "equities": {
                 "provider": "yahoo",
-                "allow_api": False,
+                "allow_api": True,
                 "allow_cache": True
             },
 
             "crypto": {
-                "provider": "coingecko",
-                "allow_api": False,
+                "provider": "binance",
+                "allow_api": True,
                 "allow_cache": True
             }
         }

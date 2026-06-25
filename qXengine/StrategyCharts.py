@@ -1,4 +1,10 @@
-
+# ===============================================================
+# StrategyChart and all derived to place on QXDashboard
+# Graphical chart rendering as a common pattern in Quant Xpert
+# Date: 2026/06/24
+# Author : bugsbunnyla
+# Comment : creates, loads, plotly charts, creates dashboard
+# ===============================================================
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -1026,377 +1032,140 @@ class ForecastStrategyChart(StrategyChart):
 # Industry Momentum Chart
 # ===================================================
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
-
-
 class IndustryMomentumChart(StrategyChart):
 
     STATIC_MAP = {
-        "metrics": [
-            "formation",
-            "industry_window",
-            "top_quantile",
-            "holding",
-            "stocks",
-            "industries",
-            "avg_stock_momentum",
-            "avg_industry_momentum",
-            "best_industry",
-            "worst_industry"
-        ],
+        "metrics": ["formation", "top_quantile", "stocks", "industries"],
+
         "signals": [
             "stock_signal",
             "industry_signal",
             "rebalance_events"
         ],
+
         "chart": [
-            "portfolio_momentum",
-            "industry_strength",
-            "momentum_ma",
+            "stock_equity",
+            "industry_equity",
+            "benchmark",
             "stock_momentum",
-            "benchmark"
+            "industry_momentum"
         ]
     }
 
     # ==================================================
-    # STANDARD SERIES
+    # SAFE SERIES
     # ==================================================
     @staticmethod
-    def _plot_series(fig, series, name, color=None):
+    def _plot(fig, series, name, color=None, secondary=False):
 
         if series is None:
             return False
 
-        try:
-            series = pd.Series(series).dropna()
-        except Exception:
-            return False
-
-        if series.empty:
+        s = pd.Series(series).dropna()
+        if s.empty:
             return False
 
         fig.add_trace(
             go.Scatter(
-                x=series.index,
-                y=series.values,
+                x=s.index,
+                y=s.values,
                 mode="lines",
                 name=name,
-                line=dict(color=color, width=2)
-                if color else dict(width=2)
-            )
+                line=dict(color=color, width=2) if color else dict(width=2)
+            ),
+            secondary_y=secondary
         )
-
         return True
 
-    @staticmethod
-    def _to_series(x):
-
-        if x is None:
-            return None
-
-        if isinstance(x, pd.DataFrame):
-            x = x.iloc[:, 0]
-
-        if isinstance(x, pd.Series):
-            return x.copy()
-
-        return pd.Series(x)
-
     # ==================================================
-    # SAFE MARKERS 
-    # ==================================================
-    @staticmethod
-    def _plot_markers(fig, signal, label, ref, color, symbol):
-
-        signal = IndustryMomentumChart._to_series(signal)
-        ref = IndustryMomentumChart._to_series(ref)
-
-        if signal is None or ref is None:
-            return False
-
-        signal = signal.astype(float).fillna(0)
-        ref = ref.astype(float)
-
-        active = signal[signal > 0]
-
-        if active.empty:
-            return False
-
-        # safe alignment (NEVER produces 2D)
-        ref_aligned = ref.reindex(active.index)
-
-        # FINAL HARD SAFETY
-        x = ref_aligned.index.astype(str).tolist()
-        y = np.asarray(ref_aligned.values).reshape(-1)
-
-        if len(x) == 0 or len(y) == 0:
-            return False
-
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=y,
-                mode="markers",
-                name=label,
-                marker=dict(
-                    size=12,
-                    color=color,
-                    symbol=symbol,
-                    line=dict(width=1, color="white")
-                )
-            )
-        )
-
-        return True
-
-
-    # ==================================================
-    # REBALANCE EVENTS
-    # ==================================================
-    @staticmethod
-    def _plot_rebalance(fig, rebalance, ref):
-
-        rebalance = IndustryMomentumChart._to_series(rebalance)
-        ref = IndustryMomentumChart._to_series(ref)
-
-        if rebalance is None or ref is None:
-            return False
-
-        rebalance = rebalance.fillna(0)
-
-        active = rebalance[rebalance > 0]
-
-        if active.empty:
-            return False
-
-        ref_aligned = ref.reindex(active.index)
-
-        x = ref_aligned.index.astype(str).tolist()
-        y = np.asarray(ref_aligned.values).reshape(-1)
-
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=y,
-                mode="markers",
-                name="Rebalance Events",
-                marker=dict(
-                    size=12,
-                    color="hotpink",
-                    symbol="x",
-                    line=dict(width=1, color="white")
-                )
-            )
-        )
-
-        return True
-
-
-
-    # ==================================================
-    # MAIN RENDER
+    # RENDER
     # ==================================================
     @staticmethod
     def render(item):
 
-        fig = go.Figure()
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-        signals = getattr(item, "signals", None)
-        metrics = getattr(item, "metrics", None)
         chart = getattr(item, "chart", None)
+        if chart is None:
+            return fig
 
-        chartdata = getattr(chart, "chartdata", None)
+        chartdata = getattr(chart, "chartdata", {}) or {}
 
-        if chartdata is None:
-            chartdata = pd.DataFrame()
-
-        if signals is None:
-            signals = pd.DataFrame()
-
-        if metrics is None:
-            metrics = pd.DataFrame()
+        signals = getattr(item, "signals", {}) or {}
 
         # ==================================================
-        # SIGNALS
+        # DATA
         # ==================================================
-        stock_signal = signals.get("stock_signal")
-        industry_signal = signals.get("industry_signal")
+        stock_eq = chartdata.get("stock_equity")
+        ind_eq = chartdata.get("industry_equity")
+        bench = chartdata.get("benchmark")
+
+        stock_mom = chartdata.get("stock_momentum")
+        ind_mom = chartdata.get("industry_momentum")
+
+        stock_sig = signals.get("stock_signal")
+        ind_sig = signals.get("industry_signal")
         rebalance = signals.get("rebalance_events")
 
         # ==================================================
-        # CHART DATA
+        # ALIGN INDEX (SAFE)
         # ==================================================
-        portfolio_momentum = chartdata.get("portfolio_momentum")
-        industry_strength = chartdata.get("industry_strength")
+        def align(s, idx):
+            if s is None:
+                return None
+            return pd.Series(s).reindex(idx)
 
-        # FIXED TYPO
-        momentum_ma = chartdata.get("momentum_ma")
+        master_idx = None
+        for s in [stock_eq, ind_eq, bench]:
+            if s is not None:
+                master_idx = pd.Series(s).dropna().index
+                break
 
-        stock_momentum = chartdata.get("stock_momentum")
-        benchmark = chartdata.get("benchmark")
-        
-        # ==================================================
-        # METADATA
-        # ==================================================
-        formation = metrics.get("formation")
-        holding = metrics.get("holding")
-        top_quantile = metrics.get("top_quantile")
+        if master_idx is None:
+            return fig
 
-        stocks = metrics.get("stocks")
-        industries = metrics.get("industries")
+        stock_eq = align(stock_eq, master_idx)
+        ind_eq = align(ind_eq, master_idx)
+        bench = align(bench, master_idx)
 
-        best = metrics.get("best_industry")
-        worst = metrics.get("worst_industry")
-
-        # ==================================================
-        # LEGEND LABELS
-        # ==================================================
-        portfolio_label = (
-            f"Portfolio "
-            f"(F={formation}, H={holding}, Q={top_quantile})"
-        )
-
-        industry_label = (
-            f"Industry Strength "
-            f"({industries} Industries)"
-        )
-
-        stock_label = (
-            f"Stock Momentum "
-            f"({stocks} Stocks)"
-        )
-        momentum_ma_label = (
-            f"Smooth Momentum MA "
-            f"({stocks} Stocks)"
-        )
-
-        industry_label = (
-            f"Benchmark "
-            f"SPY"
-        )
+        stock_mom = align(stock_mom, master_idx)
+        ind_mom = align(ind_mom, master_idx)
 
         # ==================================================
-        # PORTFOLIO
+        # PLOT (LEFT = FACTORS)
         # ==================================================
-        IndustryMomentumChart._plot_series(
-            fig,
-            portfolio_momentum,
-            portfolio_label,
-            "cyan"
-        )
+        IndustryMomentumChart._plot(fig, stock_mom, "SM-Signals", "crimson", False)
+        IndustryMomentumChart._plot(fig, ind_mom, "IM-Signals", "orange", False)
 
         # ==================================================
-        # INDUSTRY STRENGTH
+        # PLOT (RIGHT = EQUITY)
         # ==================================================
-        IndustryMomentumChart._plot_series(
-            fig,
-            industry_strength,
-            industry_label,
-            "orange"
-        )
-
-        # ==================================================
-        # MOMENTUM MA
-        # ==================================================
-        IndustryMomentumChart._plot_series(
-            fig,
-            momentum_ma,
-            "Momentum MA",
-            "yellow"
-        )
-
-        # ==================================================
-        # STOCK MOMENTUM
-        # ==================================================
-        IndustryMomentumChart._plot_series(
-            fig,
-            stock_momentum,
-            stock_label,
-            "crimson"
-        )
-
-        # ==================================================
-        # BENCHMARK
-        # ==================================================
-        IndustryMomentumChart._plot_series(
-            fig,
-            benchmark,
-            "Benchmark (SPY)",
-            "white"
-        )
-
-        # ==================================================
-        # SIGNALS
-        # ==================================================
-        IndustryMomentumChart._plot_markers(
-            fig,
-            industry_signal,
-            "Industry Signal",
-            portfolio_momentum,
-            color="violet",
-            symbol="triangle-up"
-        )
-
-        IndustryMomentumChart._plot_markers(
-            fig,
-            stock_signal,
-            "Stock Signal",
-            portfolio_momentum,
-            color="lime",
-            symbol="circle"
-        )
-
-        # ==================================================
-        # REBALANCES
-        # ==================================================
-        IndustryMomentumChart._plot_rebalance(
-
-            fig,
-            rebalance,
-            portfolio_momentum
-        )
-
-        # ==================================================
-        # ANNOTATION
-        # ==================================================
-        if best is not None or worst is not None:
-
-            fig.add_annotation(
-                text=(
-                    f"<b>Best Industry:</b> {best}"
-                    f"<br>"
-                    f"<b>Worst Industry:</b> {worst}"
-                ),
-                x=0.01,
-                y=1.10,
-                xref="paper",
-                yref="paper",
-                showarrow=False,
-                align="left",
-                bgcolor="rgba(30,30,30,0.8)",
-                bordercolor="gray",
-                borderwidth=1
-            )
+        IndustryMomentumChart._plot(fig, stock_eq, "SM-Equity", "cyan", True)
+        IndustryMomentumChart._plot(fig, ind_eq, "IM-Equity", "yellow", True)
+        IndustryMomentumChart._plot(fig, bench, "SPY-Benchmark", "white", True)
 
         # ==================================================
         # LAYOUT
         # ==================================================
         fig.update_layout(
             template="plotly_dark",
-            title=getattr(
-                item,
-                "name",
-                "Industry Momentum Strategy"
-            ),
+            title="Industry + Stock Momentum",
             xaxis_title="Date",
-            yaxis_title="Normalized Performance",
-            legend_title="Series / Signals",
             hovermode="x unified",
+            legend_title="Series / Signals",
             showlegend=True,
-            margin=dict(r=220)
+            margin=dict(r=180)
+
         )
+        # ==================================================
+        fig.update_yaxes(title_text="Momentum Signals", secondary_y=False)
+        fig.update_yaxes(title_text="Growth of $1", secondary_y=True)
 
         return fig
+
+
 # ===================================================
 # DispersionStrategy Chart 
 # ===================================================
@@ -3396,7 +3165,7 @@ class TimeSeriesMomentumChart(StrategyChart):
             legend_title="Series / Signals",
             hovermode="x unified",
             showlegend=True,
-            margin=dict(r=220)
+            margin=dict(r=180)
         )
 
         return fig
@@ -3569,7 +3338,7 @@ class UMDMomentumChart(StrategyChart):
             legend_title="Series / Signals",
             hovermode="x unified",
             showlegend=True,
-            margin=dict(r=220)
+            margin=dict(r=180)
         )
 
         return fig
@@ -4435,3 +4204,6 @@ class QXDashboard:
         webbrowser.open("file://" + tmp.name)
 
         return tmp.name
+# =====================================================================
+# END OF QXDASHBOARD and STRATEGY CHARTS and all derived charts
+# =====================================================================

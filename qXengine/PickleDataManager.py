@@ -6,7 +6,7 @@
 # ===============================================================
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime,timedelta
 
 from config import ENVIRONMENTS, DEFAULT_SYMBOLS
 
@@ -27,31 +27,31 @@ class PickleDataManager:
         os.makedirs(self.path, exist_ok=True)
 
         self.market_data = self.env.get("market_data", {})
-
         self.lookback_years = 4
-
-    # =========================================================
-    # DATE
-    # =========================================================
-    def _today(self):
-        return datetime.now().strftime("%Y%m%d")
 
     # =========================================================
     # FILE PATH
     # =========================================================
     def _file_path(self, symbol: str):
-        return os.path.join(self.path, f"{symbol}.{self._today()}.pkl")
+        return os.path.join(self.path, f"{symbol}.pkl")
 
     # =========================================================
-    # SYMBOLS
+    # ASSET TYPE
     # =========================================================
-    def get_all_symbols(self):
-        return DEFAULT_SYMBOLS
+    def _asset_type(self, symbol: str):
+        return "crypto" if symbol.endswith("USDT") else "equities"
 
     # =========================================================
-    # NORMALIZATION
+    # CONFIG
     # =========================================================
-    def _normalize_columns(self, df: pd.DataFrame):
+    def _provider_config(self, symbol: str):
+        asset = self._asset_type(symbol)
+        return self.market_data.get(asset, {})
+
+    # =========================================================
+    # NORMALIZE
+    # =========================================================
+    def _normalize(self, df):
 
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -62,50 +62,75 @@ class PickleDataManager:
         return df
 
     # =========================================================
-    # SERIES
+    # BACKTEST FETCH (SAFE: no url, no api keys)
     # =========================================================
-    def _extract_series(self, df, col):
+    def _fetch_backtest(self, symbol: str):
 
-        if col not in df.columns:
-            return None
+        start = (datetime.utcnow() - timedelta(days=365 * self.lookback_years)).strftime("%Y-%m-%d")
 
-        data = df[col]
-
-        if isinstance(data, pd.DataFrame):
-            return data.iloc[:, 0]
-
-        return data
-
-    # =========================================================
-    # ASSET TYPE
-    # =========================================================
-    def _asset_type(self, symbol: str):
-
+        # -------------------------
+        # CRYPTO → BINANCE (direct REST, no config)
+        # -------------------------
         if symbol.endswith("USDT"):
-            return "crypto"
 
-        return "equities"
+            import requests
+
+            url = "https://api.binance.com/api/v3/klines"
+
+            params = {
+                "symbol": symbol,
+                "interval": "1d",
+                "limit": 1000
+            }
+
+            all_data = []
+            start_time = int(pd.Timestamp(start).timestamp() * 1000)
+
+            while True:
+
+                params["startTime"] = start_time
+
+                r = requests.get(url, params=params)
+                batch = r.json()
+
+                if not isinstance(batch, list) or len(batch) == 0:
+                    break
+
+                all_data.extend(batch)
+                start_time = batch[-1][0] + 1
+
+                if len(batch) < 1000:
+                    break
+
+            df = pd.DataFrame(all_data, columns=[
+                "time","open","high","low","close","volume",
+                "close_time","qav","trades","tbb","tbq","ignore"
+            ])
+
+            df = df[["time","open","high","low","close","volume"]]
+            df["time"] = pd.to_datetime(df["time"], unit="ms")
+
+        # -------------------------
+        # EQUITIES → YAHOO (direct library)
+        # -------------------------
+        else:
+
+            import yfinance as yf
+
+            df = yf.download(
+                symbol,
+                period=f"{self.lookback_years}y",
+                interval="1d",
+                auto_adjust=False,
+                progress=False
+            ).reset_index()
+
+        return self._normalize(df)
 
     # =========================================================
-    # PROVIDER CONFIG
+    # PRODUCTION FETCH (USES CONFIG FULLY)
     # =========================================================
-    def _provider_config(self, symbol: str):
-       asset_type = self._asset_type(symbol)
-
-       cfg = self.market_data.get(asset_type, {})
-
-       # if nested provider exists (crypto case)
-       provider_name = cfg.get("provider")
-
-       if isinstance(cfg.get(provider_name), dict):
-          return cfg[provider_name]
-
-       return cfg
-
-    # =========================================================
-    # API ROUTER (SAFE + COMPLETE)
-    # =========================================================
-    def _fetch_api(self, symbol: str):
+    def _fetch_production(self, symbol: str):
 
         cfg = self._provider_config(symbol)
         provider = cfg.get("provider")
@@ -114,25 +139,91 @@ class PickleDataManager:
             return self._fetch_yahoo(symbol)
 
         if provider == "binance":
-            return self._fetch_binance(cfg)
-
-        if provider == "kraken":
-            return self._fetch_kraken(cfg)
-
-        if provider == "coinbase":
-            return self._fetch_coinbase(cfg)
-
-        if provider == "coingecko":
-            return self._fetch_coingecko(cfg)
+            return self._fetch_binance(cfg, symbol)
 
         raise ValueError(f"Unsupported provider: {provider}")
 
     # =========================================================
-    # YAHOO (EQUITIES)
+    # YAHOO PRODUCTION
     # =========================================================
-    def _fetch_yahoo(self, symbol: str):
+    def _fetch_yahoo(self, symbol):
 
         import yfinance as yf
+
+        df = yf.download(
+            symbol,
+            period=f"{self.lookback_years}y",
+            interval="1d",
+            progress=False
+        ).reset_index()
+
+        return self._normalize(df)
+
+    # =========================================================
+    # BINANCE PRODUCTION (URL + KEYS)
+    # =========================================================
+    def _fetch_binance_api(self, cfg, symbol):
+
+        import requests
+
+        if not cfg.get("allow_api", True):
+            raise RuntimeError("Binance API disabled")
+
+        url = cfg["url"]
+        headers = {}
+
+        keys = cfg.get("api_keys", {})
+        if keys.get("api_key"):
+            headers["X-MBX-APIKEY"] = keys["api_key"]
+
+        r = requests.get(url, params={
+            "symbol": symbol,
+            "interval": "1d",
+            "limit": 1000
+        }, headers=headers)
+
+        data = r.json()
+
+        if isinstance(data, dict) and "code" in data:
+            raise ValueError(f"Binance error: {data}")
+
+        df = pd.DataFrame(data)
+        return self._normalize(df)
+
+    # =========================================================
+    # FETCH binance/yahoo
+    # =========================================================
+    def _load_backtest(self, symbol: str):
+
+      import yfinance as yf
+
+      path = self._file_path(symbol)
+
+      # =========================================================
+      # 1. LOAD FROM CACHE FIRST (HARD PRIORITY)
+      # =========================================================
+      if os.path.exists(path):
+
+        df = pd.read_pickle(path)
+        df = self._normalize(df)
+
+        close = self._extract_series(df, "close")
+        if close is not None:
+            df["ret"] = close.pct_change()
+
+        return df
+
+      # =========================================================
+      # 2. BUILD DATASET (NO API, ONLY YFINANCE)
+      # =========================================================
+      print(f"[BACKTEST] Building dataset {symbol}...")
+
+      asset_type = self._asset_type(symbol)
+
+      # =========================================================
+      # EQUITIES
+      # =========================================================
+      if asset_type == "equities":
 
         df = yf.download(
             symbol,
@@ -142,218 +233,109 @@ class PickleDataManager:
             progress=False
         )
 
-        return self._normalize_columns(df.reset_index())
+      # =========================================================
+      # CRYPTO (USDT → -USD MAPPING)
+      # =========================================================
+      else:
 
-    # =========================================================
-    # BINANCE
-    # =========================================================
-    def _fetch_binance(self, cfg):
+        yf_symbol = symbol.replace("USDT", "-USD")
 
-        import requests
-
-        if not cfg.get("allow_api", True):
-            raise RuntimeError("API disabled for Binance")
-
-        url = cfg["url"]
-        keys = cfg.get("api_keys", {})
-
-        headers = {}
-        if keys.get("api_key"):
-            headers["X-MBX-APIKEY"] = keys["api_key"]
-
-        params = {
-            "symbol": "BTCUSDT",
-            "interval": "1d",
-            "limit": 1000
-        }
-
-        r = requests.get(url, params=params, headers=headers)
-        data = r.json()
-
-        df = pd.DataFrame(data)
-
-        return self._normalize_columns(df)
-
-    # =========================================================
-    # KRAKEN
-    # =========================================================
-    def _fetch_kraken(self, cfg):
-
-        import requests
-
-        if not cfg.get("allow_api", True):
-            raise RuntimeError("API disabled for Kraken")
-
-        url = cfg["url"]
-
-        pair = "BTCUSD"
-
-        r = requests.get(url, params={
-            "pair": pair,
-            "interval": 1440
-        })
-
-        data = r.json()
-
-        if "result" not in data:
-            raise ValueError(f"Kraken error: {data}")
-
-        key = list(data["result"].keys())[0]
-
-        df = pd.DataFrame(data["result"][key], columns=[
-            "time","open","high","low","close","vwap","volume","count"
-        ])
-
-        df["time"] = pd.to_datetime(df["time"], unit="s")
-
-        return self._normalize_columns(df[["time","open","high","low","close","volume"]])
-
-    # =========================================================
-    # COINBASE
-    # =========================================================
-    def _fetch_coinbase(self, cfg):
-
-        import requests
-
-        if not cfg.get("allow_api", True):
-            raise RuntimeError("API disabled for Coinbase")
-
-        base_url = cfg["url"]
-
-        product = "BTC-USD"
-
-        r = requests.get(
-            f"{base_url}/{product}/candles",
-            params={"granularity": 86400}
+        df = yf.download(
+            yf_symbol,
+            period=f"{self.lookback_years}y",
+            interval="1d",
+            auto_adjust=False,
+            progress=False
         )
 
-        data = r.json()
+      # =========================================================
+      # 3. VALIDATION
+      # =========================================================
+      if df is None or df.empty:
+        raise RuntimeError(f"[BACKTEST] No data for {symbol}")
 
-        if not isinstance(data, list):
-            raise ValueError(f"Coinbase error: {data}")
+      # =========================================================
+      # 4. NORMALIZE
+      # =========================================================
+      df = df.reset_index()
+      df = self._normalize(df)
 
-        df = pd.DataFrame(data, columns=[
-            "time","low","high","open","close","volume"
-        ])
 
-        df["time"] = pd.to_datetime(df["time"], unit="s")
+      # =========================================================
+      # 5. STORE SNAPSHOT (DETERMINISTIC BACKTEST CACHE)
+      # =========================================================
+      self._store(path, df)
 
-        return self._normalize_columns(df)
+      return df
+    def _extract_series(self, df, col):
 
-    # =========================================================
-    # COINGECKO
-    # =========================================================
-    def _fetch_coingecko(self, cfg):
+       if df is None or df.empty:
+          return None
 
-        import requests
+       col = col.lower()
 
-        if not cfg.get("allow_api", True):
-            raise RuntimeError("API disabled for CoinGecko")
+       if col not in df.columns:
+          return None
 
-        url = cfg["url"]
+       data = df[col]
 
-        r = requests.get(
-            f"{url}/bitcoin/ohlc",
-            params={
-                "vs_currency": "usd",
-                "days": 365
-            }
-        )
+       if isinstance(data, pd.DataFrame):
+          return data.iloc[:, 0]
 
-        data = r.json()
-
-        if not isinstance(data, list):
-            raise ValueError(f"CoinGecko error: {data}")
-
-        df = pd.DataFrame(data, columns=[
-            "time","open","high","low","close"
-        ])
-
-        df["time"] = pd.to_datetime(df["time"], unit="ms")
-
-        df["volume"] = 0
-
-        return self._normalize_columns(df)
+       return data
 
     # =========================================================
     # STORE
     # =========================================================
-    def _store(self, path: str, df: pd.DataFrame):
+    def _store(self, path, df):
 
-        df = self._normalize_columns(df)
+        df = self._normalize(df)
 
-        close = self._extract_series(df, "close")
-
-        if close is not None:
-            df["ret"] = close.pct_change()
-        df = df.dropna(subset=["close"])
+        if "close" in df.columns:
+            df["ret"] = df["close"].astype(float).pct_change()
 
         df.to_pickle(path)
 
     # =========================================================
-    # FETCH + CACHE LOGIC
+    # MAIN FETCH
     # =========================================================
-    def fetch_store(self, symbol: str, force_refresh: bool = False):
+    def fetch_store(self, symbol: str, force_refresh=False):
 
         path = self._file_path(symbol)
-
         cfg = self._provider_config(symbol)
 
-        allow_api = cfg.get("allow_api", True)
         allow_cache = cfg.get("allow_cache", True)
+        allow_api = cfg.get("allow_api", True)
 
-        # -------------------------
-        # BACKTEST (UNCHANGED)
-        # -------------------------
+        # =====================================================
+        # BACKTEST MODE
+        # =====================================================
         if self.run_option == "backtest":
 
-            if os.path.exists(path):
+            if os.path.exists(path) and not force_refresh:
+                df = pd.read_pickle(path)
+                return self._normalize(df)
 
-               df = pd.read_pickle(path)
-               df = self._normalize_columns(df)
+            print(f"[BACKTEST] Building dataset {symbol}...")
 
-               close = self._extract_series(df, "close")
-               if close is not None:
-                  df["ret"] = close.pct_change()
-
-               return df
-
-            # auto fallback instead of crash
-            print(f"[BACKTEST] Missing cache for {symbol}, falling back to production fetch...")
-
-            df = self._fetch_api(symbol)
+            df = self._load_backtest(symbol)
 
             if df is None or df.empty:
-               raise ValueError(f"[BACKTEST] No data for {symbol}")
+                raise ValueError(f"[BACKTEST] No data for {symbol}")
 
-            # store snapshot so next run is stable
             self._store(path, df)
-
             return df
 
-        # -------------------------
-        # PRODUCTION CACHE FIRST
-        # -------------------------
-        if os.path.exists(path) and not force_refresh and allow_cache:
-
-            df = pd.read_pickle(path)
-            df = self._normalize_columns(df)
-
-            close = self._extract_series(df, "close")
-            if close is not None:
-                df["ret"] = close.pct_change()
-
-            return df
+        # =====================================================
+        # PRODUCTION MODE
+        # =====================================================
+        if os.path.exists(path) and allow_cache and not force_refresh:
+            return self._normalize(pd.read_pickle(path))
 
         if not allow_api:
             raise RuntimeError(f"[PRODUCTION] API disabled for {symbol}")
 
-        print(f"[DATA] Fetching {symbol} via {cfg.get('provider')}...")
-
-        df = self._fetch_api(symbol)
-
-        if df is None or df.empty:
-            raise ValueError(f"Empty dataset: {symbol}")
+        df = self._fetch_production(symbol)
 
         if allow_cache:
             self._store(path, df)
@@ -361,48 +343,19 @@ class PickleDataManager:
         return df
 
     # =========================================================
-    # LOAD ALL
+    # BOOTSTRAP
     # =========================================================
-    def load_all(self):
-
-        data = {}
-        today = self._today()
-
-        for file in os.listdir(self.path):
-
-            if file.endswith(f"{today}.pkl"):
-
-                symbol = file.split(".")[0]
-
-                df = pd.read_pickle(os.path.join(self.path, file))
-                df = self._normalize_columns(df)
-
-                data[symbol] = df
-
-        return data
-
-    # =========================================================
-    # BOOTSTRAP ALL
-    # =========================================================
-    def bootstrap_all(self, force_refresh: bool = False):
+    def bootstrap_all(self, symbols):
 
         dataset = {}
 
-        for symbol in self.get_all_symbols():
-
+        for s in symbols:
             try:
-                df = self.fetch_store(symbol, force_refresh)
-
-                if df is not None and not df.empty:
-                    dataset[symbol] = df
-                    print(f"[DATA] Loaded {symbol} ({len(df)})")
-
+                df = self.fetch_store(s)
+                dataset[s] = df
+                print(f"[DATA] Loaded {s} ({len(df)})")
             except Exception as e:
-                print(f"[DATA] Failed {symbol}: {e}")
-
-        print(f"[DATA] Bootstrap complete: {len(dataset)} assets")    
-        if len(dataset) == 0:
-           raise RuntimeError(f"[DATA] Universe empty in {self.run_option}")
+                print(f"[DATA] Failed {s}: {e}")
 
         return dataset
 

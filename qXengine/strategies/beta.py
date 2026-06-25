@@ -1,3 +1,9 @@
+# ===============================================================
+# BetaNeutralStrategy : beta strategy in Quant Xpert
+# Date: 2026/06/24 
+# Author : bugsbunnyla
+# Comment : Processing of beta neutral strategy
+# ===============================================================
 import numpy as np
 import pandas as pd
 
@@ -206,3 +212,7 @@ class BetaNeutralStrategy(BaseStrategy):
                 series=[]
             )
         )
+
+# ============================================================
+# END OF BETA NEUTRAL STRATEGY
+# ============================================================

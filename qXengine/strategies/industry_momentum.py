@@ -1,3 +1,10 @@
+# =====================================================================
+# IndustryMomentumStrategy : stock and industry strategy in Quant Xpert
+# Date: 2026/06/24 
+# Author : bugsbunnyla
+# Comment : JT and MG paper references of stock and industry momentum 
+# applied strategy processing in Quant Xpert
+# =====================================================================
 import numpy as np
 import pandas as pd
 
@@ -19,7 +26,7 @@ from ..StrategyResult import StrategyResult
 #  Rank industries: Rank(IndustryMomentumj​) then buy stocks only inside winning industries.  no industry grouping 
 # As a cross sectional industry momentum - Cross-Sectional Momentum (Stock Momentum) Momentum i	​=Pi(t)/Pi​(t−k)	​−1 Rank all stocks:Rank(Momentumi	​)
 # Classic reference:  Narasimhan Jegadeesh Sheridan Titman  Core idea: Buy stocks that have outperformed other stocks and sell stocks that have underperformed other stocks.
-# Missed Industry Momentum (Moskowitz & Grinblatt) Paper: Tobias Moskowitz and Mark Grinblatt Published: Do Industries Explain Momentum? 
+# Industry Momentum (Moskowitz & Grinblatt) Paper: Tobias Moskowitz and Mark Grinblatt Published: Do Industries Explain Momentum? 
 # Core finding  -> A large portion of stock momentum comes from industry performance rather than firm-specific performance.
 # Group stocks by industry.  as Tech energy etc Calculate industry return. IndustryReturnj	​=1/N​i∈j∑​Returni	​ next is Step 4 Buy stocks from winning industries. may Not be  best individual stocks.
 # Cross-sectional momentum:  Rank(StockMomentum)  vs Industry momentum: Rank(IndustryMomentum)
@@ -42,275 +49,48 @@ from ..StrategyResult import StrategyResult
 # "avg_stock_momentum":        float(stock_mom_df.mean().mean()),    "avg_industry_momentum":        float(industry_mom_df.mean().mean()),    "top_industry":        best_industry,    "bottom_industry":  worst_industry}
 # chart- signals = {     "industry_momentum_index":        industry_momentum_index,    "stock_momentum_index":        stock_momentum_index,    "industry_signal":        industry_signal_series,    
 #                    "stock_signal":        stock_signal_series,    "rebalance_events":        rebalance_events}
-class IndustryMomentumStrategyBase(BaseStrategy):
-
-    # ==================================================
-    # MAIN STRATEGY
-    # ==================================================
-    def run(self):
-
-        cfg = self.cfg
-
-        formation = cfg.get("formation", 252)
-        holding = cfg.get("holding", 21)
-        industry_window = cfg.get("industry_window", 252)
-        top_q = cfg.get("top_quantile", 0.30)
-
-        # ==================================================
-        # BUILD PRICE MATRIX
-        # ==================================================
-        prices = pd.DataFrame({
-            sym: df["close"]
-            for sym, df in self.data.items()
-            if "close" in df.columns
-        })
-
-        prices = prices.dropna(how="all")
-
-        if prices.empty:
-
-            return StrategyResult(
-                name="IndustryMomentumStrategy",
-                data=self.data,
-                metrics={"error": "no valid price data"},
-                signals={}
-            )
-
-        # ==================================================
-        # MOMENTUM RETURNS
-        # ==================================================
-        momentum = prices.pct_change(formation)
-
-        # ==================================================
-        # INDUSTRY STRENGTH
-        # ==================================================
-        industry_strength = (
-            momentum
-            .rolling(industry_window)
-            .mean()
-        )
-
-        # ==================================================
-        # CROSS-SECTIONAL RANKING
-        # ==================================================
-        ranks = industry_strength.rank(
-            axis=1,
-            pct=True
-        )
-
-        # ==================================================
-        # TOP QUANTILE MEMBERSHIP
-        # ==================================================
-        signal_matrix = (
-            ranks >= (1 - top_q)
-        ).astype(float)
-
-        # ==================================================
-        # PORTFOLIO MOMENTUM
-        # ==================================================
-        portfolio_signal = signal_matrix.shift(1)
-
-        portfolio_returns = (
-            prices.pct_change()
-            * portfolio_signal
-        ).mean(axis=1)
-
-        portfolio_returns = portfolio_returns.fillna(0)
-
-        portfolio_momentum = (
-            1 + portfolio_returns
-        ).cumprod()
-
-        # ==================================================
-        # AVERAGE INDUSTRY MOMENTUM
-        # ==================================================
-        avg_strength = industry_strength.mean(axis=1)
-
-        momentum_ma = avg_strength.rolling(
-            industry_window
-        ).mean()
-
-        # ==================================================
-        # REBALANCE EVENTS
-        # ==================================================
-        rebalance_events = pd.Series(
-            0,
-            index=portfolio_momentum.index
-        )
-
-        rebalance_events.iloc[::holding] = 1
-
-        # ==================================================
-        # BENCHMARK
-        # ==================================================
-        benchmark = None
-
-        benchmark_symbol = (
-            cfg.get("chart", {})
-               .get("benchmark")
-        )
-
-        if benchmark_symbol in prices.columns:
-
-            benchmark = (
-                prices[benchmark_symbol]
-                / prices[benchmark_symbol].iloc[0]
-            )
-
-        # ==================================================
-        # PER-ASSET SIGNALS
-        # ==================================================
-        asset_signals = {}
-
-        for sym in signal_matrix.columns:
-
-            asset_signals[sym] = (
-                signal_matrix[sym]
-                .fillna(0)
-            )
-
-        # ==================================================
-        # BUILD CHART
-        # ==================================================
-        chart = self.build_chart(
-            series=cfg.get("chart", {}).get("series"),
-            title=cfg.get("title"),
-            charttype=cfg.get("chart", {}).get("type"),
-            chartmode=cfg.get("chart", {}).get("mode")
-        )
-
-        # ==================================================
-        # METRICS
-        # ==================================================
-        metrics = {
-
-            "formation": formation,
-
-            "holding": holding,
-
-            "industry_window": industry_window,
-
-            "top_quantile": top_q,
-
-            "assets": int(prices.shape[1]),
-
-            "avg_industry_strength":
-                float(avg_strength.mean())
-                if not avg_strength.empty
-                else None,
-
-            "latest_strength":
-                float(avg_strength.iloc[-1])
-                if not avg_strength.empty
-                else None,
-
-            "portfolio_return":
-                float(
-                    portfolio_momentum.iloc[-1] - 1
-                )
-                if not portfolio_momentum.empty
-                else None
-        }
-
-        # ==================================================
-        # SIGNALS
-        # ==================================================
-        signals = {
-
-            "industry_strength": avg_strength,
-
-            "momentum_ma": momentum_ma,
-
-            "portfolio_momentum": portfolio_momentum,
-
-            "rebalance_events": rebalance_events,
-
-            "benchmark": benchmark,
-
-            "asset_signals": asset_signals
-        }
-
-        # ==================================================
-        # RETURN
-        # ==================================================
-        return StrategyResult(
-            name="IndustryMomentumStrategy",
-            data=self.data,
-            metrics=metrics,
-            signals=signals,
-            chart=chart
-        )
-
-
-#====================================================== 
-# INDUSTRY and STOCK 
-#======================================================
-
-import numpy as np
-import pandas as pd
-
-from .BaseStrategy import BaseStrategy
-from ..StrategyResult import StrategyResult
-
-
 class IndustryMomentumStrategy(BaseStrategy):
 
     # ==================================================
-    # INDUSTRY MAP (UNCHANGED LOGIC)
+    # INDEX NORMALIZER
     # ==================================================
-    def _get_industry_map(self, columns):
-
-        crypto_assets = {
-            "BTCUSDT", "ETHUSDT", "SOLUSDT",
-            "BNBUSDT", "XRPUSDT", "DOGEUSDT"
-        }
-
-        macro_assets = {
-            "SPY", "QQQ", "IWM", "TLT", "GLD"
-        }
-
-        tech_assets = {"AAPL", "MSFT", "NVDA", "AMD"}
-        financial_assets = {"JPM", "GS", "BAC"}
-
-        mapping = {}
-
-        for s in columns:
-            if s in crypto_assets:
-                mapping[s] = "Crypto"
-            elif s in macro_assets:
-                mapping[s] = "Macro"
-            elif s in tech_assets:
-                mapping[s] = "Technology"
-            elif s in financial_assets:
-                mapping[s] = "Financials"
-            else:
-                mapping[s] = "Other"
-
-        return mapping
-
-
-    # ==================================================
-    # SAFE NORMALIZER (CRITICAL FIX)
-    # ==================================================
-    def _normalize_df(self, df):
+    def _normalize(self, df):
 
         df = df.copy()
 
-        # CASE 1: date column exists
         if "date" in df.columns:
             df["date"] = pd.to_datetime(df["date"], errors="coerce")
             df = df.dropna(subset=["date"])
             df = df.set_index("date")
-
-        # CASE 2: index already exists
         else:
             df.index = pd.to_datetime(df.index, errors="coerce")
 
-        df = df[~df.index.isna()]
-        df = df.sort_index()
+        df = df[df.index.notna()]
+        return df.sort_index()
 
-        return df
+    # ==================================================
+    # INDUSTRY MAP
+    # ==================================================
+    def _industry_map(self, cols):
 
+        crypto = {"BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT"}
+        macro = {"SPY","QQQ","IWM","TLT","GLD"}
+        tech = {"AAPL","MSFT","NVDA","AMD"}
+        fin = {"JPM","GS","BAC"}
+
+        m = {}
+        for s in cols:
+            if s in crypto:
+                m[s] = "Crypto"
+            elif s in macro:
+                m[s] = "Macro"
+            elif s in tech:
+                m[s] = "Tech"
+            elif s in fin:
+                m[s] = "Financials"
+            else:
+                m[s] = "Other"
+        return m
 
     # ==================================================
     # MAIN
@@ -318,149 +98,157 @@ class IndustryMomentumStrategy(BaseStrategy):
     def run(self):
 
         cfg = self.cfg
+        chart_cfg = cfg.get("chart", {})
 
         formation = cfg.get("formation", 252)
-        industry_window = cfg.get("industry_window", 252)
-        top_q = cfg.get("top_quantile", 0.30)
+        top_q = cfg.get("top_quantile", 0.3)
 
-        # ==================================================
-        # STEP 1: CLEAN INPUT DATA
-        # ==================================================
+        # --------------------------------------------------
+        # CLEAN DATA
+        # --------------------------------------------------
         clean = {}
 
         for sym, df in self.data.items():
             if "close" not in df.columns:
                 continue
-            clean[sym] = self._normalize_df(df)
+            clean[sym] = self._normalize(df)
 
-        # ==================================================
-        # STEP 2: BUILD PRICE MATRIX (ONLY HERE INDEX IS FIXED)
-        # ==================================================
-        prices = pd.DataFrame({
-            sym: df["close"]
-            for sym, df in clean.items()
-        }).sort_index()
-
-        # 🚨 DEBUG (CRITICAL)
-        #print("\n[DEBUG] prices.index (FINAL SOURCE):")
-        #print(prices.index[:5])
-        #print("dtype:", prices.index.dtype)
+        prices = pd.DataFrame({k: v["close"] for k, v in clean.items()}).sort_index()
 
         if prices.empty or prices.shape[1] < 2:
-            return StrategyResult(
-                name="IndustryMomentumStrategy",
-                data=self.data,
+            return self.build_result(
+                signals={},
                 metrics={"error": "insufficient data"},
-                signals={}
+                chart=None
             )
 
+        master_index = prices.index
+
         # ==================================================
-        # RETURNS + MOMENTUM
+        # RETURNS
         # ==================================================
         returns = prices.pct_change()
-        stock_momentum = prices.pct_change(formation)
 
         # ==================================================
-        # INDUSTRY GROUPING
+        # ================= STOCK MOMENTUM =================
+        # Jegadeesh & Titman (1993)
         # ==================================================
-        industry_map = self._get_industry_map(prices.columns)
+        stock_signal_raw = prices.pct_change(formation).shift(1)
 
-        industry_frames = {}
+        stock_rank = stock_signal_raw.rank(axis=1, pct=True)
 
-        for ind in set(industry_map.values()):
+        stock_long = (stock_rank > (1 - top_q)).astype(float)
+        stock_short = (stock_rank < top_q).astype(float)
 
-            members = [s for s in prices.columns if industry_map[s] == ind]
+        # ✔ correct portfolio construction (FIXED)
+        stock_weights = stock_long - stock_short
 
+        stock_port_ret = (returns * stock_weights.shift(1)).mean(axis=1)
+
+        stock_equity = (1 + stock_port_ret.fillna(0)).cumprod()
+
+        stock_signal = (stock_long > 0).astype(int)
+
+        stock_momentum_factor = stock_signal_raw.mean(axis=1)
+
+        # ==================================================
+        # =============== INDUSTRY MOMENTUM ===============
+        # Moskowitz & Grinblatt (1999)
+        # ==================================================
+        ind_map = self._industry_map(prices.columns)
+
+        ind_returns = {}
+
+        for ind in set(ind_map.values()):
+            members = [s for s in prices.columns if ind_map[s] == ind]
             if not members:
                 continue
+            ind_returns[ind] = returns[members].mean(axis=1)
 
-            industry_frames[ind] = stock_momentum[members].mean(axis=1)
+        ind_returns = pd.DataFrame(ind_returns)
 
-        industry_momentum = pd.DataFrame(industry_frames).fillna(0)
+        # ✔ FIX: use cumulative formation return, NOT rolling mean
+        ind_signal_raw = ind_returns.pct_change(formation).shift(1)
 
-        industry_momentum_smoothed = (
-            industry_momentum.rolling(industry_window)
-            .mean()
-            .fillna(0)
-        )
+        ind_rank = ind_signal_raw.rank(axis=1, pct=True)
+
+        ind_long = (ind_rank > (1 - top_q)).astype(float)
+        ind_short = (ind_rank < top_q).astype(float)
+
+        # ✔ correct portfolio construction
+        ind_weights = ind_long - ind_short
+
+        ind_port_ret = (ind_returns * ind_weights.shift(1)).mean(axis=1)
+
+        industry_equity = (1 + ind_port_ret.fillna(0)).cumprod()
+
+        industry_signal = (ind_long > 0).astype(int)
+
+        industry_momentum_factor = ind_signal_raw.mean(axis=1)
 
         # ==================================================
-        # SIGNALS
+        # BENCHMARK
         # ==================================================
-        stock_rank = stock_momentum.rank(axis=1, pct=True)
-        stock_signal = (stock_rank > (1 - top_q)).astype(float)
-
-        industry_rank = industry_momentum_smoothed.rank(axis=1, pct=True)
-        industry_signal = (industry_rank > (1 - top_q)).astype(float)
-
-        # ==================================================
-        # SERIES
-        # ==================================================
-        stock_momentum_index = stock_momentum.mean(axis=1).fillna(0)
-        industry_strength = industry_momentum_smoothed.mean(axis=1).fillna(0)
-
-        momentum_ma = industry_strength.rolling(industry_window).mean().fillna(0)
-
-        rebalance_events = (stock_signal.sum(axis=1) > 0).astype(float)
-
-        portfolio_momentum = (1 + stock_momentum_index).cumprod()
-
         benchmark = None
         if "SPY" in prices.columns:
             benchmark = (1 + prices["SPY"].pct_change().fillna(0)).cumprod()
 
         # ==================================================
-        #  PRINT BEFORE CHARTDATA (YOUR REQUEST)
+        # REBALANCE EVENTS
         # ==================================================
-        #print("\n[DEBUG BEFORE CHARTDATA]")
-        #print("portfolio_momentum:", portfolio_momentum.index[:3])
-        #print("industry_strength:", industry_strength.index[:3])
-        #print("momentum_ma:", momentum_ma.index[:3])
-        #print("stock_momentum_index:", stock_momentum_index.index[:3])
+        rebalance = (stock_long.sum(axis=1) > 0).astype(int)
 
         # ==================================================
-        # CHARTDATA (CRITICAL FIX - NO INDEX INFERENCE)
+        # ALIGNMENT
         # ==================================================
-        chartdata = pd.DataFrame(index=prices.index)
-
-        chartdata["portfolio_momentum"] = portfolio_momentum
-        chartdata["industry_strength"] = industry_strength
-        chartdata["momentum_ma"] = momentum_ma
-        chartdata["stock_momentum"] = stock_momentum_index
-        chartdata["benchmark"] = benchmark
-        chartdata["rebalance_events"] = rebalance_events
-
-        chartdata = chartdata.replace([np.inf, -np.inf], np.nan).fillna(0)
+        def A(x):
+            return x.reindex(master_index) if x is not None else None
 
         # ==================================================
-        # FINAL DEBUG
+        # CHARTDATA (PAPER-CORRECT STRUCTURE)
         # ==================================================
-        #print("\n[DEBUG FINAL chartdata]")
-        #print(chartdata.index[:5])
-        #print("dtype:", chartdata.index.dtype)
+        chartdata = {
+            "stock_equity": A(stock_equity),
+            "industry_equity": A(industry_equity),
+            "benchmark": A(benchmark),
 
-        # ==================================================
-        # CHART BUILD
-        # ==================================================
+            # factors (non-cumulative)
+            "stock_momentum": A(stock_momentum_factor),
+            "industry_momentum": A(industry_momentum_factor),
+
+            # signals
+            "stock_signal": A(stock_signal),
+            "industry_signal": A(industry_signal),
+            "rebalance_events": A(rebalance),
+
+            "assets": list(prices.columns),
+            "industries": list(ind_returns.columns)
+        }
+
         chart = self.build_chart(
+            charttype=chart_cfg.get("type", "line"),
+            chartmode=chart_cfg.get("mode", "overlay"),
+            title=chart_cfg.get("title", "Industry & Stock Momentum (Paper Corrected)"),
             chartdata=chartdata,
-            series=cfg.get("chart", {}).get("series"),
-            title=cfg.get("title"),
-            charttype=cfg.get("chart", {}).get("type"),
-            chartmode=cfg.get("chart", {}).get("mode")
+            series=chart_cfg.get("series", [])
         )
 
         return StrategyResult(
-            name="IndustryMomentumStrategy",
-            data=self.data,
+     name="IndustryMomentumStrategy",
+     data = self.data,
+            signals={
+                "stock_signal": A(stock_signal),
+                "industry_signal": A(industry_signal),
+                "rebalance_events": A(rebalance)
+            },
             metrics={
                 "formation": formation,
-                "industry_window": industry_window,
-                "assets": len(prices.columns)
-            },
-            signals={
-                "stock_signal": stock_signal,
-                "industry_signal": industry_signal
+                "top_quantile": top_q,
+                "stocks": len(prices.columns),
+                "industries": len(ind_returns.columns)
             },
             chart=chart
         )
+# ===========================================================
+# END OF INDUSTRY MOMENTUM
+# ===========================================================
