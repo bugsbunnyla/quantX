@@ -1739,7 +1739,9 @@ class VolatilityStrategyChart(StrategyChart):
             hovermode="x unified"
         )
 
-        return fig# ====================================================
+        return fig
+
+# ====================================================
 # Correlation Chart
 # ====================================================
 import numpy as np
