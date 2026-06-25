@@ -65,6 +65,7 @@ pip install -r requirements.txt
 \## Run QuantX
 
 Start the application :
+
 a.For Backtesting :
 
 ```bash
