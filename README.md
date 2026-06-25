@@ -64,12 +64,16 @@ pip install -r requirements.txt
 
 \## Run QuantX
 
+Start the application :
+a.For Backtesting :
+
+```bash
+python -m qXengine.backtest.e2ebacktest
 
 
-Start the application:
 
-
-
+b. For production:
+Ensure you have the config.py set for the URL access of at least two providers with api keys for access.
 ```bash
 
 python main.py
