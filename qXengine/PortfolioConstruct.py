@@ -267,7 +267,7 @@ class PortfolioConstruct:
         for i, r in df.iterrows():
             print(f"{i} | {r['weight']:.2%} | ${r['allocation']:.2f}")
 
-        print(f"\nPie saved → {img}")
+        print(f"\nPie saved -->{img}")
 
 # ===================================================================
 # END OF PORTFOLIO CONSTRUCT

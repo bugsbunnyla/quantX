@@ -47,203 +47,213 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
-
 class AlphaStrategyChart(StrategyChart):
 
-    # ==================================================
-    # SAFE RESCALE (prevents flat lines)
-    # ==================================================
+    BAR_SERIES = {"alpha_scores", "beta_scores"}
+    LINE_SERIES = {"price", "benchmark", "signal"}
+
+    STATIC_MAP = {
+        "metrics": [
+            "r_squared",
+            "tstat",
+            "corr",
+            "sharpe_ratio",
+            "hit_ratio",
+            "cvar"
+        ],
+        "series": {
+            "price": {"type": "line", "visible": False},
+            "benchmark": {"type": "line", "visible": False},
+            "signal": {"type": "line", "visible": True},
+
+            "alpha_scores": {"type": "bar", "visible": True},
+            "beta_scores": {"type": "bar", "visible": True},
+        }
+    }
+
+    # -------------------------------------------------
+    # SAFE SCALING
+    # -------------------------------------------------
     @staticmethod
     def _safe_scale(y):
         y = np.asarray(y, dtype=float)
-        if len(y) == 0:
+        y = np.nan_to_num(y)
+
+        m = np.nanmax(np.abs(y))
+        if not np.isfinite(m) or m == 0:
             return y
+        return y / m
 
-        # prevent domination
-        max_val = np.nanmax(np.abs(y))
-        if max_val == 0:
-            return y
-
-        return y / max_val
-
-    # ==================================================
-    # CATEGORICAL SERIES
-    # ==================================================
+    # -------------------------------------------------
+    # FIXED XY CONVERSION (IMPORTANT FIX)
+    # -------------------------------------------------
     @staticmethod
-    def _plot_dict(fig, d, name):
+    def _to_xy(data):
 
-        if not isinstance(d, dict) or not d:
-            return False
+        # already structured
+        if isinstance(data, dict) and "x" in data and "y" in data:
+            return list(data["x"]), list(data["y"])
 
-        y = AlphaStrategyChart._safe_scale(list(d.values()))
+        # dict = categorical series (alpha_scores, beta_scores)
+        if isinstance(data, dict):
+            keys = list(data.keys())
+            vals = [data[k] for k in keys]
+            return keys, vals
 
-        fig.add_trace(go.Bar(
-            x=list(d.keys()),
-            y=y,
-            name=name
-        ))
-        return True
+        # list/array fallback
+        if isinstance(data, (list, tuple, np.ndarray)):
+            return list(range(len(data))), list(data)
 
-    # ==================================================
-    # SIGNAL
-    # ==================================================
+        return [], []
+
+    # -------------------------------------------------
+    # FIXED METRICS FLATTENING
+    # -------------------------------------------------
     @staticmethod
-    def _plot_signal(fig, signal, name="signal"):
+    def _flatten_metrics(metrics):
 
-        if not signal:
-            return False
+        by_symbol = metrics.get("by_symbol", {})
 
-        if isinstance(signal, dict) and "x" in signal:
+        if not by_symbol:
+            return metrics  # fallback
 
-            y = AlphaStrategyChart._safe_scale(signal["y"])
+        # aggregate across symbols (MEAN per metric)
+        out = {}
 
-            fig.add_trace(go.Scatter(
-                x=signal["x"],
-                y=y,
-                mode="lines+markers",
-                name=name
-            ))
-            return True
+        keys = next(iter(by_symbol.values())).keys()
 
-        ordered = sorted(signal.items(), key=lambda x: x[1])
-        y = AlphaStrategyChart._safe_scale([v for _, v in ordered])
+        for k in keys:
+            vals = [v.get(k) for v in by_symbol.values() if v.get(k) is not None]
+            out[k] = float(np.mean(vals)) if vals else None
 
-        fig.add_trace(go.Bar(
-            x=[k for k, _ in ordered],
-            y=y,
-            name=name
-        ))
+        # keep base metrics
+        out["lookback"] = metrics.get("lookback")
+        out["assets"] = metrics.get("assets")
 
-        return True
+        return out
 
-    # ==================================================
-    # BENCHMARK (ONLY TIME SERIES WHEN SOLO)
-    # ==================================================
-    @staticmethod
-    def _plot_benchmark(fig, series, name="benchmark", force_symbol_mode=False):
-
-        if series is None:
-            return False
-
-        if isinstance(series, dict):
-            x = pd.to_datetime(series.get("x", []), errors="coerce")
-            y = series.get("y", [])
-        else:
-            s = pd.Series(series).dropna()
-            x = pd.to_datetime(s.index, errors="coerce")
-            y = s.values
-
-        mask = pd.notna(x)
-
-        y = AlphaStrategyChart._safe_scale(np.asarray(y)[mask])
-
-        if force_symbol_mode:
-            # convert datetime → symbol labels
-            x_plot = pd.Series(x[mask]).dt.strftime("%Y-%m")
-        else:
-            x_plot = x[mask]
-
-        fig.add_trace(go.Scatter(
-            x=x_plot,
-            y=y,
-            mode="lines",
-            name=name
-        ))
-
-        return True
-
-    # ==================================================
-    # PORTFOLIO
-    # ==================================================
-    @staticmethod
-    def _plot_portfolio(fig, port):
-
-        if not port:
-            return False
-
-        s = pd.Series(port)
-        s.index = pd.to_datetime(s.index, errors="coerce")
-        s = s.sort_index()
-
-        mask = pd.notna(s.index)
-
-        y = AlphaStrategyChart._safe_scale(s.values[mask])
-
-        fig.add_trace(go.Scatter(
-            x=s.index[mask].strftime("%Y-%m"),
-            y=y,
-            mode="lines",
-            name="portfolio_curve"
-        ))
-
-        return True
-
-    # ==================================================
-    # RENDER (DECISION ENGINE)
-    # ==================================================
+    # -------------------------------------------------
+    # RENDER
+    # -------------------------------------------------
     @staticmethod
     def render(item):
 
         fig = go.Figure()
-        chartdata = getattr(item.chart, "chartdata", {}) or {}
 
-        has_factors = any([
-            chartdata.get("alpha_scores"),
-            chartdata.get("beta_scores"),
-            chartdata.get("signal_curve")
-        ])
+        chart = getattr(item, "chart", None)
+        if chart is None:
+            return fig
 
-        has_benchmark = chartdata.get("benchmark_close") is not None
-        has_portfolio = chartdata.get("portfolio_curve") is not None
+        chartdata = getattr(chart, "chartdata", {}) or {}
+        series_cfg = getattr(chart, "series", []) or []
+        title = getattr(chart, "title", "Chart")
 
-        # -------------------------
-        # CASE 1: FACTORS EXIST → FORCE SYMBOL MODE
-        # -------------------------
-        if has_factors:
+        metrics = getattr(item, "metrics", {}) or {}
+        metrics = AlphaStrategyChart._flatten_metrics(metrics)
 
-            AlphaStrategyChart._plot_dict(fig, chartdata.get("alpha_scores"), "alpha_scores")
-            AlphaStrategyChart._plot_dict(fig, chartdata.get("beta_scores"), "beta_scores")
-            AlphaStrategyChart._plot_signal(fig, chartdata.get("signal_curve"), "signal_curve")
+        plotted = False
 
-            if has_benchmark:
-                AlphaStrategyChart._plot_benchmark(
-                    fig,
-                    chartdata.get("benchmark_close"),
-                    force_symbol_mode=True
-                )
+        # ==================================================
+        # SERIES
+        # ==================================================
+        series_map = AlphaStrategyChart.STATIC_MAP["series"]
 
-            if has_portfolio:
-                AlphaStrategyChart._plot_portfolio(fig, chartdata.get("portfolio_curve"))
+        # fallback if no series config provided
+        if not series_cfg:
+            series_cfg = [{"source": k} for k in chartdata.keys()]
 
-            fig.update_layout(
-                template="plotly_dark",
-                barmode="group",
-                hovermode="x unified",
-                legend=dict(orientation="v")
-            )
+        for s in series_cfg:
 
-        # -------------------------
-        # CASE 2: BENCHMARK ONLY → TIME MODE
-        # -------------------------
-        else:
+            source = s.get("source")
+            label = s.get("label", source)
 
-            if has_benchmark:
-                AlphaStrategyChart._plot_benchmark(
-                    fig,
-                    chartdata.get("benchmark_close"),
-                    force_symbol_mode=False
-                )
+            if not source or source not in chartdata:
+                continue
 
-            if has_portfolio:
-                AlphaStrategyChart._plot_portfolio(fig, chartdata.get("portfolio_curve"))
+            cfg = series_map.get(source, {"type": "bar", "visible": True})
 
-            fig.update_layout(
-                template="plotly_dark",
-                hovermode="x unified",
-                legend=dict(orientation="v")
-            )
+            if not cfg.get("visible", True):
+                continue
+
+            x, y = AlphaStrategyChart._to_xy(chartdata[source])
+
+            if len(x) == 0 or y is None:
+                continue
+
+            y = AlphaStrategyChart._safe_scale(y) if source in {"alpha_scores", "beta_scores"} else y
+
+            if cfg["type"] == "line":
+
+                fig.add_trace(go.Scatter(
+                    x=x,
+                    y=y,
+                    mode="lines",
+                    name=label
+                ))
+
+            else:
+
+                fig.add_trace(go.Bar(
+                    x=x,
+                    y=y,
+                    name=label,
+                    opacity=0.75
+                ))
+
+            plotted = True
+
+        # ==================================================
+        # METRICS PANEL (FIXED)
+        # ==================================================
+        metric_keys = AlphaStrategyChart.STATIC_MAP["metrics"]
+
+        mx, my = [], []
+
+        for k in metric_keys:
+            if k in metrics and metrics[k] is not None:
+                mx.append(k)
+                my.append(metrics[k])
+
+        if mx:
+
+            fig.add_trace(go.Bar(
+                x=mx,
+                y=my,
+                name="Metrics",
+                marker_color="orange",
+                opacity=0.8
+            ))
+
+            plotted = True
+
+        # ==================================================
+        # FALLBACK
+        # ==================================================
+        if not plotted:
+
+            fig.add_trace(go.Scatter(
+                x=[0, 1],
+                y=[0, 1],
+                mode="lines",
+                name="No Data"
+            ))
+
+        # ==================================================
+        # LAYOUT FIX (IMPORTANT FOR AXIS)
+        # ==================================================
+        fig.update_layout(
+            template="plotly_dark",
+            title=dict(text=title, x=0.5),
+            hovermode="x unified",
+            legend=dict(orientation="v"),
+            margin=dict(l=40, r=40, t=60, b=40),
+
+            # FIX: prevents "0 axis" confusion
+            xaxis=dict(type="category"),
+        )
 
         return fig
+
 
 # ==================================================
 # STRATEGY CHARTS (UNCHANGED BUT SAFE)
@@ -2417,6 +2427,12 @@ class PairTradingChart(StrategyChart):
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+
+
 class IntradayReversalChart(StrategyChart):
 
     STATIC_MAP = {
@@ -2439,29 +2455,13 @@ class IntradayReversalChart(StrategyChart):
     # =========================================================
 
     @staticmethod
-    def get_attr_or_key(obj, name, default=None):
-
-        if isinstance(obj, dict):
-            return obj.get(name, default)
-
-        return getattr(obj, name, default)
-
-    @staticmethod
     def _resolve_xaxis(index, length):
-
         if isinstance(index, pd.DatetimeIndex):
             return index
-
-        if pd.api.types.is_datetime64_any_dtype(index):
-            return index
-
-        if pd.api.types.is_object_dtype(index):
-            try:
-                return pd.to_datetime(index, errors="raise")
-            except Exception:
-                pass
-
-        return list(range(length))
+        try:
+            return pd.to_datetime(index)
+        except Exception:
+            return list(range(length))
 
     @staticmethod
     def _safe_series(v, index=None):
@@ -2470,100 +2470,10 @@ class IntradayReversalChart(StrategyChart):
             return v
 
         if isinstance(v, (list, tuple, np.ndarray)):
-
-            idx = (
-                index
-                if index is not None
-                else range(len(v))
-            )
-
+            idx = index if index is not None else range(len(v))
             return pd.Series(v, index=idx)
 
-        if isinstance(
-            v,
-            (
-                int,
-                float,
-                np.integer,
-                np.floating
-            )
-        ):
-
-            idx = index if index is not None else [0]
-
-            return pd.Series(
-                [v] * len(idx),
-                index=idx
-            )
-
         return None
-
-    # =========================================================
-    # GENERIC PLOTTERS
-    # =========================================================
-
-    @staticmethod
-    def _plot_dict(fig, d, name):
-
-        if not isinstance(d, dict):
-            return False
-
-        if len(d) == 0:
-            return False
-
-        fig.add_trace(
-            go.Bar(
-                x=list(d.keys()),
-                y=list(d.values()),
-                name=name
-            )
-        )
-
-        return True
-
-    @staticmethod
-    def _plot_series(fig, v, name):
-
-        if v is None:
-            return False
-
-        try:
-            v = list(v)
-        except Exception:
-            return False
-
-        fig.add_trace(
-            go.Scatter(
-                y=v,
-                mode="lines",
-                name=name
-            )
-        )
-
-        return True
-
-    @staticmethod
-    def _plot_dataframe_series(
-        fig,
-        x,
-        y,
-        name,
-        color=None,
-        dash=None
-    ):
-
-        fig.add_trace(
-            go.Scatter(
-                x=x,
-                y=y,
-                mode="lines",
-                name=name,
-                line=dict(
-                    color=color,
-                    dash=dash
-                ) if color or dash else None
-            )
-        )
 
     # =========================================================
     # RENDER
@@ -2573,310 +2483,181 @@ class IntradayReversalChart(StrategyChart):
     def render(item):
 
         fig = go.Figure()
-
         chart = getattr(item, "chart", None)
 
         if chart is None:
             return fig
 
-        # =====================================================
-        # PASS 1
-        # STATIC CHART ATTRIBUTES
-        # =====================================================
-
-        #for field in IntradayReversalChart.STATIC_MAP.get(
-        #    "chart",
-        #    []
-        #):
-
-        #    value = IntradayReversalChart.get_attr_or_key(
-        #        chart,
-        #        field
-        #    )
-
-        #    if value is None:
-        #        continue
-
-        #    if isinstance(value, dict):
-
-        #        IntradayReversalChart._plot_dict(
-        #            fig,
-        #            value,
-        #            field
-        #        )
-
-        #        continue
-
-        #    if isinstance(
-        #        value,
-        #        (
-        #            list,
-        #            tuple,
-        #            np.ndarray,
-        #            pd.Series
-        #        )
-        #    ):
-
-        #        IntradayReversalChart._plot_series(
-        #            fig,
-        #            value,
-        #            field
-        #        )
-
-        # =====================================================
-        # PASS 2
-        # DATAFRAME SERIES
-        # =====================================================
-
         df = getattr(chart, "chartdata", None)
 
-        if isinstance(df, pd.DataFrame) and not df.empty:
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            return fig
 
-            xbase = (
-                IntradayReversalChart
-                ._resolve_xaxis(
-                    df.index,
-                    len(df)
-                )
-            )
-
-            # ---------------------------------------------
-            # Normal indicator series
-            # ---------------------------------------------
-
-            series_map = {
-                "z_vol": "Z Volatility Reversal",
-                "z_volume": "Z Volume Reversal",
-                "volatility": "Rolling Volatility"
-            }
-
-            for col, label in series_map.items():
-
-                if col not in df.columns:
-                    continue
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=xbase,
-                        y=df[col],
-                        mode="lines",
-                        name=label
-                    )
-                )
-
-            # ---------------------------------------------
-            # Event series as visible legend traces
-            # ---------------------------------------------
-
-            event_map = {
-                "reversal_event_vol":
-                    (
-                        "Volatility Reversal Events",
-                        "red"
-                    ),
-                "reversal_event_volume":
-                    (
-                        "Volume Reversal Events",
-                        "orange"
-                    )
-            }
-
-            for event_col, (
-                label,
-                color
-            ) in event_map.items():
-
-                if event_col not in df.columns:
-                    continue
-
-                event_values = (
-                    df[event_col]
-                    .fillna(False)
-                    .astype(int)
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=xbase,
-                        y=event_values,
-                        mode="markers",
-                        line=dict(
-                            dash="dot",
-                            color=color
-                        ),
-                        name=label
-                    )
-                )
-
-            # ---------------------------------------------
-            # Actual event markers
-            # ---------------------------------------------
-
-            marker_map = {
-                "reversal_event_vol":
-                    (
-                        "z_vol",
-                        "Volatility Event Marker",
-                        "red"
-                    ),
-                "reversal_event_volume":
-                    (
-                        "z_volume",
-                        "Volume Event Marker",
-                        "orange"
-                    )
-            }
-
-            for event_col, (
-                target_col,
-                marker_name,
-                marker_color
-            ) in marker_map.items():
-
-                if event_col not in df.columns:
-                    continue
-
-                if target_col not in df.columns:
-                    continue
-
-                mask = (
-                    df[event_col]
-                    .fillna(False)
-                    .astype(bool)
-                )
-
-                if mask.sum() == 0:
-                    continue
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=df.index[mask],
-                        y=df.loc[
-                            mask,
-                            target_col
-                        ],
-                        mode="markers",
-                        marker=dict(
-                            size=10,
-                            color=marker_color,
-                            symbol="diamond"
-                        ),
-                        name=marker_name
-                    )
-                )
-
-            # ---------------------------------------------
-            # Config-driven series (optional)
-            # ---------------------------------------------
-
-            plotted = {
-                "z_vol",
-                "z_volume",
-                "volatility"
-            }
-
-            for s in getattr(chart, "series", []):
-
-                source = s.get("source")
-
-                if (
-                    not source
-                    or source not in df.columns
-                    or source in plotted
-                ):
-                    continue
-
-                name = s.get(
-                    "name",
-                    source
-                )
-
-                style = s.get(
-                    "style",
-                    "line"
-                )
-
-                dash = (
-                    "dash"
-                    if style == "dash"
-                    else None
-                )
-
-                IntradayReversalChart._plot_dataframe_series(
-                    fig,
-                    xbase,
-                    df[source],
-                    name,
-                    dash=dash
-                )
+        xbase = IntradayReversalChart._resolve_xaxis(df.index, len(df))
 
         # =====================================================
-        # PASS 3
-        # SIGNALS
+        # INDICATORS (ALL VISIBLE BY DEFAULT)
         # =====================================================
 
-        signals = (
-            getattr(item, "signals", {})
-            or {}
-        )
+        indicators = {
+            "z_vol": "Z Volatility",
+            "z_volume": "Z Volume",
+            "volatility": "Rolling Volatility"
+        }
 
-        if isinstance(signals, dict):
+        for col, label in indicators.items():
 
-            for sym, sig in signals.items():
+            if col not in df.columns:
+                continue
 
-                sig = (
-                    IntradayReversalChart
-                    ._safe_series(sig)
-                )
-
-                if sig is None:
-                    continue
-
-                x = (
-                    IntradayReversalChart
-                    ._resolve_xaxis(
-                        sig.index,
-                        len(sig)
-                    )
-                )
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=x,
-                        y=sig.values,
-                        mode="markers",
-                        line=dict(
-                            color="green",
-                            dash="dot"
-                        ),
-                        opacity=0.6,
-                        name=f"{sym} Signal"
-                    )
-                )
+            fig.add_trace(go.Scattergl(
+                x=xbase,
+                y=df[col],
+                mode="lines",
+                name=label
+            ))
 
         # =====================================================
-        # LAYOUT
+        # EVENT LINES (OFF BY DEFAULT)
         # =====================================================
 
+        events = {
+            "reversal_event_vol": ("Volatility Events", "red"),
+            "reversal_event_volume": ("Volume Events", "orange")
+        }
+
+        for col, (label, color) in events.items():
+
+            if col not in df.columns:
+                continue
+
+            event_values = df[col].fillna(False).astype(int)
+
+            fig.add_trace(go.Scattergl(
+                x=xbase,
+                y=event_values,
+                mode="lines",
+                name=label,
+                line=dict(color=color, width=1, dash="dot"),
+                visible="legendonly",
+                hoverinfo="skip"
+            ))
+
+        # =====================================================
+        # EVENT MARKERS (OFF BY DEFAULT)
+        # =====================================================
+
+        marker_map = {
+            "reversal_event_vol": ("z_vol", "Volatility Markers", "red"),
+            "reversal_event_volume": ("z_volume", "Volume Markers", "orange")
+        }
+
+        for event_col, (target_col, label, color) in marker_map.items():
+
+            if event_col not in df.columns or target_col not in df.columns:
+                continue
+
+            mask = df[event_col].fillna(False).astype(bool)
+
+            if mask.sum() == 0:
+                continue
+
+            fig.add_trace(go.Scattergl(
+                x=df.index[mask],
+                y=df.loc[mask, target_col],
+                mode="markers",
+                name=label,
+                visible="legendonly",
+                marker=dict(size=8, color=color, symbol="diamond"),
+                hoverinfo="skip"
+            ))
+
+        # =====================================================
+        # CONFIG SERIES (SAFE)
+        # =====================================================
+
+        plotted = {"z_vol", "z_volume", "volatility"}
+
+        for s in getattr(chart, "series", []):
+
+            source = s.get("source")
+
+            if not source or source not in df.columns or source in plotted:
+                continue
+
+            fig.add_trace(go.Scattergl(
+                x=xbase,
+                y=df[source],
+                mode="lines",
+                name=s.get("name", source)
+            ))
+
+        # =====================================================
+        # SIGNALS (ALL OFF BY DEFAULT - FIXED)
+        # =====================================================
+
+        signals = getattr(item, "signals", {}) or {}
+
+        for sym, sig in signals.items():
+
+            sig = IntradayReversalChart._safe_series(sig)
+            if sig is None:
+                continue
+
+            x = IntradayReversalChart._resolve_xaxis(sig.index, len(sig))
+
+            fig.add_trace(go.Scattergl(
+                x=x,
+                y=sig.values,
+                mode="markers",
+                name=f"{sym} Signal",
+                visible="legendonly",   # 🔥 FIX: OFF BY DEFAULT
+                marker=dict(size=5, color="green"),
+                hoverinfo="skip"
+            ))
+
+        # =====================================================
+        # LAYOUT (FIXED — NO CHART SHRINKING)
+        # =====================================================
+
+        #fig.update_layout(
+
+        #    template="plotly_dark",
+        #    title=getattr(chart, "title", "Intraday Reversal"),
+
+        #    xaxis=dict(title="Time"),
+        #    yaxis=dict(title="Value"),
+
+        #    hovermode="x unified",
+
+        #    showlegend=True,
+
+            #  FIX: prevent chart compression
+        #    legend=dict(
+        #        orientation="h",   # horizontal legend = no shrinking
+        #        yanchor="bottom",
+        #        y=1.02,
+        #        xanchor="left",
+        #        x=0,
+        #        font=dict(size=11),
+        #        itemsizing="constant",
+        #        bgcolor="rgba(0,0,0,0)"
+        #    ),
+
+            #  FIX: remove right squeeze
+        #     margin=dict(l=60, r=40, t=60, b=40),
+
+            # preserves toggle state
+        #    uirevision="intraday-reversal"
+        #)
+
+        #return fig
         fig.update_layout(
-
             template="plotly_dark",
+            title=getattr(chart, "title", "Intraday Reversal"),
 
-            title=getattr(
-                chart,
-                "title",
-                "Intraday Reversal"
-            ),
-
-            xaxis=dict(
-                title="Time",
-                automargin=True
-            ),
-
-            yaxis=dict(
-                title="Value",
-                automargin=True
-            ),
+            xaxis=dict(title="Time", automargin=True),
+            yaxis=dict(title="Value", automargin=True),
 
             legend_title="Series / Signals",
 
@@ -2884,12 +2665,14 @@ class IntradayReversalChart(StrategyChart):
 
             showlegend=True,
 
-            margin=dict(
-                r=220
-            )
+            margin=dict(r=220),
+
+            # CRITICAL FOR FAST LEGEND TOGGLING
+            uirevision="intraday-reversal"
         )
 
         return fig
+
 # =======================================================
 # STREV chart
 # =======================================================

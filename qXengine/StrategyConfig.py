@@ -59,18 +59,16 @@ STRATEGY_CONFIG = {
             "lookback": 252,
             "rebalance": 21,
             "top_quantile": 0.2,
+            "title": "Cross-sectional Alpha (4Y)",
             "chart": {
                 "type": "bar",
                 "series": [
-                    {"key": "price", "source": "close", "label": "Price"},
+                    {"key": "price", "source": "price", "label": "Price"},
                     {"key": "signal", "source": "signal", "label": "Alpha Signal"},
                     {"key": "benchmark", "source": "SPY", "label": "Benchmark"},
+                    {"key": "alpha_scores", "source": "alpha_scores", "label": "Alpha scores"},
+                    {"key": "beta_scores", "source": "beta_scores", "label": "Beta scores"},
                 ],
-                "series": {
-                    "key": "signal",
-                    "source": "signal",
-                    "label": "Alpha Signal",
-                },
                 "axes": {"x": "date", "y": "normalized_value"},
                 "title": "Cross-sectional Alpha (4Y)",
             },

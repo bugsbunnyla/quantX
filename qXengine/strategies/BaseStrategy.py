@@ -1,3 +1,9 @@
+# ===============================================================
+# BaseStrategy : base strategy in Quant Xpert
+# Date: 2026/06/24 
+# Author : bugsbunnyla
+# Comment : Processing of base class of strategy
+# ===============================================================
 from ..StrategyResult import StrategyResult
 from ..StrategyCharts import StrategyChart
 from .FormulaOutput import FormulaOutput
@@ -245,3 +251,6 @@ class BaseStrategy:
             f"{self.__class__.__name__}.run() not implemented"
         )
 
+# =============================================================================
+# END OF BASE STRATEGY
+# =============================================================================

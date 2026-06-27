@@ -75,6 +75,18 @@ class FormulaOutput:
             for c in r.columns
         }).fillna(0)
 
+    def _corr(self, r, s, mkt_ret=None):
+
+      if mkt_ret is None:
+        mkt_ret = r.mean(axis=1)
+
+      series = r[s]
+
+      if series.std() == 0 or mkt_ret.std() == 0:
+        return 0.0
+
+      return float(series.corr(mkt_ret))
+
     # =====================================================
     # ALPHA
     # =====================================================
@@ -155,6 +167,7 @@ class FormulaOutput:
     def _residual(self, r, benchmark):
         return r.sub(benchmark, axis=0).mean()
 
+    
     # =====================================================
     # MAIN ASSEMBLY
     # =====================================================
@@ -170,6 +183,7 @@ class FormulaOutput:
         volatility = self._volatility(r)
         sharpe = self._sharpe(r)
         cvar = self._cvar(r)
+
         ic = self._ic(r)
 
         alpha_ts = self._alpha_ts(r)
@@ -271,7 +285,8 @@ class FormulaOutput:
                 # ================= BASIC =================
                 ("basic", "r_squared"): float(r.corr().mean().mean()),
                 ("basic", "tstat"): float(r.mean().mean() / (r.std().mean() + 1e-9)),
-                ("basic", "hit_ratio"): self._f(hit_ratio[s]),
+                ("basic", "hit_ratio"): self._f(hit_ratio[s]),                
+                ("basic", "corr"):  self._corr(r, s, r.mean(axis=1)),
 
                 # ================= STRUCTURE =================
                 ("market_structure", "liq_adj_vol"): liq_adj,
@@ -318,8 +333,8 @@ class FormulaOutput:
       "std_ret":    {"category":"basic","type":"std","formula":"std(ret)","depends":["ret"],"dtype":"float","return_result":"std_ret"},
       "var_ret":    {"category":"basic","type":"var","formula":"var(ret)","depends":["ret","mean_ret"],"dtype":"float","return_result":"var_ret"},
 
-      "cov_rm":     {"category":"basic","type":"cov","formula":"cov(ret,mkt_ret)","depends":["ret","mkt_ret","mean_ret"],"dtype":"float","return_result":"cov_rm"},
-      "corr_rm":    {"category":"basic","type":"corr","formula":"corr(ret,mkt_ret)","depends":["cov_rm","std_ret"],"dtype":"float","return_result":"corr_rm"},
+      "cov_rm":     {"category":"basic","type":"cov_rm","formula":"cov(ret,mkt_ret)","depends":["ret","mkt_ret","mean_ret"],"dtype":"float","return_result":"cov_rm"},
+      "corr_rm":    {"category":"basic","type":"corr_rm","formula":"corr(ret,mkt_ret)","depends":["cov_rm","std_ret"],"dtype":"float","return_result":"corr_rm"},
 
       # rolling primitives
       "rolling_mean": {"category":"basic","type":"rolling_mean","formula":"mean(window)","depends":["ret"],"dtype":"Series","return_result":"rolling_mean"},
