@@ -24,34 +24,11 @@ or interactive prompts.
 
 # =========================================================
 # DEFAULT SYMBOL UNIVERSE
+# "TAOUSDT","UNIUSDT","TONUSDT",
 # =========================================================
 
-DEFAULT_SYMBOLS = [
-    "SCHD",
-    "VOO",
-    "VOOG",
-    "VTI",
-    "IONQ",
-    "RGTI",
-    "MU",
-    "PL",
-    "BTCUSDT",
-    "ETHUSDT",
-    "SOLUSDT",
-    "BNBUSDT",
-    "XRPUSDT",
-    "DOGEUSDT",
-    "AAPL", 
-    "MSFT", 
-    "NVDA", 
-    "AMD",
-    "SPY",
-    "QQQ",
-    "IWM",
-    "TLT",
-    "GLD",
-]
-
+#DEFAULT_SYMBOLS =["SCHD","VOO","VOOG","VTI","IONQ","RGTI","MU","PL","BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT","AAPL","MSFT","NVDA", "AMD","SPY","QQQ","IWM","TLT","GLD"]
+DEFAULT_SYMBOLS = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT","DOGEUSDT","ADAUSDT","TRXUSDT","HYPEUSDT","SUIUSDT","LINKUSDT","AVAXUSDT","XLMUSDT","HBARUSDT","BCHUSDT","LTCUSDT","SHIBUSDT","DOTUSDT","AAVEUSDT","PEPEUSDT","NEARUSDT","APTUSDT","ICPUSDT","ETCUSDT","ONDOUSDT","POLUSDT","CROUSDT",]
 # =========================================================
 # DEFAULT USER TRADE CAPITAL
 # =========================================================

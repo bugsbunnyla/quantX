@@ -19,44 +19,47 @@ class BreadthStrategy(BaseStrategy):
     def _prepare_returns(self):
 
         frames = {}
+        data = self.data.copy()
+        fo = self.formulaOutput
+        fo.assemble()
+        #for sym, df in data.items():
+        #    if not isinstance(df, pd.DataFrame):
+        #        continue
 
-        for sym, df in self.data.items():
-
-            if not isinstance(df, pd.DataFrame):
-                continue
-
-            tmp = df.copy()
+        #    tmp = df.copy()
 
             # ---- CASE 1: explicit date column ----
-            if "date" in tmp.columns:
-                tmp["date"] = pd.to_datetime(tmp["date"], errors="coerce")
-                tmp = tmp.dropna(subset=["date"])
-                tmp = tmp[tmp["date"] > pd.Timestamp("2000-01-01")]
-                tmp = tmp.sort_values("date")
-                tmp = tmp.set_index("date")
+        #    if "date" in tmp.columns:
+        #        tmp["date"] = pd.to_datetime(tmp["date"], errors="coerce")
+        #        tmp = tmp.dropna(subset=["date"])
+        #        tmp = tmp[tmp["date"] > pd.Timestamp("2000-01-01")]
+        #        tmp = tmp.sort_values("date")
+        #        tmp = tmp.set_index("date")
 
             # ---- CASE 2: index already exists ----
-            else:
-                tmp.index = pd.to_datetime(tmp.index, errors="coerce")
-                tmp = tmp[tmp.index.notna()]
-                tmp = tmp[tmp.index > pd.Timestamp("2000-01-01")]
-                tmp = tmp.sort_index()
+        #    else:
+        #        tmp.index = pd.to_datetime(tmp.index, errors="coerce")
+        #        tmp = tmp[tmp.index.notna()]
+        #        tmp = tmp[tmp.index > pd.Timestamp("2000-01-01")]
+        #        tmp = tmp.sort_index()
 
             # ---- ensure numeric returns ----
-            if "ret" in tmp.columns:
-                frames[sym] = tmp["ret"]
-            elif "close" in tmp.columns:
-                frames[sym] = tmp["close"].pct_change()
-
-        return pd.DataFrame(frames).dropna()
-
+        #    if "ret" in tmp.columns:
+        #        frames[sym] = tmp["ret"]
+        #    elif "close" in tmp.columns:
+        #        frames[sym] = tmp["close"].pct_change()
+        frames = fo.get("ret") 
+        if frames.empty:
+           frames=fo.get("mkt_price")
+        #return pd.DataFrame(frames).dropna()
+        return frames
     # =====================================================
     def run(self):
 
         lookback = self.get_cfg("lookback", 20)
         ma_short = self.get_cfg("ma_short", 20)
         ma_long = self.get_cfg("ma_long", 50)
-
+        data=self.data.copy()
         # =====================================================
         # CLEAN UNIVERSE 
         # =====================================================
@@ -65,7 +68,7 @@ class BreadthStrategy(BaseStrategy):
         if rets.empty:
             return StrategyResult(
                 name="BreadthStrategy",
-                data=self.data,
+                data=data,
                 metrics={"error": "no valid return data"},
                 signals={},
                 chart={"chartdata": pd.DataFrame()}

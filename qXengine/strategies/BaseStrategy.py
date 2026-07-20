@@ -6,7 +6,7 @@
 # ===============================================================
 from ..StrategyResult import StrategyResult
 from ..StrategyCharts import StrategyChart
-from .FormulaOutput import FormulaOutput
+from .FormulaInfo import FormulaInfo
 import numpy as np
 import pandas as pd
 
@@ -20,18 +20,61 @@ class BaseStrategy:
             raise ValueError(
                 "Context must be provided by QuantXEngine"
             )
-
+        self.rawdata = context.data
         self.context = context
 
-        self.data = context.data
+        self.data = context.data.copy()
+        cleaned_data = {}
+        for symbol, df in self.data.items():
+            if df is None:
+                continue
+            df = df.copy()
+            # ---------------------------------
+            # REMOVE FULL NaN ROWS FIRST
+            # ---------------------------------
+            df = df.dropna( how="all" )
+            # skip empty dataframe
+            if df.empty:
+                continue
+            cleaned_data[symbol] = df
+        # ---------------------------------
+        # NOW ASSIGN DATA
+        # ---------------------------------
+        self.data = cleaned_data
+        # -----------------------------------------
+        # FIX INDEXES BEFORE FORMULA ENGINE
+        # -----------------------------------------
+        for symbol, df in self.data.items():
+            self.data[symbol] = self._ensure_datetime_index(df)
+
         self.cfg = context.cfg
         self.runtime_cfg = context.runtime_cfg
         self.factor_engine = context.factor_engine
         self.logger = context.logger
         ##### qX base data structure #####
-        self.formulaOutput = FormulaOutput(self.data)
+        self.formulaOutput = FormulaInfo(self.data)
 
-        print("[BASE] structured data ", self.formulaOutput.assemble())
+    # -------------------------------------------------
+    # INDEX HANDLING
+    # -------------------------------------------------
+    def _ensure_datetime_index(self, df):
+        df = df.copy()
+        # remove only fully empty rows
+        df = df.dropna( how="all")
+        if "date" in df.columns:
+            df["date"] = pd.to_datetime( df["date"], errors="coerce")
+            df = df.dropna( subset=["date"] )
+            df = df[ df["date"] >  pd.Timestamp("2000-01-01")  ]
+            df = df.sort_values( "date" )
+            df = df.set_index(  "date"  )
+        else:
+          if not isinstance( df.index,  pd.DatetimeIndex  ):
+            df.index = pd.to_datetime( df.index,  errors="coerce" )
+            df = df[  df.index.notna() ]
+            df = df[ df.index >  pd.Timestamp("2000-01-01")  ]
+            df = df.sort_index()
+        return df
+
     # =====================================================
     # CONFIG HELPERS
     # =====================================================
@@ -153,7 +196,7 @@ class BaseStrategy:
                 "title",
                 self.__class__.__name__
             ),
-
+            
             data=self.data,
 
             metrics=metrics or {},
@@ -250,6 +293,41 @@ class BaseStrategy:
         raise NotImplementedError(
             f"{self.__class__.__name__}.run() not implemented"
         )
+
+    # ====================================================
+    # Get value
+    # ====================================================
+    def _extract_metric(self, fo, symbol, name, report_key=None):
+      def clean(value):
+        # DataFrame
+        if isinstance(value, pd.DataFrame):
+            if symbol in value.columns:
+                value = value[symbol].iloc[-1]
+            elif len(value):
+                value = value.iloc[-1, 0]
+        # Series
+        elif isinstance(value, pd.Series):
+            if symbol in value.index:
+                value = value.loc[symbol]
+            elif len(value):
+                value = value.iloc[-1]
+        # Dictionary
+        elif isinstance(value, dict):
+            value = value.get(symbol)
+        try:
+            value = float(value)
+            return value if np.isfinite(value) else None
+        except (TypeError, ValueError):
+            return None
+      try:
+        value = fo.get(name)
+        return clean(value)
+      except KeyError:
+        return None
+      except Exception as e:
+        print(f"[WARN] {name} {symbol}: {e}")
+        return None
+
 
 # =============================================================================
 # END OF BASE STRATEGY

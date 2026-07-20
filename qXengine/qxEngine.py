@@ -69,6 +69,8 @@ class QuantXEngine:
 
     def __init__(self):
         self.fe = None  # kept for backward compatibility if strategies expect it
+        self.results = []
+        self.strategy = []
 
     # =====================================================
     # MAIN PIPELINE (CLEAN)
@@ -81,7 +83,7 @@ class QuantXEngine:
             "benchmark": STRATEGY_CONFIG.get("data", {}).get("benchmark", "SPY"),
         }
 
-        results = []
+        
         enabled = STRATEGY_CONFIG.get("strategies", {})
 
         for name, params in enabled.items():
@@ -108,15 +110,95 @@ class QuantXEngine:
 
                 # attach metadata if needed
                 result.add(params.get("tab"))
-
-                results.append(result)
-
+ 
+                self.results.append(result)
+                self.strategy.append(strategy)
                 print(f"[QuantX] {name} OK")
 
             except Exception as e:
-                results.append(
+                self.results.append(
                     ErrorStrategy(name=name, error=str(e))
                 )
                 continue
 
-        return results
+        return self.results
+
+    def qxStrategySelect(self, strategy_names, data, interval="4y"):
+      """
+      Execute one or more strategies by name.
+
+      Parameters
+      ----------
+      strategy_names : str | Iterable[str]
+        Strategy name or collection of strategy names.
+      data : Any
+        Market data.
+      interval : str
+        Runtime interval.
+
+      Returns
+      -------
+      list
+        List of strategy results.
+      """
+
+      runtime_cfg = {
+        "data": data,
+        "interval": interval,
+        "benchmark": STRATEGY_CONFIG.get("data", {}).get("benchmark", "SPY"),
+      }
+
+      # Accept a single string or an iterable
+      if isinstance(strategy_names, str):
+        strategy_names = [strategy_names]
+
+      strategies_cfg = STRATEGY_CONFIG.get("strategies", {})
+
+      for name in strategy_names:
+
+        params = strategies_cfg.get(name)
+
+        if params is None:
+            self.results.append(
+                ErrorStrategy(
+                    name=name,
+                    error=f"Strategy '{name}' not found in STRATEGY_CONFIG."
+                )
+            )
+            continue
+
+        if not params.get("enabled", False):
+            continue
+
+        StrategyClass = StrategyResolver.resolve(name)
+
+        context = Context(
+            data=data,
+            cfg=params,
+            runtime_cfg=runtime_cfg,
+            factor_engine=self.fe,
+            logger=None,
+        )
+
+        # =================================================
+        # EXECUTION LAYER
+        # =================================================
+        try:
+            strategy = StrategyClass(context)
+            result = strategy.run()
+
+            result.add(params.get("tab"))
+            self.results.append(result)
+            self.strategy.append(strategy)
+
+            print(f"[QuantX] {name} OK")
+
+        except Exception as e:
+            self.results.append(
+                ErrorStrategy(
+                    name=name,
+                    error=str(e)
+                )
+            )
+
+      return self.results

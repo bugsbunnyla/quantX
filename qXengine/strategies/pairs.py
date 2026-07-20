@@ -46,6 +46,8 @@ class PairTrading(BaseStrategy):
     def run(self):
 
         cfg = self.cfg
+        data = self.data.copy()
+        print("[DEBUG] data",  data.keys())
 
         lookback = cfg.get("lookback", 252)
         entry_z = cfg.get("entry_zscore", 2.0)
@@ -56,47 +58,49 @@ class PairTrading(BaseStrategy):
         # ==================================================
         # FIX: DATE → INDEX
         # ==================================================
-        cleaned = {}
+        #cleaned = {}
 
-        for sym, df in self.data.items():
-
-            if "close" not in df.columns or "date" not in df.columns:
-                continue
-
-            tmp = df.copy()
-
-            tmp["date"] = pd.to_datetime(tmp["date"], errors="coerce")
-            tmp = tmp.dropna(subset=["date"])
-            tmp = tmp.sort_values("date")
-
-            # KEY FIX
-            tmp = tmp.set_index("date")
-
-            cleaned[sym] = tmp
+        #for sym, df in data.items():
+        #  tmp = df.copy()
+        #  if isinstance(tmp.index, pd.DatetimeIndex):
+            # Already correctly indexed
+        #    pass
+        #  elif "date" in tmp.columns:
+        #    tmp["date"] = pd.to_datetime(tmp["date"], errors="coerce")
+        #    tmp = tmp.dropna(subset=["date"])
+        #    tmp = tmp.set_index("date")
+        #  else:
+            # Existing index contains dates
+        #    tmp.index = pd.to_datetime(tmp.index, errors="coerce")
+        #    tmp = tmp[~tmp.index.isna()]
+        #  tmp = tmp.sort_index()
+        #  cleaned[sym] = tmp
+        #print("[DEBUG] cleaned and data", cleaned.keys(), data.keys())
 
         # ==================================================
         # PRICE MATRIX
         # ==================================================
-        prices = pd.DataFrame({
-            sym: df["close"]
-            for sym, df in cleaned.items()
-        })
-
-        prices = prices.dropna()
-        prices = prices.sort_index()
-
-        if prices.empty or prices.shape[1] < 2:
+        fo=self.formulaOutput
+        fo.assemble()
+        prices = fo.get("mkt_price")
+        #print("[DEBUG] prices ",len(prices),prices)    
+        #prices = prices.dropna()
+        #prices = prices.sort_index()        
+        #print("[DEBUG] prices sort",len(prices),prices)   
+        #if prices.empty or prices.shape[1] < 2:
+        if prices.empty:
             return StrategyResult(
                 name="PairTrading",
                 data=self.data,
                 metrics={"error": "insufficient data"},
-                signals={}
+                signals={},
+                chart = None
             )
 
         # ==================================================
         # RETURNS + CORRELATION (UNCHANGED)
         # ==================================================
-        rets = prices.pct_change().dropna()
+        rets = fo.get("ret").dropna()
         corr = rets.corr().abs()
 
         pairs = (
@@ -104,8 +108,9 @@ class PairTrading(BaseStrategy):
             .stack()
             .sort_values(ascending=False)
         )
-
+        #print("[DEBUG] pairs", pairs)
         pairs = pairs[pairs < 0.999]
+        pairs = pairs.dropna()
         top_pairs = list(pairs.head(max_pairs).index)
 
         spreads_out = {}
@@ -185,15 +190,20 @@ class PairTrading(BaseStrategy):
             }
 
             signals_out[key] = signal_series
-
+            #print("spread", spreads_out,  signals_out)
         # ==================================================
         # BUILD CHART
         # ==================================================
+        chartdata = {
+           "signal" : signals_out,
+           "spread" : spreads_out
+        }
         chart = self.build_chart(
             series=self.cfg.get("chart").get("series"),
             title=self.cfg.get("title"),
             charttype=self.cfg.get("chart").get("type"),
             chartmode=self.cfg.get("chart").get("mode"),
+            chartdata=chartdata
         )
 
         # ==================================================
@@ -210,6 +220,7 @@ class PairTrading(BaseStrategy):
                 self.compute_half_life(v["spread"]) for v in spreads_out.values()
             ])) if spreads_out else None
         }
+       
 
         # ==================================================
         # FINAL OUTPUT (UNCHANGED STRUCTURE)
@@ -218,9 +229,6 @@ class PairTrading(BaseStrategy):
             name="PairTrading",
             data=self.data,
             metrics=metrics,
-            signals={
-                "spread": spreads_out,
-                "signal": signals_out
-            },
+            signals=chartdata,
             chart=chart
         )

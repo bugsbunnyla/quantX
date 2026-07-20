@@ -29,11 +29,18 @@ class PickleDataManager:
         self.market_data = self.env.get("market_data", {})
         self.lookback_years = 4
 
+    
+    # =========================================================
+    # DATE
+    # =========================================================
+    def _today(self):
+        return datetime.now().strftime("%Y%m%d")
+
     # =========================================================
     # FILE PATH
     # =========================================================
     def _file_path(self, symbol: str):
-        return os.path.join(self.path, f"{symbol}.pkl")
+        return os.path.join(self.path, f"{symbol}.{self._today()}.pkl")
 
     # =========================================================
     # ASSET TYPE

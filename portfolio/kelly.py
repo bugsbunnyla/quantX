@@ -9,7 +9,4 @@ class Kelly:
     """
 
     def size(self, mu, var):
-       if var == 0:
-          mu / (var + 1e-9)
-
-       return mu / var
+       return mu / max(var, 1e-9)

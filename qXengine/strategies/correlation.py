@@ -22,7 +22,7 @@ class CorrelationStrategy(BaseStrategy):
     def run(self):
 
         cfg = self.cfg
-
+        data = self.data.copy()
         lookback = cfg.get("lookback", 20)
         corr_window = cfg.get("corr_window", 20)
         signal_threshold = cfg.get("signal_threshold", 0.50)
@@ -30,59 +30,58 @@ class CorrelationStrategy(BaseStrategy):
         # ==================================================
         # FIX INPUT DATA ONLY
         # ==================================================
-        cleaned = {}
+        #cleaned = {}
 
-        for sym, df in self.data.items():
+        #for sym, df in self.data.items():
 
-            if not isinstance(df, pd.DataFrame):
-                continue
+        #    if not isinstance(df, pd.DataFrame):
+        #        continue
 
-            if "close" not in df.columns:
-                continue
+        #    if "close" not in df.columns:
+        #        continue
 
-            tmp = df.copy()
+        #    tmp = df.copy()
 
-            if "date" in tmp.columns:
+        #    if "date" in tmp.columns:
 
-                tmp["date"] = pd.to_datetime(
-                    tmp["date"],
-                    errors="coerce"
-                )
+        #        tmp["date"] = pd.to_datetime(
+        #            tmp["date"],
+        #            errors="coerce"
+        #        )
 
-                tmp = tmp.dropna(subset=["date"])
-                tmp = tmp.sort_values("date")
-                tmp = tmp.set_index("date")
+        #        tmp = tmp.dropna(subset=["date"])
+        #        tmp = tmp.sort_values("date")
+        #        tmp = tmp.set_index("date")
 
-            else:
+        #    else:
 
-                if not isinstance(
-                    tmp.index,
-                    pd.DatetimeIndex
-                ):
+        #        if not isinstance(
+        #            tmp.index,
+        #            pd.DatetimeIndex
+        #        ):
 
-                    tmp.index = pd.to_datetime(
-                        tmp.index,
-                        errors="coerce"
-                    )
+        #            tmp.index = pd.to_datetime(
+        #                tmp.index,
+        #                errors="coerce"
+        #            )
 
-                    tmp = tmp[tmp.index.notna()]
+        #            tmp = tmp[tmp.index.notna()]
 
-                tmp = tmp.sort_index()
+        #        tmp = tmp.sort_index()
 
-            cleaned[sym] = tmp
+        #    cleaned[sym] = tmp
 
         # ==================================================
         # PRICE MATRIX
         # ==================================================
-        prices = pd.DataFrame({
-            sym: df["close"]
-            for sym, df in cleaned.items()
-        }).dropna()
+        fo = self.formulaOutput
+        fo.assemble()
+        prices = fo.get("mkt_price")
 
-        prices = prices.sort_index()
+        #prices = prices.sort_index()
 
-        if prices.empty or prices.shape[1] < 2:
-
+        #if prices.empty or prices.shape[1] < 2:
+        if prices.empty: 
             return StrategyResult(
                 name="CorrelationStrategy",
                 data=self.data,
@@ -96,7 +95,7 @@ class CorrelationStrategy(BaseStrategy):
         # ==================================================
         # RETURNS
         # ==================================================
-        returns = prices.pct_change().dropna()
+        returns = fo.get("ret")
 
         if len(returns) < corr_window:
 

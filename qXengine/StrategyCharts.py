@@ -55,11 +55,21 @@ class AlphaStrategyChart(StrategyChart):
     STATIC_MAP = {
         "metrics": [
             "r_squared",
-            "tstat",
             "corr",
             "sharpe_ratio",
             "hit_ratio",
-            "cvar"
+            "cvar",
+            "ic",
+            "volatility",
+            "slippage",
+            "turnover",
+            "drawdown",
+            "max_drawdown",
+            "transaction_cost",
+            "alpha",
+            "beta",
+            "tstat_alpha",
+            "tstat_beta"
         ],
         "series": {
             "price": {"type": "line", "visible": False},
@@ -68,6 +78,7 @@ class AlphaStrategyChart(StrategyChart):
 
             "alpha_scores": {"type": "bar", "visible": True},
             "beta_scores": {"type": "bar", "visible": True},
+            "metric_series" : {"type": "bar", "visible": True},
         }
     }
 
@@ -2327,7 +2338,6 @@ class PairTradingChart(StrategyChart):
     # ==================================================
     @staticmethod
     def render(item):
-
         fig = go.Figure()
 
         signals = getattr(item, "signals", {}) or {}
@@ -3081,7 +3091,6 @@ class UMDMomentumChart(StrategyChart):
     # ==================================================
     @staticmethod
     def render(item):
-
         fig = go.Figure()
 
         chart = getattr(item, "chart", None)
@@ -3142,7 +3151,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-class BetaNeutralStrategyChart(StrategyChart):
+class BetaNeutralStrategyChartWorks(StrategyChart):
 
     STATIC_MAP = {
         "metrics": ["beta_stats", "assets", "beta_window"],
@@ -3259,6 +3268,308 @@ class BetaNeutralStrategyChart(StrategyChart):
         )
 
         return fig
+
+class BetaNeutralStrategyChart(StrategyChart):
+
+    STATIC_MAP = {
+        "metrics": [
+            "beta_stats",
+            "assets",
+            "beta_window",
+            "r_squared",
+            "tstat",
+            "corr",
+            "sharpe_ratio",
+            "hit_ratio",
+            "cvar",
+            "ic",
+            "volatility",
+            "slippage",
+            "turnover",
+            "drawdown",
+            "max_drawdown",
+            "transaction_cost",
+            "alpha",
+            "beta",
+            "tstat_alpha",
+            "tstat_beta",
+        ],
+        "chart": [
+            "bn_returns"
+        ]
+    }
+
+    # ---------------------------------------------------------
+    # Clean Series
+    # ---------------------------------------------------------
+    @staticmethod
+    def _clean(series):
+
+        if series is None:
+            return None
+
+        try:
+
+            if isinstance(series, pd.Series):
+                s = series.copy()
+
+            elif isinstance(series, (list, tuple, np.ndarray)):
+                s = pd.Series(series)
+
+            else:
+                return None
+
+        except Exception as e:
+            print(f"[CLEAN ERROR] {e}")
+            return None
+
+        s = (
+            s.replace([np.inf, -np.inf], np.nan)
+             .dropna()
+        )
+
+        if s.empty:
+            return None
+
+        if not isinstance(s.index, pd.DatetimeIndex):
+
+            try:
+                idx = pd.to_datetime(s.index, errors="coerce")
+
+                # Only replace if conversion worked
+                if idx.notna().any():
+                    s.index = idx
+                    s = s[s.index.notna()]
+
+            except Exception:
+                pass
+
+        s = s.sort_index()
+
+        if s.empty:
+            return None
+
+        return s
+
+    # ---------------------------------------------------------
+    # Plot helper
+    # ---------------------------------------------------------
+    @staticmethod
+    def _plot(fig, series, name):
+        #print("Plotting:", name)
+        #print("Type:", type(series))
+        #print(f"[PLOT] {name}: {type(series)}")
+        if name.endswith("USDT"):
+           return
+        # dictionary {"x":..., "y":...}
+        if isinstance(series, dict):
+
+            if "x" in series and "y" in series:
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=series["x"],
+                        y=series["y"],
+                        mode="lines+markers",
+                        name=name,
+                    )
+                )
+
+                #print(f"  -> added dict trace ({len(series['y'])} points)")
+                return
+
+            return
+
+        # Convert arrays/lists into Series
+        if isinstance(series, (list, tuple, np.ndarray)):
+            series = pd.Series(series)
+
+        if isinstance(series, pd.Series):
+
+            s = BetaNeutralStrategyChart._clean(series)
+
+            if s is None:
+                print(f"  -> skipped (empty after cleaning)")
+                return
+
+            fig.add_trace(
+                go.Scatter(
+                    x=s.index,
+                    y=s.values,
+                    mode="lines",
+                    name=name,
+                )
+            )
+            #print("Figure traces:", len(fig.data))
+            #print(f"  -> added series ({len(s)} points)")
+            return
+
+        #print(f"  -> unsupported type")
+
+    # ---------------------------------------------------------
+    # Plot markers
+    # ---------------------------------------------------------
+    @staticmethod
+    def _plot_markers(fig, series, label):
+
+        s = BetaNeutralStrategyChart._clean(series)
+
+        if s is None:
+            return
+
+        std = s.std()
+
+        if std == 0 or np.isnan(std):
+            return
+
+        z = (s - s.mean()) / std
+
+        spikes = np.where(np.abs(z) > 2)[0]
+
+        if len(spikes) == 0:
+            return
+
+        fig.add_trace(
+            go.Scatter(
+                x=s.index[spikes],
+                y=s.iloc[spikes],
+                mode="markers",
+                name=label,
+                marker=dict(size=7),
+            )
+        )
+
+    # ---------------------------------------------------------
+    # Render
+    # ---------------------------------------------------------
+    @staticmethod
+    def render(item):
+        #print("===== ITEM.DATA =====")
+        #print(type(item.data))
+        #print(item.data.keys())
+        for k, v in item.data.items():
+          print(k, type(v), getattr(v, "shape", None), getattr(v, "__len__", lambda: "N/A")())
+
+        fig = go.Figure()
+
+        data = getattr(item, "data", {}) or {}
+
+        #print("\n==============================")
+        #print("Available data keys:")
+        #print(list(data.keys()))
+        #print("==============================")
+
+        # -----------------------------------------------------
+        # Main chart series
+        # -----------------------------------------------------
+        for key in BetaNeutralStrategyChart.STATIC_MAP["chart"]:
+
+            if key in data:
+                BetaNeutralStrategyChart._plot(
+                    fig,
+                    data[key],
+                    key,
+                )
+
+        # Optional standard series
+        for key in ("pnl", "benchmark", "price"):
+
+            if key in data:
+                BetaNeutralStrategyChart._plot(
+                    fig,
+                    data[key],
+                    key,
+                )
+
+        # -----------------------------------------------------
+        # Signals
+        # -----------------------------------------------------
+        signals = getattr(item, "signals", {}) or {}
+
+        for name, sig in signals.items():
+            BetaNeutralStrategyChart._plot(
+                fig,
+                sig,
+                name,
+            )
+
+        # -----------------------------------------------------
+        # Other dict metrics
+        # -----------------------------------------------------
+        #for key, value in data.items():
+
+        #    if key in (
+        #        "bn_returns",
+        #        "pnl",
+        #        "benchmark",
+        #        "price",
+        #        "rebalance_events",
+        #    ):
+        #        continue
+
+        #    if isinstance(value, dict):
+
+        #        if "x" in value and "y" in value:
+
+        #            BetaNeutralStrategyChart._plot(
+        #                fig,
+        #                value,
+        #                key,
+        #            )
+
+        # -----------------------------------------------------
+        # Plot metric series from item.chart.series
+        # -----------------------------------------------------
+        chart = getattr(item, "chart", None)
+        if chart is not None:
+           series_map = getattr(chart, "chartdata", {}) 
+           #if isinstance(chartdata, dict):
+           #   series_map = chartdata.get("metric_series", {})
+           #else:
+           #   series_map = getattr(chartdata, "metric_series", {}) or {}
+           #print("SERIES KEYS:", series_map.keys())
+           for name, source in series_map.items():
+               #print("Plotting series:", name)
+               #if name in ("pnl", "benchmark", "price"):
+               #   pass
+               # source contains [x, y]
+               if isinstance(source, (list, tuple)) and len(source) == 2:
+                  x = source[0]
+                  y = source[1]
+                  fig.add_trace(
+                      go.Scatter(
+                          x=x,
+                          y=y,
+                          mode="lines",
+                          name=name
+                      )
+                  )
+                  #print( f"Added {name}: {len(y)} points"  )
+               else:
+                    # print(f"Skipping {name}: unsupported source {type(source)}")
+                    pass
+        if len(fig.data) == 0:
+            fig.add_annotation(
+                text="No chart data",
+                x=0.5,
+                y=0.5,
+                xref="paper",
+                yref="paper",
+                showarrow=False,
+                font=dict(size=18),
+            )
+
+        fig.update_layout(
+            template="plotly_dark",
+            title="Beta Neutral Strategy",
+            hovermode="x unified",
+            xaxis_title="Time",
+            yaxis_title="Value",
+        )
+
+
+        return fig
+
 # ==================================================
 # DASHBOARD
 # ==================================================
@@ -3818,7 +4129,7 @@ class QXDashboard:
             document.getElementById(tabName).style.display = "block";
             event.currentTarget.classList.add("active");
 
-            // 🚀 CRITICAL FIX: render only visible tab
+            //  CRITICAL FIX: render only visible tab
             setTimeout(() => {{
                 renderTab(tabName);
             }}, 50);
