@@ -47,7 +47,7 @@ class PairTrading(BaseStrategy):
 
         cfg = self.cfg
         data = self.data.copy()
-        print("[DEBUG] data",  data.keys())
+        #print("[DEBUG] data",  data.keys())
 
         lookback = cfg.get("lookback", 252)
         entry_z = cfg.get("entry_zscore", 2.0)

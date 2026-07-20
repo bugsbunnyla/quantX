@@ -65,7 +65,7 @@ class StrategyInit:
         if not data:
             raise RuntimeError("[DATA] Universe empty")
 
-        print("[DATA] Assets:", list(data.keys()))
+        #print("[DATA] Assets:", list(data.keys()))
 
         # -------------------------------------
         # ENGINE EXECUTION

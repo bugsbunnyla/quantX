@@ -3447,8 +3447,8 @@ class BetaNeutralStrategyChart(StrategyChart):
         #print("===== ITEM.DATA =====")
         #print(type(item.data))
         #print(item.data.keys())
-        for k, v in item.data.items():
-          print(k, type(v), getattr(v, "shape", None), getattr(v, "__len__", lambda: "N/A")())
+        #for k, v in item.data.items():
+        #  print(k, type(v), getattr(v, "shape", None), getattr(v, "__len__", lambda: "N/A")())
 
         fig = go.Figure()
 

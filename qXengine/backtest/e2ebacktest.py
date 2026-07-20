@@ -86,8 +86,8 @@ def run_backtest(symbols=None, capital=None, view="both"):
 
     #print("\n[BACKTEST] SIGNAL SUMMARY\n")
 
-    signal = output[("decision", "signal")] if hasattr(output, "__getitem__") else None
-    print(signal.to_string() if hasattr(signal, "to_string") else signal)
+    #signal = output[("decision", "signal")] if hasattr(output, "__getitem__") else None
+    #print(signal.to_string() if hasattr(signal, "to_string") else signal)
 
     # =====================================================
     # STRATEGY PIPELINE
