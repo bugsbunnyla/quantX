@@ -575,7 +575,13 @@ class FormulaInfo:
                 if dep not in scope:
                     raise KeyError(f"{prop}: missing dependency '{dep}'")
             try:
+                import numpy
+                import pandas
+                import numexpr 
+                import bottleneck
+
                 val = eval(formula, {"__builtins__": {}}, scope)
+                print(val, formula, depends, prop)
             except Exception:
                 print("formula:", formula)
                 for dep in depends:
