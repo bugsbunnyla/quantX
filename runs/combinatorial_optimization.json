@@ -2,13 +2,13 @@
   "best_params": {
     "trees": 500,
     "depth": 16,
-    "horizon": 42,
+    "horizon": 21,
     "min_samples_split": 10,
     "max_features": "sqrt",
     "model": "random_forest",
-    "_hash": "7723de7f"
+    "_hash": "0646c8ab"
   },
   "best_resiliency_score": 0.08839580682655349,
   "total_combinations": 72,
-  "timestamp": "2026-07-21T15:17:34.380384"
+  "timestamp": "2026-07-21T16:57:58.742494"
 }

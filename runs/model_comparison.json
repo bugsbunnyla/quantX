@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-21T15:17:36.263884",
+  "timestamp": "2026-07-21T16:58:03.061324",
   "model_comparison": {
     "rmse": {
       "baseline": 0.0769568128810365,
@@ -29,15 +29,15 @@
   "validation_comparison": {
     "sharpe": {
       "baseline": 0.058008779741492066,
-      "optimized": 0.05800877974149206,
-      "absolute_change": -6.938893903907228e-18,
-      "pct_change": -1.1961799463511264e-16
+      "optimized": 0.058008779741492066,
+      "absolute_change": 0.0,
+      "pct_change": 0.0
     },
     "corr": {
       "baseline": 0.10610710416054184,
-      "optimized": 0.10610710416054182,
-      "absolute_change": -1.3877787807814457e-17,
-      "pct_change": -1.307903737229237e-16
+      "optimized": 0.1061071041605418,
+      "absolute_change": -4.163336342344337e-17,
+      "pct_change": -3.9237112116877104e-16
     },
     "hit": {
       "baseline": 0.47130434782608693,
@@ -46,10 +46,10 @@
       "pct_change": 0.0
     },
     "r2": {
-      "baseline": 0.011258717553336073,
-      "optimized": 0.011258717553336081,
-      "absolute_change": 8.673617379884035e-18,
-      "pct_change": 7.70391240280644e-16
+      "baseline": 0.011258717553336083,
+      "optimized": 0.011258717553336073,
+      "absolute_change": -1.0408340855860843e-17,
+      "pct_change": -9.24469488336772e-16
     },
     "score": {
       "baseline": 0.14093754580458978,
@@ -59,32 +59,32 @@
     },
     "cvar": {
       "baseline": -0.010375965992907646,
-      "optimized": -0.010375965992907646,
-      "absolute_change": 0.0,
-      "pct_change": 0.0
+      "optimized": -0.010375965992907648,
+      "absolute_change": -1.734723475976807e-18,
+      "pct_change": -1.6718669636760128e-16
     },
     "t_beta": {
-      "baseline": 4.429408785029825,
-      "optimized": 4.4294087850298265,
-      "absolute_change": 1.7763568394002505e-15,
-      "pct_change": 4.010370064293557e-16
+      "baseline": 4.429408785029827,
+      "optimized": 4.429408785029825,
+      "absolute_change": -2.6645352591003757e-15,
+      "pct_change": -6.015555096440332e-16
     }
   },
   "rating": {
-    "score": 8.456132206799691e-18,
+    "score": -1.9053972912586997e-16,
     "label": "NEUTRAL",
     "details": [
       {
         "metric": "sharpe",
         "weight": 0.3,
-        "pct_change": -1.1961799463511264e-16,
-        "contribution": -3.588539839053379e-17
+        "pct_change": 0.0,
+        "contribution": 0.0
       },
       {
         "metric": "corr",
         "weight": 0.25,
-        "pct_change": -1.307903737229237e-16,
-        "contribution": -3.269759343073092e-17
+        "pct_change": -3.9237112116877104e-16,
+        "contribution": -9.809278029219276e-17
       },
       {
         "metric": "score",
@@ -101,8 +101,8 @@
       {
         "metric": "r2",
         "weight": 0.1,
-        "pct_change": 7.70391240280644e-16,
-        "contribution": 7.703912402806441e-17
+        "pct_change": -9.24469488336772e-16,
+        "contribution": -9.244694883367721e-17
       }
     ],
     "interpretation": "No meaningful change. Parameters may already be near-optimal or grid insufficient."
@@ -110,7 +110,7 @@
   "prediction": {
     "predicted_next_score": 0.14093754580458978,
     "improvement_rate": 0.0,
-    "consistency": 0.9999996621122733,
+    "consistency": 0.9999996361910543,
     "confidence": 0.95,
     "recommendation": "EITHER_MODEL_OK: No significant difference. Choose based on computational cost or simplicity."
   }

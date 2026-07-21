@@ -1,0 +1,5414 @@
+{
+  "best_params": {
+    "trees": 500,
+    "depth": 16,
+    "horizon": 21,
+    "min_samples_split": 10,
+    "max_features": "sqrt",
+    "model": "random_forest",
+    "_hash": "0646c8ab"
+  },
+  "best_resiliency_score": 0.08839580682655349,
+  "all_results": [
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "46c6d446"
+      },
+      "sharpe": 0.0714435551333232,
+      "score": 0.14355662573997263,
+      "corr": 0.09023239431835835
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "46c6d446"
+      },
+      "sharpe": 0.03732828125827866,
+      "score": 0.12840629251881877,
+      "corr": 0.08877012695650331
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "46c6d446"
+      },
+      "sharpe": 0.04305387609115504,
+      "score": 0.12964915360011037,
+      "corr": 0.089737390480954
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "46c6d446"
+      },
+      "sharpe": 0.03699604808766827,
+      "score": 0.12787057345025224,
+      "corr": 0.08952072407965675
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "46c6d446"
+      },
+      "sharpe": 0.05222042498687943,
+      "score": 0.13232239552850622,
+      "corr": 0.09191176155392758
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e23e5519"
+      },
+      "sharpe": 0.07966212837149148,
+      "score": 0.1508068862296988,
+      "corr": 0.10726283059314907
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e23e5519"
+      },
+      "sharpe": 0.04563725747538262,
+      "score": 0.1367933515016647,
+      "corr": 0.11084124383202358
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e23e5519"
+      },
+      "sharpe": 0.05279618936914895,
+      "score": 0.13890106772818853,
+      "corr": 0.10821661655718341
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e23e5519"
+      },
+      "sharpe": 0.04542785379827336,
+      "score": 0.13636105682988545,
+      "corr": 0.10703031920731808
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e23e5519"
+      },
+      "sharpe": 0.061015029348978074,
+      "score": 0.1404279900667492,
+      "corr": 0.10812830600402583
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e5e2b6a9"
+      },
+      "sharpe": 0.07885244209490021,
+      "score": 0.1507356549514422,
+      "corr": 0.10782534616201704
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e5e2b6a9"
+      },
+      "sharpe": 0.04700430704243921,
+      "score": 0.13826281547103775,
+      "corr": 0.10844392839024046
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e5e2b6a9"
+      },
+      "sharpe": 0.05183006820977697,
+      "score": 0.1391985657031685,
+      "corr": 0.10816849966135741
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e5e2b6a9"
+      },
+      "sharpe": 0.0463539177455552,
+      "score": 0.13772156168449856,
+      "corr": 0.10776494946726539
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e5e2b6a9"
+      },
+      "sharpe": 0.059571681376158085,
+      "score": 0.13956034115759527,
+      "corr": 0.10788807214243924
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "f0cfb237"
+      },
+      "sharpe": 0.08187356078135927,
+      "score": 0.15253753890589333,
+      "corr": 0.11073606736563442
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "f0cfb237"
+      },
+      "sharpe": 0.046246714842599346,
+      "score": 0.13804598648347105,
+      "corr": 0.11164803140888092
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "f0cfb237"
+      },
+      "sharpe": 0.05325591721935533,
+      "score": 0.1396410460883402,
+      "corr": 0.11097266624746895
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "f0cfb237"
+      },
+      "sharpe": 0.046242728089625505,
+      "score": 0.1381980875079663,
+      "corr": 0.11227591244044818
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "f0cfb237"
+      },
+      "sharpe": 0.06256499209718601,
+      "score": 0.14192725225729616,
+      "corr": 0.11173231238806162
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9cc0e9e3"
+      },
+      "sharpe": 0.0714435551333232,
+      "score": 0.14355662573997266,
+      "corr": 0.09023239431835833
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9cc0e9e3"
+      },
+      "sharpe": 0.03732828125827867,
+      "score": 0.12840629251881877,
+      "corr": 0.08877012695650333
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9cc0e9e3"
+      },
+      "sharpe": 0.04305387609115504,
+      "score": 0.1296491536001104,
+      "corr": 0.08973739048095403
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9cc0e9e3"
+      },
+      "sharpe": 0.03699604808766827,
+      "score": 0.12787057345025224,
+      "corr": 0.08952072407965676
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9cc0e9e3"
+      },
+      "sharpe": 0.05222042498687943,
+      "score": 0.13232239552850622,
+      "corr": 0.09191176155392758
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3641da81"
+      },
+      "sharpe": 0.07966212837149145,
+      "score": 0.1508068862296988,
+      "corr": 0.10726283059314907
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3641da81"
+      },
+      "sharpe": 0.04563725747538262,
+      "score": 0.1367933515016647,
+      "corr": 0.11084124383202358
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3641da81"
+      },
+      "sharpe": 0.052796189369148934,
+      "score": 0.13890106772818853,
+      "corr": 0.10821661655718343
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3641da81"
+      },
+      "sharpe": 0.04542785379827336,
+      "score": 0.13636105682988545,
+      "corr": 0.10703031920731806
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3641da81"
+      },
+      "sharpe": 0.06101502934897806,
+      "score": 0.1404279900667492,
+      "corr": 0.1081283060040258
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9d743d72"
+      },
+      "sharpe": 0.07885244209490021,
+      "score": 0.1507356549514422,
+      "corr": 0.10782534616201706
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9d743d72"
+      },
+      "sharpe": 0.04700430704243921,
+      "score": 0.13826281547103775,
+      "corr": 0.10844392839024047
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9d743d72"
+      },
+      "sharpe": 0.05183006820977699,
+      "score": 0.1391985657031685,
+      "corr": 0.1081684996613574
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9d743d72"
+      },
+      "sharpe": 0.0463539177455552,
+      "score": 0.13772156168449856,
+      "corr": 0.10776494946726538
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9d743d72"
+      },
+      "sharpe": 0.05957168137615808,
+      "score": 0.13956034115759527,
+      "corr": 0.10788807214243924
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbdbbd1c"
+      },
+      "sharpe": 0.08187356078135925,
+      "score": 0.15253753890589333,
+      "corr": 0.11073606736563445
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbdbbd1c"
+      },
+      "sharpe": 0.04624671484259936,
+      "score": 0.13804598648347105,
+      "corr": 0.11164803140888094
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbdbbd1c"
+      },
+      "sharpe": 0.05325591721935534,
+      "score": 0.1396410460883402,
+      "corr": 0.11097266624746893
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbdbbd1c"
+      },
+      "sharpe": 0.0462427280896255,
+      "score": 0.13819808750796628,
+      "corr": 0.11227591244044818
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbdbbd1c"
+      },
+      "sharpe": 0.06256499209718601,
+      "score": 0.14192725225729616,
+      "corr": 0.11173231238806165
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7045452f"
+      },
+      "sharpe": 0.07982904290296823,
+      "score": 0.15215917135785964,
+      "corr": 0.1120588467238481
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7045452f"
+      },
+      "sharpe": 0.04245181724400446,
+      "score": 0.13477969937311804,
+      "corr": 0.10971180533592025
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7045452f"
+      },
+      "sharpe": 0.04958410344934787,
+      "score": 0.13653155874718126,
+      "corr": 0.10613746816664564
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7045452f"
+      },
+      "sharpe": 0.04240350502354717,
+      "score": 0.13597151501766067,
+      "corr": 0.11465778139515545
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7045452f"
+      },
+      "sharpe": 0.06012399373843525,
+      "score": 0.14302215781392172,
+      "corr": 0.11356092158096963
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "2a60f001"
+      },
+      "sharpe": 0.08496283850397784,
+      "score": 0.15619382636385562,
+      "corr": 0.11963053954429978
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "2a60f001"
+      },
+      "sharpe": 0.04470943853063887,
+      "score": 0.13701399082978524,
+      "corr": 0.11183880986871163
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "2a60f001"
+      },
+      "sharpe": 0.0577579164799248,
+      "score": 0.14556807954247986,
+      "corr": 0.1215967629959493
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "2a60f001"
+      },
+      "sharpe": 0.04681898180019253,
+      "score": 0.13876878396173295,
+      "corr": 0.11460734464561803
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "2a60f001"
+      },
+      "sharpe": 0.06456101041235973,
+      "score": 0.14511360876239093,
+      "corr": 0.1176718277170742
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "d9226dc4"
+      },
+      "sharpe": 0.08411883463806645,
+      "score": 0.1568901017382706,
+      "corr": 0.12471658408410503
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "d9226dc4"
+      },
+      "sharpe": 0.04776427284587336,
+      "score": 0.14096881214317064,
+      "corr": 0.12569116029202826
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "d9226dc4"
+      },
+      "sharpe": 0.05515963453736287,
+      "score": 0.14448801381445833,
+      "corr": 0.126079765254663
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "d9226dc4"
+      },
+      "sharpe": 0.04691051219109047,
+      "score": 0.14043098619082736,
+      "corr": 0.12444223869826956
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "d9226dc4"
+      },
+      "sharpe": 0.06360341000473599,
+      "score": 0.14671575617755808,
+      "corr": 0.12379931393575942
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "7572f627"
+      },
+      "sharpe": 0.08612939740566282,
+      "score": 0.1564987229089829,
+      "corr": 0.11944578503946082
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "7572f627"
+      },
+      "sharpe": 0.048012415105693415,
+      "score": 0.14097783943289302,
+      "corr": 0.12254318655575318
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "7572f627"
+      },
+      "sharpe": 0.05565126336196253,
+      "score": 0.14321835409400083,
+      "corr": 0.12066418162704916
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "7572f627"
+      },
+      "sharpe": 0.046861192144725755,
+      "score": 0.14020498363412368,
+      "corr": 0.12175388716115594
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "7572f627"
+      },
+      "sharpe": 0.06576246309079782,
+      "score": 0.14749350774926454,
+      "corr": 0.12112614260590832
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "173fe506"
+      },
+      "sharpe": 0.07982904290296823,
+      "score": 0.15215917135785964,
+      "corr": 0.1120588467238481
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "173fe506"
+      },
+      "sharpe": 0.04245181724400445,
+      "score": 0.13477969937311804,
+      "corr": 0.10971180533592022
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "173fe506"
+      },
+      "sharpe": 0.04958410344934787,
+      "score": 0.13653155874718126,
+      "corr": 0.10613746816664567
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "173fe506"
+      },
+      "sharpe": 0.042403505023547165,
+      "score": 0.13597151501766064,
+      "corr": 0.11465778139515548
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "173fe506"
+      },
+      "sharpe": 0.060123993738435265,
+      "score": 0.14302215781392172,
+      "corr": 0.1135609215809696
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "54e878ae"
+      },
+      "sharpe": 0.08496283850397784,
+      "score": 0.15619382636385562,
+      "corr": 0.11963053954429974
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "54e878ae"
+      },
+      "sharpe": 0.04470943853063887,
+      "score": 0.13701399082978524,
+      "corr": 0.11183880986871164
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "54e878ae"
+      },
+      "sharpe": 0.057757916479924794,
+      "score": 0.14556807954247983,
+      "corr": 0.1215967629959493
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "54e878ae"
+      },
+      "sharpe": 0.04681898180019252,
+      "score": 0.13876878396173292,
+      "corr": 0.11460734464561802
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "54e878ae"
+      },
+      "sharpe": 0.06456101041235973,
+      "score": 0.1451136087623909,
+      "corr": 0.11767182771707424
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4769364a"
+      },
+      "sharpe": 0.08411883463806645,
+      "score": 0.15689010173827056,
+      "corr": 0.124716584084105
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4769364a"
+      },
+      "sharpe": 0.04776427284587336,
+      "score": 0.14096881214317064,
+      "corr": 0.12569116029202826
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4769364a"
+      },
+      "sharpe": 0.05515963453736286,
+      "score": 0.14448801381445833,
+      "corr": 0.12607976525466305
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4769364a"
+      },
+      "sharpe": 0.04691051219109047,
+      "score": 0.14043098619082736,
+      "corr": 0.12444223869826955
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4769364a"
+      },
+      "sharpe": 0.06360341000473602,
+      "score": 0.14671575617755808,
+      "corr": 0.12379931393575938
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "03ffaa06"
+      },
+      "sharpe": 0.08612939740566282,
+      "score": 0.1564987229089829,
+      "corr": 0.11944578503946085
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "03ffaa06"
+      },
+      "sharpe": 0.048012415105693415,
+      "score": 0.14097783943289302,
+      "corr": 0.12254318655575315
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "03ffaa06"
+      },
+      "sharpe": 0.05565126336196253,
+      "score": 0.14321835409400083,
+      "corr": 0.12066418162704916
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "03ffaa06"
+      },
+      "sharpe": 0.046861192144725755,
+      "score": 0.14020498363412368,
+      "corr": 0.12175388716115594
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "03ffaa06"
+      },
+      "sharpe": 0.06576246309079781,
+      "score": 0.14749350774926454,
+      "corr": 0.12112614260590832
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "a0eee883"
+      },
+      "sharpe": 0.08220577183472101,
+      "score": 0.1540627104214091,
+      "corr": 0.11216222371831175
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "a0eee883"
+      },
+      "sharpe": 0.045332252319414554,
+      "score": 0.13640524270264204,
+      "corr": 0.10975117177671476
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "a0eee883"
+      },
+      "sharpe": 0.05325760523926786,
+      "score": 0.13921818316468068,
+      "corr": 0.1082848740134538
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "a0eee883"
+      },
+      "sharpe": 0.04846849188556175,
+      "score": 0.13758165825166693,
+      "corr": 0.1108561373438834
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "a0eee883"
+      },
+      "sharpe": 0.061541339407744124,
+      "score": 0.14305282395968819,
+      "corr": 0.10517717405520621
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "6022e1c8"
+      },
+      "sharpe": 0.08468980076778315,
+      "score": 0.15533168142098847,
+      "corr": 0.11328572890580206
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "6022e1c8"
+      },
+      "sharpe": 0.04469241984084095,
+      "score": 0.13846610911977758,
+      "corr": 0.11870896096708845
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "6022e1c8"
+      },
+      "sharpe": 0.05192646593194882,
+      "score": 0.13824857105899538,
+      "corr": 0.11077172277711303
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "6022e1c8"
+      },
+      "sharpe": 0.04085537639241487,
+      "score": 0.1323524141306943,
+      "corr": 0.10425473240741581
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "6022e1c8"
+      },
+      "sharpe": 0.06244224898414967,
+      "score": 0.14340974955219712,
+      "corr": 0.10993386711712791
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "984d5021"
+      },
+      "sharpe": 0.08533281456328129,
+      "score": 0.15839446689020176,
+      "corr": 0.12322400034001302
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "984d5021"
+      },
+      "sharpe": 0.047815456829391895,
+      "score": 0.1402263526822337,
+      "corr": 0.12356570069698204
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "984d5021"
+      },
+      "sharpe": 0.05493595840424457,
+      "score": 0.1414055118609641,
+      "corr": 0.12198535949318579
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "984d5021"
+      },
+      "sharpe": 0.04706145272054389,
+      "score": 0.13960781621641383,
+      "corr": 0.12229374814014854
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "984d5021"
+      },
+      "sharpe": 0.06440830609137166,
+      "score": 0.14649731612907493,
+      "corr": 0.12209589437317839
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "82fbfed0"
+      },
+      "sharpe": 0.08812877442101243,
+      "score": 0.16064501130487305,
+      "corr": 0.1282106868739421
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "82fbfed0"
+      },
+      "sharpe": 0.04723509786002505,
+      "score": 0.1405851353365817,
+      "corr": 0.12731805707390118
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "82fbfed0"
+      },
+      "sharpe": 0.05596122906923021,
+      "score": 0.14392655475477142,
+      "corr": 0.12672384620621585
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "82fbfed0"
+      },
+      "sharpe": 0.04739647659915447,
+      "score": 0.14100727147262715,
+      "corr": 0.1296628369395782
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "82fbfed0"
+      },
+      "sharpe": 0.06656660724247214,
+      "score": 0.14859013482000827,
+      "corr": 0.12747948420116315
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e1d4440"
+      },
+      "sharpe": 0.08220577183472101,
+      "score": 0.1540627104214091,
+      "corr": 0.11216222371831175
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e1d4440"
+      },
+      "sharpe": 0.04533225231941456,
+      "score": 0.13640524270264204,
+      "corr": 0.10975117177671476
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e1d4440"
+      },
+      "sharpe": 0.053257605239267855,
+      "score": 0.13921818316468068,
+      "corr": 0.10828487401345381
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e1d4440"
+      },
+      "sharpe": 0.04846849188556176,
+      "score": 0.13758165825166693,
+      "corr": 0.1108561373438834
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e1d4440"
+      },
+      "sharpe": 0.06154133940774411,
+      "score": 0.14305282395968819,
+      "corr": 0.10517717405520624
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbf87400"
+      },
+      "sharpe": 0.08468980076778315,
+      "score": 0.15533168142098847,
+      "corr": 0.11328572890580206
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbf87400"
+      },
+      "sharpe": 0.04469241984084095,
+      "score": 0.13846610911977758,
+      "corr": 0.11870896096708845
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbf87400"
+      },
+      "sharpe": 0.05192646593194884,
+      "score": 0.13824857105899538,
+      "corr": 0.11077172277711307
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbf87400"
+      },
+      "sharpe": 0.04085537639241488,
+      "score": 0.1323524141306943,
+      "corr": 0.10425473240741578
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "bbf87400"
+      },
+      "sharpe": 0.06244224898414967,
+      "score": 0.1434097495521971,
+      "corr": 0.1099338671171279
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "941dd80f"
+      },
+      "sharpe": 0.08533281456328129,
+      "score": 0.15839446689020176,
+      "corr": 0.12322400034001299
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "941dd80f"
+      },
+      "sharpe": 0.0478154568293919,
+      "score": 0.14022635268223374,
+      "corr": 0.12356570069698204
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "941dd80f"
+      },
+      "sharpe": 0.05493595840424457,
+      "score": 0.1414055118609641,
+      "corr": 0.12198535949318581
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "941dd80f"
+      },
+      "sharpe": 0.04706145272054389,
+      "score": 0.13960781621641383,
+      "corr": 0.12229374814014854
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "941dd80f"
+      },
+      "sharpe": 0.06440830609137166,
+      "score": 0.14649731612907493,
+      "corr": 0.1220958943731784
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4dd3920d"
+      },
+      "sharpe": 0.08812877442101243,
+      "score": 0.16064501130487305,
+      "corr": 0.1282106868739421
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4dd3920d"
+      },
+      "sharpe": 0.047235097860025055,
+      "score": 0.14058513533658173,
+      "corr": 0.12731805707390118
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4dd3920d"
+      },
+      "sharpe": 0.05596122906923021,
+      "score": 0.14392655475477142,
+      "corr": 0.12672384620621585
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4dd3920d"
+      },
+      "sharpe": 0.04739647659915447,
+      "score": 0.14100727147262715,
+      "corr": 0.1296628369395782
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 200,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4dd3920d"
+      },
+      "sharpe": 0.06656660724247214,
+      "score": 0.14859013482000827,
+      "corr": 0.12747948420116317
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4cf9bfa2"
+      },
+      "sharpe": 0.07437426205188402,
+      "score": 0.1472198729038028,
+      "corr": 0.10069052038867007
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4cf9bfa2"
+      },
+      "sharpe": 0.041564890742241914,
+      "score": 0.13304740708017904,
+      "corr": 0.09970283124266577
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4cf9bfa2"
+      },
+      "sharpe": 0.046737339982489946,
+      "score": 0.13412670584982225,
+      "corr": 0.09895997544300246
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4cf9bfa2"
+      },
+      "sharpe": 0.04082922615632377,
+      "score": 0.1324255058172274,
+      "corr": 0.09881968805515642
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4cf9bfa2"
+      },
+      "sharpe": 0.055327882786451815,
+      "score": 0.13599684544221358,
+      "corr": 0.10113014160447031
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "174081ef"
+      },
+      "sharpe": 0.08103368903064107,
+      "score": 0.1522556710999569,
+      "corr": 0.11095740314116437
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "174081ef"
+      },
+      "sharpe": 0.04707973440356737,
+      "score": 0.13875820064023958,
+      "corr": 0.1108271402480643
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "174081ef"
+      },
+      "sharpe": 0.054394381694113175,
+      "score": 0.14008480186281147,
+      "corr": 0.11187324595396128
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "174081ef"
+      },
+      "sharpe": 0.04714886889190089,
+      "score": 0.13850753821714495,
+      "corr": 0.11063707262280044
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "174081ef"
+      },
+      "sharpe": 0.062021244710050716,
+      "score": 0.14136985969801427,
+      "corr": 0.11081639151420422
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "052c675a"
+      },
+      "sharpe": 0.07702862077935661,
+      "score": 0.14941034077527765,
+      "corr": 0.10536990607994402
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "052c675a"
+      },
+      "sharpe": 0.0442721901377225,
+      "score": 0.1357741648973357,
+      "corr": 0.10460221262875097
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "052c675a"
+      },
+      "sharpe": 0.04969242876937629,
+      "score": 0.1368443344424165,
+      "corr": 0.10581410326667705
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "052c675a"
+      },
+      "sharpe": 0.04396171828926234,
+      "score": 0.1354444623304406,
+      "corr": 0.10471124238588561
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "052c675a"
+      },
+      "sharpe": 0.05725365881363865,
+      "score": 0.1370257928880972,
+      "corr": 0.1046066349661511
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e2cf7e2a"
+      },
+      "sharpe": 0.08318060601879093,
+      "score": 0.1541187090922481,
+      "corr": 0.11505309074758036
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e2cf7e2a"
+      },
+      "sharpe": 0.048031015240982904,
+      "score": 0.1395563152324408,
+      "corr": 0.11489540352359207
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e2cf7e2a"
+      },
+      "sharpe": 0.05500322092487334,
+      "score": 0.14171730156771778,
+      "corr": 0.11517082054711453
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e2cf7e2a"
+      },
+      "sharpe": 0.048047486911153355,
+      "score": 0.13986398439592784,
+      "corr": 0.11564766677589859
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e2cf7e2a"
+      },
+      "sharpe": 0.06373046125879543,
+      "score": 0.14349869039253477,
+      "corr": 0.11481992805848165
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "03cfd775"
+      },
+      "sharpe": 0.07437426205188402,
+      "score": 0.1472198729038028,
+      "corr": 0.10069052038867007
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "03cfd775"
+      },
+      "sharpe": 0.041564890742241914,
+      "score": 0.13304740708017904,
+      "corr": 0.09970283124266577
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "03cfd775"
+      },
+      "sharpe": 0.046737339982489946,
+      "score": 0.13412670584982225,
+      "corr": 0.09895997544300249
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "03cfd775"
+      },
+      "sharpe": 0.04082922615632377,
+      "score": 0.1324255058172274,
+      "corr": 0.0988196880551564
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "03cfd775"
+      },
+      "sharpe": 0.05532788278645182,
+      "score": 0.13599684544221358,
+      "corr": 0.10113014160447033
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "facaf7a6"
+      },
+      "sharpe": 0.08103368903064105,
+      "score": 0.1522556710999569,
+      "corr": 0.11095740314116437
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "facaf7a6"
+      },
+      "sharpe": 0.04707973440356737,
+      "score": 0.13875820064023958,
+      "corr": 0.11082714024806427
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "facaf7a6"
+      },
+      "sharpe": 0.05439438169411316,
+      "score": 0.14008480186281147,
+      "corr": 0.1118732459539613
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "facaf7a6"
+      },
+      "sharpe": 0.04714886889190089,
+      "score": 0.13850753821714498,
+      "corr": 0.11063707262280047
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "facaf7a6"
+      },
+      "sharpe": 0.062021244710050716,
+      "score": 0.14136985969801427,
+      "corr": 0.11081639151420422
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "265e30a2"
+      },
+      "sharpe": 0.07702862077935663,
+      "score": 0.14941034077527765,
+      "corr": 0.10536990607994402
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "265e30a2"
+      },
+      "sharpe": 0.044272190137722496,
+      "score": 0.1357741648973357,
+      "corr": 0.10460221262875093
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "265e30a2"
+      },
+      "sharpe": 0.04969242876937627,
+      "score": 0.13684433444241648,
+      "corr": 0.10581410326667706
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "265e30a2"
+      },
+      "sharpe": 0.043961718289262326,
+      "score": 0.1354444623304406,
+      "corr": 0.10471124238588561
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "265e30a2"
+      },
+      "sharpe": 0.05725365881363864,
+      "score": 0.1370257928880972,
+      "corr": 0.10460663496615112
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a20e411a"
+      },
+      "sharpe": 0.08318060601879092,
+      "score": 0.15411870909224806,
+      "corr": 0.11505309074758029
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a20e411a"
+      },
+      "sharpe": 0.04803101524098291,
+      "score": 0.1395563152324408,
+      "corr": 0.11489540352359207
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a20e411a"
+      },
+      "sharpe": 0.05500322092487334,
+      "score": 0.14171730156771778,
+      "corr": 0.11517082054711454
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a20e411a"
+      },
+      "sharpe": 0.048047486911153355,
+      "score": 0.13986398439592784,
+      "corr": 0.11564766677589862
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a20e411a"
+      },
+      "sharpe": 0.06373046125879543,
+      "score": 0.14349869039253477,
+      "corr": 0.11481992805848165
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "99fa10c4"
+      },
+      "sharpe": 0.0783471174356045,
+      "score": 0.14870506495234764,
+      "corr": 0.10122272998444545
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "99fa10c4"
+      },
+      "sharpe": 0.04183682893755811,
+      "score": 0.1341302507374093,
+      "corr": 0.10614550928026018
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "99fa10c4"
+      },
+      "sharpe": 0.04739908899146326,
+      "score": 0.1348072872352935,
+      "corr": 0.09924396589144653
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "99fa10c4"
+      },
+      "sharpe": 0.041349945728756284,
+      "score": 0.13394716508237917,
+      "corr": 0.10667159708363332
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "99fa10c4"
+      },
+      "sharpe": 0.05754000169925621,
+      "score": 0.14037542749186865,
+      "corr": 0.10455999390858133
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "cbd81775"
+      },
+      "sharpe": 0.08556843902701686,
+      "score": 0.15693174615126948,
+      "corr": 0.12209333188186385
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "cbd81775"
+      },
+      "sharpe": 0.04513030806902697,
+      "score": 0.139210341552875,
+      "corr": 0.1167890829009065
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "cbd81775"
+      },
+      "sharpe": 0.056985473000540805,
+      "score": 0.1444940720412295,
+      "corr": 0.12318094215792086
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "cbd81775"
+      },
+      "sharpe": 0.04630623941176879,
+      "score": 0.14002458065457457,
+      "corr": 0.11771222706356396
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "cbd81775"
+      },
+      "sharpe": 0.06381462551446203,
+      "score": 0.1455567375791252,
+      "corr": 0.11785810649796669
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "edbf7083"
+      },
+      "sharpe": 0.08513687394856076,
+      "score": 0.15759883675028513,
+      "corr": 0.1259220453609194
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "edbf7083"
+      },
+      "sharpe": 0.04955331320275155,
+      "score": 0.14276814124848597,
+      "corr": 0.12631486627812435
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "edbf7083"
+      },
+      "sharpe": 0.05638151848642987,
+      "score": 0.14538710125455767,
+      "corr": 0.12679192837323733
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "edbf7083"
+      },
+      "sharpe": 0.04907930866495941,
+      "score": 0.14227745898605515,
+      "corr": 0.12557543080698294
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "edbf7083"
+      },
+      "sharpe": 0.06480848871002079,
+      "score": 0.14780204107342848,
+      "corr": 0.12575325887331898
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e6f5c6ae"
+      },
+      "sharpe": 0.08629137712190242,
+      "score": 0.15716642982718715,
+      "corr": 0.12187430865223568
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e6f5c6ae"
+      },
+      "sharpe": 0.047755452478051776,
+      "score": 0.14086119533800023,
+      "corr": 0.12295299505880708
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e6f5c6ae"
+      },
+      "sharpe": 0.056146422361363205,
+      "score": 0.14400944168909627,
+      "corr": 0.12351331700002847
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e6f5c6ae"
+      },
+      "sharpe": 0.047499716074476776,
+      "score": 0.14088388347673736,
+      "corr": 0.12345436685740986
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "e6f5c6ae"
+      },
+      "sharpe": 0.0656235643241585,
+      "score": 0.1478891869702368,
+      "corr": 0.12247423121098579
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e7d48dba"
+      },
+      "sharpe": 0.07834711743560449,
+      "score": 0.14870506495234764,
+      "corr": 0.10122272998444545
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e7d48dba"
+      },
+      "sharpe": 0.04183682893755811,
+      "score": 0.1341302507374093,
+      "corr": 0.10614550928026015
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e7d48dba"
+      },
+      "sharpe": 0.04739908899146325,
+      "score": 0.1348072872352935,
+      "corr": 0.09924396589144652
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e7d48dba"
+      },
+      "sharpe": 0.041349945728756284,
+      "score": 0.13394716508237914,
+      "corr": 0.1066715970836333
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e7d48dba"
+      },
+      "sharpe": 0.05754000169925622,
+      "score": 0.14037542749186868,
+      "corr": 0.10455999390858138
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b5e6a02d"
+      },
+      "sharpe": 0.08556843902701688,
+      "score": 0.1569317461512695,
+      "corr": 0.12209333188186389
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b5e6a02d"
+      },
+      "sharpe": 0.045130308069026966,
+      "score": 0.139210341552875,
+      "corr": 0.11678908290090652
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b5e6a02d"
+      },
+      "sharpe": 0.056985473000540805,
+      "score": 0.1444940720412295,
+      "corr": 0.12318094215792086
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b5e6a02d"
+      },
+      "sharpe": 0.04630623941176879,
+      "score": 0.14002458065457457,
+      "corr": 0.11771222706356396
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b5e6a02d"
+      },
+      "sharpe": 0.063814625514462,
+      "score": 0.1455567375791252,
+      "corr": 0.11785810649796667
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "aecca9ad"
+      },
+      "sharpe": 0.08513687394856077,
+      "score": 0.15759883675028513,
+      "corr": 0.12592204536091942
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "aecca9ad"
+      },
+      "sharpe": 0.04955331320275157,
+      "score": 0.142768141248486,
+      "corr": 0.12631486627812438
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "aecca9ad"
+      },
+      "sharpe": 0.05638151848642988,
+      "score": 0.14538710125455764,
+      "corr": 0.12679192837323738
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "aecca9ad"
+      },
+      "sharpe": 0.04907930866495942,
+      "score": 0.14227745898605515,
+      "corr": 0.12557543080698294
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "aecca9ad"
+      },
+      "sharpe": 0.0648084887100208,
+      "score": 0.14780204107342848,
+      "corr": 0.12575325887331898
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d27723b3"
+      },
+      "sharpe": 0.08629137712190244,
+      "score": 0.15716642982718718,
+      "corr": 0.12187430865223568
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d27723b3"
+      },
+      "sharpe": 0.04775545247805179,
+      "score": 0.14086119533800023,
+      "corr": 0.12295299505880708
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d27723b3"
+      },
+      "sharpe": 0.056146422361363205,
+      "score": 0.14400944168909627,
+      "corr": 0.1235133170000285
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d27723b3"
+      },
+      "sharpe": 0.04749971607447677,
+      "score": 0.14088388347673736,
+      "corr": 0.12345436685740992
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d27723b3"
+      },
+      "sharpe": 0.0656235643241585,
+      "score": 0.1478891869702368,
+      "corr": 0.12247423121098575
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e0fefdf7"
+      },
+      "sharpe": 0.08159817497715875,
+      "score": 0.15361219341143284,
+      "corr": 0.1127351199725491
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e0fefdf7"
+      },
+      "sharpe": 0.044733351404930656,
+      "score": 0.13607354198816762,
+      "corr": 0.1103238566773607
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e0fefdf7"
+      },
+      "sharpe": 0.05385729879273827,
+      "score": 0.1396507647511239,
+      "corr": 0.11145119143188881
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e0fefdf7"
+      },
+      "sharpe": 0.04731882750019862,
+      "score": 0.13822487381721138,
+      "corr": 0.11676556126612692
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e0fefdf7"
+      },
+      "sharpe": 0.06227956320322262,
+      "score": 0.14318417913145476,
+      "corr": 0.11022640225120676
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d382ae38"
+      },
+      "sharpe": 0.08490770761273288,
+      "score": 0.15542977709657646,
+      "corr": 0.11568872061472685
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d382ae38"
+      },
+      "sharpe": 0.045104214571371946,
+      "score": 0.1385840493003218,
+      "corr": 0.11945646345202368
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d382ae38"
+      },
+      "sharpe": 0.05408215384770843,
+      "score": 0.14091998386707988,
+      "corr": 0.11531254227706156
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d382ae38"
+      },
+      "sharpe": 0.042308073966045336,
+      "score": 0.13507361685680938,
+      "corr": 0.11115101205869085
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "d382ae38"
+      },
+      "sharpe": 0.06286334351565329,
+      "score": 0.14407174526431124,
+      "corr": 0.11290009956262263
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0646c8ab"
+      },
+      "sharpe": 0.08706509449219556,
+      "score": 0.16023092303733383,
+      "corr": 0.1282559873352325
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0646c8ab"
+      },
+      "sharpe": 0.04927957907964663,
+      "score": 0.14235438808278622,
+      "corr": 0.12833668136850684
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0646c8ab"
+      },
+      "sharpe": 0.05677345481988079,
+      "score": 0.14549290045604243,
+      "corr": 0.1284362222167607
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0646c8ab"
+      },
+      "sharpe": 0.048804418220351975,
+      "score": 0.14191977343599846,
+      "corr": 0.12782477155872599
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0646c8ab"
+      },
+      "sharpe": 0.06628351208359694,
+      "score": 0.1489164636671177,
+      "corr": 0.12876754647622188
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "48f2585e"
+      },
+      "sharpe": 0.08705584463105717,
+      "score": 0.15932015764758722,
+      "corr": 0.12648950428225186
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "48f2585e"
+      },
+      "sharpe": 0.04595202101833645,
+      "score": 0.14008265296326636,
+      "corr": 0.12504650692819425
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "48f2585e"
+      },
+      "sharpe": 0.055306087528405615,
+      "score": 0.1438008578133145,
+      "corr": 0.12634268375069416
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "48f2585e"
+      },
+      "sharpe": 0.04665905038857749,
+      "score": 0.14101676107325856,
+      "corr": 0.12764609266099633
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "48f2585e"
+      },
+      "sharpe": 0.06526033095064726,
+      "score": 0.147742887591582,
+      "corr": 0.1252578662000353
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "112739ad"
+      },
+      "sharpe": 0.08159817497715875,
+      "score": 0.15361219341143284,
+      "corr": 0.11273511997254913
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "112739ad"
+      },
+      "sharpe": 0.044733351404930656,
+      "score": 0.13607354198816762,
+      "corr": 0.1103238566773607
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "112739ad"
+      },
+      "sharpe": 0.05385729879273827,
+      "score": 0.1396507647511239,
+      "corr": 0.11145119143188878
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "112739ad"
+      },
+      "sharpe": 0.04731882750019861,
+      "score": 0.1382248738172114,
+      "corr": 0.11676556126612694
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "112739ad"
+      },
+      "sharpe": 0.062279563203222636,
+      "score": 0.14318417913145476,
+      "corr": 0.11022640225120682
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "13ebe182"
+      },
+      "sharpe": 0.08490770761273289,
+      "score": 0.1554297770965765,
+      "corr": 0.11568872061472688
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "13ebe182"
+      },
+      "sharpe": 0.04510421457137195,
+      "score": 0.1385840493003218,
+      "corr": 0.11945646345202365
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "13ebe182"
+      },
+      "sharpe": 0.05408215384770842,
+      "score": 0.14091998386707988,
+      "corr": 0.11531254227706156
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "13ebe182"
+      },
+      "sharpe": 0.042308073966045336,
+      "score": 0.13507361685680938,
+      "corr": 0.11115101205869085
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "13ebe182"
+      },
+      "sharpe": 0.06286334351565329,
+      "score": 0.14407174526431124,
+      "corr": 0.11290009956262259
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7723de7f"
+      },
+      "sharpe": 0.08706509449219553,
+      "score": 0.1602309230373338,
+      "corr": 0.1282559873352325
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7723de7f"
+      },
+      "sharpe": 0.04927957907964663,
+      "score": 0.14235438808278622,
+      "corr": 0.12833668136850684
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7723de7f"
+      },
+      "sharpe": 0.05677345481988078,
+      "score": 0.14549290045604243,
+      "corr": 0.12843622221676074
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7723de7f"
+      },
+      "sharpe": 0.04880441822035198,
+      "score": 0.14191977343599846,
+      "corr": 0.127824771558726
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "7723de7f"
+      },
+      "sharpe": 0.06628351208359694,
+      "score": 0.1489164636671177,
+      "corr": 0.12876754647622193
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "852298eb"
+      },
+      "sharpe": 0.08705584463105719,
+      "score": 0.15932015764758722,
+      "corr": 0.12648950428225186
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "852298eb"
+      },
+      "sharpe": 0.04595202101833644,
+      "score": 0.14008265296326636,
+      "corr": 0.12504650692819425
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "852298eb"
+      },
+      "sharpe": 0.055306087528405615,
+      "score": 0.1438008578133145,
+      "corr": 0.12634268375069416
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "852298eb"
+      },
+      "sharpe": 0.04665905038857751,
+      "score": 0.14101676107325856,
+      "corr": 0.12764609266099633
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 500,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "852298eb"
+      },
+      "sharpe": 0.06526033095064726,
+      "score": 0.147742887591582,
+      "corr": 0.1252578662000353
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "5dead323"
+      },
+      "sharpe": 0.07824814893290488,
+      "score": 0.15116167788211993,
+      "corr": 0.11056560041846035
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "5dead323"
+      },
+      "sharpe": 0.045250374829741286,
+      "score": 0.13711813876461446,
+      "corr": 0.11185399114693229
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "5dead323"
+      },
+      "sharpe": 0.05002459726082128,
+      "score": 0.13805034243400552,
+      "corr": 0.10927580815424487
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "5dead323"
+      },
+      "sharpe": 0.04339954716403639,
+      "score": 0.1352802479325833,
+      "corr": 0.1078299250601372
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "5dead323"
+      },
+      "sharpe": 0.05854261194286079,
+      "score": 0.13952146450794561,
+      "corr": 0.10989455975301611
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3f820506"
+      },
+      "sharpe": 0.0810719726297491,
+      "score": 0.15211987784241265,
+      "corr": 0.11033877065696697
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3f820506"
+      },
+      "sharpe": 0.04624289573608305,
+      "score": 0.13802311977260448,
+      "corr": 0.1101372702517659
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3f820506"
+      },
+      "sharpe": 0.053487945732368876,
+      "score": 0.13999468149996908,
+      "corr": 0.11061656421921244
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3f820506"
+      },
+      "sharpe": 0.046548653092742906,
+      "score": 0.13802485099471978,
+      "corr": 0.11106772160073711
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3f820506"
+      },
+      "sharpe": 0.06171569021083598,
+      "score": 0.1412428772328703,
+      "corr": 0.11079690635688651
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "500d4772"
+      },
+      "sharpe": 0.07884613196049807,
+      "score": 0.1513638936049787,
+      "corr": 0.11041417494473586
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "500d4772"
+      },
+      "sharpe": 0.04541187597519264,
+      "score": 0.13712792837654253,
+      "corr": 0.11020662223249031
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "500d4772"
+      },
+      "sharpe": 0.05091031492336896,
+      "score": 0.13898725181788657,
+      "corr": 0.11071327290837805
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "500d4772"
+      },
+      "sharpe": 0.04488777322231301,
+      "score": 0.1367067062157483,
+      "corr": 0.1098146658314319
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "500d4772"
+      },
+      "sharpe": 0.058893620432335,
+      "score": 0.1391472784567811,
+      "corr": 0.1101614356104391
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b7715875"
+      },
+      "sharpe": 0.08371632487185654,
+      "score": 0.15525753528597883,
+      "corr": 0.11879964261517938
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b7715875"
+      },
+      "sharpe": 0.048378626214055316,
+      "score": 0.14065104691576527,
+      "corr": 0.11876877243839523
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b7715875"
+      },
+      "sharpe": 0.0553880872417794,
+      "score": 0.14286556424114094,
+      "corr": 0.11919844895309133
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b7715875"
+      },
+      "sharpe": 0.048182839194989564,
+      "score": 0.14035126881941729,
+      "corr": 0.11927910326127808
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "b7715875"
+      },
+      "sharpe": 0.06419786046045597,
+      "score": 0.14417546725019068,
+      "corr": 0.11868527572789798
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0d24794e"
+      },
+      "sharpe": 0.07824814893290488,
+      "score": 0.15116167788211993,
+      "corr": 0.11056560041846034
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0d24794e"
+      },
+      "sharpe": 0.045250374829741286,
+      "score": 0.13711813876461446,
+      "corr": 0.11185399114693227
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0d24794e"
+      },
+      "sharpe": 0.05002459726082126,
+      "score": 0.1380503424340055,
+      "corr": 0.10927580815424486
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0d24794e"
+      },
+      "sharpe": 0.0433995471640364,
+      "score": 0.13528024793258334,
+      "corr": 0.1078299250601372
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "0d24794e"
+      },
+      "sharpe": 0.05854261194286079,
+      "score": 0.1395214645079456,
+      "corr": 0.10989455975301607
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "84d2cfae"
+      },
+      "sharpe": 0.0810719726297491,
+      "score": 0.15211987784241265,
+      "corr": 0.110338770656967
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "84d2cfae"
+      },
+      "sharpe": 0.04624289573608302,
+      "score": 0.13802311977260445,
+      "corr": 0.11013727025176588
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "84d2cfae"
+      },
+      "sharpe": 0.053487945732368876,
+      "score": 0.13999468149996908,
+      "corr": 0.11061656421921245
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "84d2cfae"
+      },
+      "sharpe": 0.046548653092742906,
+      "score": 0.13802485099471978,
+      "corr": 0.11106772160073711
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "84d2cfae"
+      },
+      "sharpe": 0.06171569021083598,
+      "score": 0.14124287723287027,
+      "corr": 0.11079690635688647
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "ff92e132"
+      },
+      "sharpe": 0.07884613196049806,
+      "score": 0.1513638936049787,
+      "corr": 0.11041417494473586
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "ff92e132"
+      },
+      "sharpe": 0.04541187597519264,
+      "score": 0.1371279283765425,
+      "corr": 0.11020662223249028
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "ff92e132"
+      },
+      "sharpe": 0.05091031492336894,
+      "score": 0.13898725181788657,
+      "corr": 0.11071327290837807
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "ff92e132"
+      },
+      "sharpe": 0.04488777322231302,
+      "score": 0.13670670621574832,
+      "corr": 0.10981466583143193
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "ff92e132"
+      },
+      "sharpe": 0.058893620432335,
+      "score": 0.1391472784567811,
+      "corr": 0.1101614356104391
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "c95f892b"
+      },
+      "sharpe": 0.08371632487185651,
+      "score": 0.1552575352859788,
+      "corr": 0.11879964261517935
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "c95f892b"
+      },
+      "sharpe": 0.04837862621405532,
+      "score": 0.14065104691576527,
+      "corr": 0.11876877243839526
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "c95f892b"
+      },
+      "sharpe": 0.0553880872417794,
+      "score": 0.14286556424114094,
+      "corr": 0.11919844895309133
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "c95f892b"
+      },
+      "sharpe": 0.048182839194989564,
+      "score": 0.14035126881941729,
+      "corr": 0.11927910326127807
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 8,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "c95f892b"
+      },
+      "sharpe": 0.06419786046045595,
+      "score": 0.14417546725019068,
+      "corr": 0.11868527572789797
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e7a94b3"
+      },
+      "sharpe": 0.07875964147884161,
+      "score": 0.14948895223067293,
+      "corr": 0.10331040867050699
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e7a94b3"
+      },
+      "sharpe": 0.04102054157344468,
+      "score": 0.1333343729181765,
+      "corr": 0.10612243369834032
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e7a94b3"
+      },
+      "sharpe": 0.047453163401817156,
+      "score": 0.13479537341281206,
+      "corr": 0.10151821539237836
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e7a94b3"
+      },
+      "sharpe": 0.040497617242313814,
+      "score": 0.13346445670061818,
+      "corr": 0.10560864560139738
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "3e7a94b3"
+      },
+      "sharpe": 0.05744921559276334,
+      "score": 0.13996086534007665,
+      "corr": 0.1039544419727573
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3b130728"
+      },
+      "sharpe": 0.08455945190269455,
+      "score": 0.15593023350741284,
+      "corr": 0.11968582733611087
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3b130728"
+      },
+      "sharpe": 0.045226926218127704,
+      "score": 0.139544411132501,
+      "corr": 0.11657664077621949
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3b130728"
+      },
+      "sharpe": 0.05590498824774438,
+      "score": 0.14390038028756746,
+      "corr": 0.12206694757171366
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3b130728"
+      },
+      "sharpe": 0.04652467508300624,
+      "score": 0.1404902700437739,
+      "corr": 0.12017690327615782
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "3b130728"
+      },
+      "sharpe": 0.06353164283213635,
+      "score": 0.14652670493094333,
+      "corr": 0.11848747823183481
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9dde3095"
+      },
+      "sharpe": 0.08639812491657203,
+      "score": 0.15835080865427212,
+      "corr": 0.12690969401717594
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9dde3095"
+      },
+      "sharpe": 0.04928807725065898,
+      "score": 0.14238496557033808,
+      "corr": 0.12705960307943653
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9dde3095"
+      },
+      "sharpe": 0.056541929519446255,
+      "score": 0.14581327452097814,
+      "corr": 0.12731072480076097
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9dde3095"
+      },
+      "sharpe": 0.04881506992873733,
+      "score": 0.14196290829530844,
+      "corr": 0.12659331645634647
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "9dde3095"
+      },
+      "sharpe": 0.0654414831457837,
+      "score": 0.1483819659707485,
+      "corr": 0.12659481841196685
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4fe71734"
+      },
+      "sharpe": 0.08713013211373934,
+      "score": 0.15796782861068648,
+      "corr": 0.12374445063304483
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4fe71734"
+      },
+      "sharpe": 0.0473667709760875,
+      "score": 0.1414596399036068,
+      "corr": 0.123651721043133
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4fe71734"
+      },
+      "sharpe": 0.05617587591493816,
+      "score": 0.14479384646219984,
+      "corr": 0.12428633054881831
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4fe71734"
+      },
+      "sharpe": 0.04713008818994818,
+      "score": 0.14139327381468358,
+      "corr": 0.12422969685257039
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "4fe71734"
+      },
+      "sharpe": 0.06607302746064335,
+      "score": 0.1479677655913471,
+      "corr": 0.12392866253603023
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e63832f8"
+      },
+      "sharpe": 0.07875964147884161,
+      "score": 0.14948895223067293,
+      "corr": 0.10331040867050703
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e63832f8"
+      },
+      "sharpe": 0.04102054157344466,
+      "score": 0.1333343729181765,
+      "corr": 0.10612243369834033
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e63832f8"
+      },
+      "sharpe": 0.047453163401817156,
+      "score": 0.13479537341281203,
+      "corr": 0.10151821539237835
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e63832f8"
+      },
+      "sharpe": 0.0404976172423138,
+      "score": 0.13346445670061818,
+      "corr": 0.10560864560139738
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "e63832f8"
+      },
+      "sharpe": 0.05744921559276334,
+      "score": 0.13996086534007665,
+      "corr": 0.10395444197275733
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "9a9e32fb"
+      },
+      "sharpe": 0.08455945190269454,
+      "score": 0.15593023350741284,
+      "corr": 0.1196858273361109
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "9a9e32fb"
+      },
+      "sharpe": 0.0452269262181277,
+      "score": 0.139544411132501,
+      "corr": 0.11657664077621949
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "9a9e32fb"
+      },
+      "sharpe": 0.05590498824774436,
+      "score": 0.14390038028756746,
+      "corr": 0.12206694757171367
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "9a9e32fb"
+      },
+      "sharpe": 0.046524675083006235,
+      "score": 0.1404902700437739,
+      "corr": 0.12017690327615786
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "9a9e32fb"
+      },
+      "sharpe": 0.06353164283213635,
+      "score": 0.14652670493094333,
+      "corr": 0.11848747823183481
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4c052569"
+      },
+      "sharpe": 0.08639812491657202,
+      "score": 0.15835080865427212,
+      "corr": 0.12690969401717594
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4c052569"
+      },
+      "sharpe": 0.04928807725065897,
+      "score": 0.14238496557033806,
+      "corr": 0.12705960307943653
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4c052569"
+      },
+      "sharpe": 0.05654192951944625,
+      "score": 0.14581327452097814,
+      "corr": 0.127310724800761
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4c052569"
+      },
+      "sharpe": 0.04881506992873733,
+      "score": 0.14196290829530842,
+      "corr": 0.12659331645634647
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "4c052569"
+      },
+      "sharpe": 0.06544148314578371,
+      "score": 0.1483819659707485,
+      "corr": 0.12659481841196685
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "65d957f0"
+      },
+      "sharpe": 0.08713013211373934,
+      "score": 0.15796782861068648,
+      "corr": 0.12374445063304484
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "65d957f0"
+      },
+      "sharpe": 0.04736677097608751,
+      "score": 0.1414596399036068,
+      "corr": 0.12365172104313309
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "65d957f0"
+      },
+      "sharpe": 0.05617587591493814,
+      "score": 0.14479384646219984,
+      "corr": 0.12428633054881831
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "65d957f0"
+      },
+      "sharpe": 0.04713008818994818,
+      "score": 0.14139327381468358,
+      "corr": 0.12422969685257043
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 12,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "65d957f0"
+      },
+      "sharpe": 0.06607302746064334,
+      "score": 0.1479677655913471,
+      "corr": 0.12392866253603022
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "79be2d81"
+      },
+      "sharpe": 0.08195395761580473,
+      "score": 0.15444853260161107,
+      "corr": 0.11461779801069721
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "79be2d81"
+      },
+      "sharpe": 0.045164007741988824,
+      "score": 0.1372813964334089,
+      "corr": 0.11643491964791189
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "79be2d81"
+      },
+      "sharpe": 0.05410539689216481,
+      "score": 0.141528133009574,
+      "corr": 0.11774087148821435
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "79be2d81"
+      },
+      "sharpe": 0.04637358044460452,
+      "score": 0.1388509459783605,
+      "corr": 0.11942027900777648
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "79be2d81"
+      },
+      "sharpe": 0.06206819327221357,
+      "score": 0.14438944837289697,
+      "corr": 0.11454530165303996
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "dba301b3"
+      },
+      "sharpe": 0.08513698175966428,
+      "score": 0.15643356242457312,
+      "corr": 0.11703681277026089
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "dba301b3"
+      },
+      "sharpe": 0.0447565022326313,
+      "score": 0.1384905846320675,
+      "corr": 0.11964055019720764
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "dba301b3"
+      },
+      "sharpe": 0.05367952839997671,
+      "score": 0.14055931534181695,
+      "corr": 0.11638484206891375
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "dba301b3"
+      },
+      "sharpe": 0.042371533203285225,
+      "score": 0.1360238905022854,
+      "corr": 0.11256139167321388
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "dba301b3"
+      },
+      "sharpe": 0.0635874658905404,
+      "score": 0.14482616599196058,
+      "corr": 0.11714580259204789
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "1a2b6eae"
+      },
+      "sharpe": 0.08560692121662064,
+      "score": 0.15832396158656414,
+      "corr": 0.12343149989778088
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "1a2b6eae"
+      },
+      "sharpe": 0.047384538943904916,
+      "score": 0.1398784297392888,
+      "corr": 0.12425598481452306
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "1a2b6eae"
+      },
+      "sharpe": 0.054895345193501956,
+      "score": 0.14310938366872006,
+      "corr": 0.12423494890534381
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "1a2b6eae"
+      },
+      "sharpe": 0.0471008834707564,
+      "score": 0.1398688229254555,
+      "corr": 0.12420757870195155
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "1a2b6eae"
+      },
+      "sharpe": 0.06449995542385109,
+      "score": 0.1472651762759764,
+      "corr": 0.12409925779130525
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "87d3c144"
+      },
+      "sharpe": 0.08688695404223748,
+      "score": 0.15868352563178917,
+      "corr": 0.12467866156880886
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "87d3c144"
+      },
+      "sharpe": 0.045052489927557844,
+      "score": 0.1393184954307225,
+      "corr": 0.12435633305976024
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "87d3c144"
+      },
+      "sharpe": 0.05454846390286191,
+      "score": 0.1435892508085967,
+      "corr": 0.1253185102655589
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "87d3c144"
+      },
+      "sharpe": 0.045203474403097146,
+      "score": 0.13998307037992397,
+      "corr": 0.12584528130912975
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 21,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "87d3c144"
+      },
+      "sharpe": 0.06487708094722967,
+      "score": 0.14784972676543484,
+      "corr": 0.12444315557255531
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "741d2f8a"
+      },
+      "sharpe": 0.08195395761580476,
+      "score": 0.15444853260161107,
+      "corr": 0.11461779801069726
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "741d2f8a"
+      },
+      "sharpe": 0.045164007741988824,
+      "score": 0.1372813964334089,
+      "corr": 0.11643491964791189
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "741d2f8a"
+      },
+      "sharpe": 0.05410539689216483,
+      "score": 0.141528133009574,
+      "corr": 0.11774087148821435
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "741d2f8a"
+      },
+      "sharpe": 0.04637358044460453,
+      "score": 0.1388509459783605,
+      "corr": 0.11942027900777649
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "741d2f8a"
+      },
+      "sharpe": 0.06206819327221357,
+      "score": 0.14438944837289697,
+      "corr": 0.11454530165303997
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "608d4a58"
+      },
+      "sharpe": 0.08513698175966426,
+      "score": 0.15643356242457312,
+      "corr": 0.11703681277026086
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "608d4a58"
+      },
+      "sharpe": 0.04475650223263131,
+      "score": 0.1384905846320675,
+      "corr": 0.11964055019720761
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "608d4a58"
+      },
+      "sharpe": 0.053679528399976716,
+      "score": 0.14055931534181695,
+      "corr": 0.11638484206891377
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "608d4a58"
+      },
+      "sharpe": 0.04237153320328523,
+      "score": 0.1360238905022854,
+      "corr": 0.11256139167321391
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 2,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "608d4a58"
+      },
+      "sharpe": 0.0635874658905404,
+      "score": 0.14482616599196058,
+      "corr": 0.11714580259204788
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "6aaa5f41"
+      },
+      "sharpe": 0.08560692121662064,
+      "score": 0.15832396158656414,
+      "corr": 0.12343149989778088
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "6aaa5f41"
+      },
+      "sharpe": 0.04738453894390492,
+      "score": 0.1398784297392888,
+      "corr": 0.12425598481452303
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "6aaa5f41"
+      },
+      "sharpe": 0.05489534519350196,
+      "score": 0.14310938366872006,
+      "corr": 0.12423494890534385
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "6aaa5f41"
+      },
+      "sharpe": 0.0471008834707564,
+      "score": 0.1398688229254555,
+      "corr": 0.12420757870195155
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": "sqrt",
+        "model": "random_forest",
+        "_hash": "6aaa5f41"
+      },
+      "sharpe": 0.06449995542385108,
+      "score": 0.1472651762759764,
+      "corr": 0.12409925779130519
+    },
+    {
+      "scenario": "BULL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a203f799"
+      },
+      "sharpe": 0.08688695404223748,
+      "score": 0.15868352563178917,
+      "corr": 0.12467866156880886
+    },
+    {
+      "scenario": "BEAR",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a203f799"
+      },
+      "sharpe": 0.04505248992755786,
+      "score": 0.13931849543072256,
+      "corr": 0.12435633305976032
+    },
+    {
+      "scenario": "HIGH_VOL",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a203f799"
+      },
+      "sharpe": 0.05454846390286191,
+      "score": 0.1435892508085967,
+      "corr": 0.12531851026555885
+    },
+    {
+      "scenario": "CRASH",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a203f799"
+      },
+      "sharpe": 0.045203474403097126,
+      "score": 0.13998307037992394,
+      "corr": 0.12584528130912975
+    },
+    {
+      "scenario": "STABLE",
+      "params": {
+        "trees": 800,
+        "depth": 16,
+        "horizon": 42,
+        "min_samples_split": 10,
+        "max_features": 0.5,
+        "model": "random_forest",
+        "_hash": "a203f799"
+      },
+      "sharpe": 0.06487708094722967,
+      "score": 0.14784972676543484,
+      "corr": 0.12444315557255535
+    }
+  ]
+}

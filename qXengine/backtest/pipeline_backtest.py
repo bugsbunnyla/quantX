@@ -1282,7 +1282,10 @@ class AgenticPipeline:
 
     def __init__(self, data, base_dir="runs"):
         self.data = data
-        self.base_dir = base_dir
+        self.base_dir = base_dir        
+        # ... existing init code ...
+        self.current_run_idx = None
+        self.current_run_dir = None
         self.storage = Storage(base_dir)
         self.split_engine = SplitEngine()
         self.strategy = ProcessEngine()
@@ -1301,6 +1304,7 @@ class AgenticPipeline:
         self.optimized_model_package = None
         self.baseline_val_metrics = None
         self.optimized_val_metrics = None
+
 
         # ... existing init code ...
         
@@ -1565,16 +1569,26 @@ class AgenticPipeline:
         if params is None:
             params = {}
 
+        # === CREATE RUN FOLDER ===
+        self.current_run_idx, run_path = self.storage.create_run()
+        self.current_run_dir = str(run_path)
+        print(f"\n{'='*60}")
+        print(f"PIPELINE RUN {self.current_run_idx:06d}")
+        print(f"Run directory: {self.current_run_dir}")
+        print(f"{'='*60}")
+
         # === PHASE 0: SRFO ONCE ===
-        print("=" * 60)
+        print(f"\n{'='*60}")
         print("PHASE 0: GENERATING SRFO")
-        print("=" * 60)
+        print(f"{'='*60}")
         self._ensure_srfo()
+        self.storage.save(self._Xy_train, f"{self.current_run_dir}/srfo/srfo_train.pkl")
+        self.storage.save(self._Xy_val, f"{self.current_run_dir}/srfo/srfo_val.pkl")
 
         # === PHASE 1: BASELINE ===
-        print("\n" + "=" * 60)
+        print(f"\n{'='*60}")
         print("PHASE 1: BASELINE MODEL")
-        print("=" * 60)
+        print(f"{'='*60}")
         baseline_params = {
             "trees": params.get("trees", 500), "depth": params.get("depth", 12),
             "horizon": params.get("horizon", 21), "min_samples_split": params.get("min_samples_split", 2),
@@ -1582,58 +1596,64 @@ class AgenticPipeline:
         }
         baseline_train = self.strategy.train(self.get_train_package(baseline_params))
         self.baseline_model_package = deepcopy(baseline_train)
-        self.storage.save(self.baseline_model_package, "baseline_model.pkl")
+        self.storage.save(self.baseline_model_package, f"{self.current_run_dir}/baseline/baseline_model.pkl")
 
         baseline_val_pkg = self.get_val_package()
         baseline_signal = self.backtest.signal(self.baseline_model_package, baseline_val_pkg)
         self.baseline_val_metrics = self.backtest.evaluate(baseline_val_pkg, baseline_signal)
         print(f"[BASELINE] Score: {self.baseline_val_metrics.get('score', 0):.4f}")
+        self.storage.save(self.baseline_val_metrics, f"{self.current_run_dir}/baseline/baseline_val_metrics.pkl")
 
-        # === PHASE 2: COMBINATORIAL (SRFO-BASED, FAST) ===
+        # === PHASE 2: COMBINATORIAL ===
         if run_combinatorial:
-            print("\n" + "=" * 60)
+            print(f"\n{'='*60}")
             print("PHASE 2: COMBINATORIAL SEARCH (SRFO-CACHED)")
-            print("=" * 60)
+            print(f"{'='*60}")
             if param_grid is None:
                 param_grid = PARAM_GRID_INSIDE
-            opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=500)
+            opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=100)
             best_params = opt_result["best_params"]
             if best_params:
                 for k in ["trees", "depth", "horizon", "min_samples_split", "max_features", "model"]:
                     if k in best_params:
                         params[k] = best_params[k]
                 print(f"[OPTIMIZER] Best: {best_params}, Resiliency: {opt_result['best_resiliency_score']:.4f}")
+            self.storage.save_json(opt_result, f"{self.current_run_dir}/combinatorial/combinatorial_optimization.json")
 
         # === PHASE 3: OPTIMIZED ===
-        print("\n" + "=" * 60)
+        print(f"\n{'='*60}")
         print("PHASE 3: OPTIMIZED MODEL")
-        print("=" * 60)
+        print(f"{'='*60}")
         opt_train = self.strategy.train(self.get_train_package(params))
         self.optimized_model_package = deepcopy(opt_train)
-        self.storage.save(self.optimized_model_package, "optimized_model.pkl")
+        self.storage.save(self.optimized_model_package, f"{self.current_run_dir}/optimized/optimized_model.pkl")
 
         opt_val_pkg = self.get_val_package()
         opt_signal = self.backtest.signal(self.optimized_model_package, opt_val_pkg)
         self.optimized_val_metrics = self.backtest.evaluate(opt_val_pkg, opt_signal)
         print(f"[OPTIMIZED] Score: {self.optimized_val_metrics.get('score', 0):.4f}")
+        self.storage.save(self.optimized_val_metrics, f"{self.current_run_dir}/optimized/optimized_val_metrics.pkl")
 
-        # === PHASE 4: COMPARE ===
-        print("\n" + "=" * 60)
+        # === PHASE 4: COMPARATOR ===
+        print(f"\n{'='*60}")
         print("PHASE 4: COMPARATOR")
-        print("=" * 60)
+        print(f"{'='*60}")
         comparison = self.comparator.compare_models(
             self.baseline_model_package, self.optimized_model_package,
             self.baseline_val_metrics, self.optimized_val_metrics)
         print(f"[COMPARE] {comparison['rating']['label']} | {comparison['prediction']['recommendation']}")
+        self.storage.save_json(comparison, f"{self.current_run_dir}/comparison/model_comparison.json")
 
-        # === PHASE 5: RESEARCH LOOP (SRFO-BASED) ===
-        print("\n" + "=" * 60)
+        # === PHASE 5: RESEARCH LOOP ===
+        print(f"\n{'='*60}")
         print("PHASE 5: RESEARCH LOOP")
-        print("=" * 60)
+        print(f"{'='*60}")
         previous_val = None
         for i in range(max_iters):
             self.iteration += 1
-            print(f"--- Iteration {self.iteration}/{max_iters} ---")
+            iter_dir = f"{self.current_run_dir}/iter_{self.iteration:02d}"
+            os.makedirs(f"{self.base_dir}/{iter_dir}", exist_ok=True)
+            print(f"\n--- Iteration {self.iteration}/{max_iters} → {iter_dir} ---")
 
             train_pkg = self.strategy.train(self.get_train_package(params))
             val_pkg = self.get_val_package()
@@ -1654,26 +1674,43 @@ class AgenticPipeline:
                 self.best_score = val_metrics.get("score", 0)
                 self.best_model = deepcopy(train_pkg)
 
-            self.research_history.append({
+            research = {
                 "iteration": self.iteration,
                 "train": {k: v for k, v in train_metrics.items() if k not in ["signal", "pnl"]},
                 "validation": {k: v for k, v in val_metrics.items() if k not in ["signal", "pnl"]},
                 "decision": decision
-            })
+            }
+            self.research_history.append(research)
+
+            # Save all iteration artifacts
+            self.storage.save(train_pkg, f"{iter_dir}/train_package.pkl")
+            self.storage.save(val_pkg, f"{iter_dir}/val_package.pkl")
+            self.storage.save(train_signal, f"{iter_dir}/train_signal.pkl")
+            self.storage.save(val_signal, f"{iter_dir}/val_signal.pkl")
+            self.storage.save(train_metrics, f"{iter_dir}/train_metrics.pkl")
+            self.storage.save(val_metrics, f"{iter_dir}/val_metrics.pkl")
+            self.storage.save(research, f"{iter_dir}/research.pkl")
+            self.storage.save_json(research, f"{iter_dir}/research.json")
+            self.storage.save(review, f"{iter_dir}/review.pkl")
+            self.storage.save({"decision": decision}, f"{iter_dir}/eval.pkl")
 
             golive = self.golive.assess(self.research_history, train_pkg)
+            self.storage.save(golive, f"{iter_dir}/golive.pkl")
+            self.storage.save_json(golive, f"{iter_dir}/golive.json")
+
             print(f"Decision: {decision} | GoLive: {golive['stage']}")
 
             if decision == "STOP":
                 break
             if decision == "ACCEPT" and golive["ready"]:
-                self.storage.save(golive.get("deployment_package"), "deployment_package.pkl")
+                self.storage.save(golive.get("deployment_package"), f"{self.current_run_dir}/deployment_package.pkl")
                 break
             if decision == "MUTATE":
                 params = self._apply_mutations(params, review.get("recommendations", []))
 
             previous_val = val_metrics
 
+        # === FINAL SUMMARY ===
         return self._generate_final_summary()
 
     def _apply_mutations(self, params, mutations):
@@ -1692,28 +1729,29 @@ class AgenticPipeline:
 
     def _generate_final_summary(self):
         summary = {
-            "total_iterations": self.iteration, "best_score": self.best_score,
+            "total_iterations": self.iteration,
+            "best_score": self.best_score,
             "research_history": self.research_history,
             "golive_ready": any(r.get("decision") == "ACCEPT" for r in self.research_history),
-            "best_model_path": f"{self.base_dir}/best_model.pkl" if self.best_model else None,
-            "baseline_model_path": f"{self.base_dir}/baseline_model.pkl",
-            "optimized_model_path": f"{self.base_dir}/optimized_model.pkl",
+            "run_idx": self.current_run_idx,
+            "run_dir": self.current_run_dir,
+            "best_model_path": f"{self.current_run_dir}/best_model.pkl" if self.best_model else None,
+            "baseline_model_path": f"{self.current_run_dir}/baseline/baseline_model.pkl",
+            "optimized_model_path": f"{self.current_run_dir}/optimized/optimized_model.pkl",
             "has_baseline": self.baseline_model_package is not None,
             "has_optimized": self.optimized_model_package is not None,
             "comparison_available": self.comparator.comparison_results != {}
         }
         if self.best_model:
-            self.storage.save(self.best_model, "best_model.pkl")
-        self.storage.save_json(summary, "final_summary.json")
-        print(f"{'='*50}FINAL RESEARCH SUMMARY{'='*50}")
+            self.storage.save(self.best_model, f"{self.current_run_dir}/best_model.pkl")
+        self.storage.save_json(summary, f"{self.current_run_dir}/final_summary.json")
+
+        print(f"\n{'='*50}FINAL SUMMARY — RUN {self.current_run_idx:06d}{'='*50}")
+        print(f"Run directory: {self.current_run_dir}")
         print(f"Total iterations: {self.iteration}")
         print(f"Best validation score: {self.best_score:.4f}")
         print(f"GoLive ready: {summary['golive_ready']}")
-        print(f"Baseline model: {summary['has_baseline']}")
-        print(f"Optimized model: {summary['has_optimized']}")
-        print(f"Comparison done: {summary['comparison_available']}")
         return summary
-
 
 # =====================================================
 # DATA LOADER
