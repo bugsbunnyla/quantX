@@ -57,7 +57,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 
 warnings.filterwarnings("ignore")
-
+from ..strategies.FormulaInfo import FormulaInfo
 
 # =====================================================
 # INDUSTRY-CALIBRATED PARAMETER GRIDS
@@ -110,6 +110,75 @@ SCENARIO_CONFIG = {
                "description": "Low signal environment"}
 }
 
+def formula_report( report,  mode="df_multi",  lookup="index",):
+    """
+    Normalize formulaOutput.report() output.
+
+    Parameters
+    ----------
+    report : tuple
+        Expected:
+            (df, df_easy)
+
+    mode : str
+        df_multi -> use MultiIndex dataframe
+        df_easy  -> use flat index dataframe
+
+    lookup : str
+        index   -> metrics are rows
+        columns -> metrics are columns
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+    import pandas as pd
+    # -------------------------------------------------
+    # Unpack report tuple
+    # -------------------------------------------------
+    if (  not isinstance(report, tuple) or len(report) != 2    ):
+        raise ValueError( "report must be tuple(df, df_easy)" )
+    df, df_easy = report
+
+    # -------------------------------------------------
+    # Select format
+    # -------------------------------------------------
+    if mode == "df_multi":
+        result = df
+    elif mode == "df_easy":
+        result = df_easy
+    else:
+        raise ValueError( "mode must be 'df_multi' or 'df_easy'" )
+    if not isinstance(result, pd.DataFrame):
+        raise TypeError( "Selected report is not a DataFrame"  )
+
+    # -------------------------------------------------
+    # Select orientation
+    # -------------------------------------------------
+    if lookup == "index":
+        return result
+    elif lookup == "columns":
+        return result.T
+    elif lookup == "symbol_features":
+        # normalize for ML:
+        # rows    -> symbols
+        # columns -> features
+
+        if isinstance(result.columns, pd.MultiIndex):
+            # df_multi format
+            result = result.copy()
+            result.columns = [
+                f"{a}_{b}" for a, b in result.columns
+            ]
+            return result
+
+        else:
+            # df_easy format:
+            # rows are metrics, columns are symbols
+            return result.T
+
+    else:
+        raise ValueError( "lookup must be 'index' or 'columns'  or 'symbol_features'"  )
 
 # =====================================================
 # STORAGE ENGINE
@@ -165,28 +234,27 @@ class Storage:
 
 """
 class SplitEngine:
-    def split(self, data, split_ratio=0.8):
+    def split(self, data, split_ratio=None):   # ignore ratio for interleaved
         train, val = {}, {}
         for symbol, df in data.items():
             if not isinstance(df, pd.DataFrame):
                 continue
-            if len(df) < 50:
-                split_idx = max(int(len(df) * split_ratio), 10)
-                if split_idx >= len(df) - 5:
-                    split_idx = len(df) // 2
-            else:
-                split_idx = int(len(df) * split_ratio)
-            train[symbol] = df.iloc[:split_idx].copy()
-            val[symbol] = df.iloc[split_idx:].copy()
+            mask_even = np.arange(len(df)) % 2 == 0
+            train[symbol] = df.iloc[mask_even].copy()
+            val[symbol]   = df.iloc[~mask_even].copy()
         return train, val
+
 """
 class SplitEngine:
-
-    def split(self, data):
-        train = copy.deepcopy(data)
-        val = copy.deepcopy(data)
+    def split(self, data, split_ratio=0.5):
+        train, val = {}, {}
+        for symbol, df in data.items():
+            if not isinstance(df, pd.DataFrame):
+                continue
+            split_idx = len(df) // 2
+            train[symbol] = df.iloc[:split_idx].copy()
+            val[symbol]   = df.iloc[split_idx:].copy()
         return train, val
-
 
 
 # =====================================================
@@ -202,24 +270,104 @@ class MLTrainEngine:
         self.label_encoders = {}
 
     def train(self, train_package):
-        X = train_package["X"]
-        y = train_package["y"]
-        self.params = train_package.get("params", {})
-        #print(f"[ML] Dataset: {X.shape}, {y.shape}")
-        if X.shape[0] < 100:
-            print(f"[ML] Dataset: {X.shape}, {y.shape}")
-        X_encoded = self._encode_categoricals(X, fit=True)
-        trained_model, metrics = self.fit(X_encoded, y, self.params)
-        self.model = trained_model
-        self.feature_schema = list(X.columns)
-        return {
-            "model": trained_model, "X": X, "y": y,
-            "features": list(X.columns), "metrics": metrics,
-            "results": train_package.get("results"),
-            "formula_outputs": train_package.get("formula_outputs"),
-            "params": self.params, "label_encoders": self.label_encoders,
-            "scaler": self.scaler
-        }
+    
+     X = train_package["X"].copy()
+     y = train_package["y"].copy()
+
+     print("[DEBUG] X type:", type(X))
+     print("[DEBUG] y type:", type(y))
+
+     print("[DEBUG] X shape:", X.shape)
+     print("[DEBUG] y shape:", y.shape)
+
+     self.params = train_package.get("params", {})
+
+
+    # =====================================================
+    # Force y into single target vector
+    # =====================================================
+
+     if isinstance(y, pd.DataFrame):
+          print( "[ML WARNING] y received as DataFrame:", list(y.columns) )
+          if "y" in y.columns:
+            y = y["y"]
+          else:
+            # fallback: first target column
+            y = y.iloc[:, 0]
+     y = ( pd.Series(y).astype(float).replace([ np.inf,-np.inf ], np.nan ) )
+
+    # =====================================================
+    # Remove invalid targets
+    # =====================================================
+     valid_mask = y.notna()
+     print("X.index =", repr(X.index))
+     print("y.index =", repr(y.index))
+     print("mask.index =", repr(valid_mask.index))
+
+     print("X == y ?", X.index.equals(y.index))
+     print("X == mask ?", X.index.equals(valid_mask.index))
+
+     print("len(X):", len(X))
+     print("len(y):", len(y))
+     X = X.loc[valid_mask]
+     y = y.loc[valid_mask]
+     print(type(valid_mask))
+     print(valid_mask.shape)
+
+     print("X index:", X.index)
+     print("mask index:", valid_mask.index)
+
+     print(valid_mask.head())
+     if len(y) == 0:
+        raise ValueError("No valid training targets after NaN removal"    )
+    # =====================================================
+    # Clean features
+    # =====================================================
+     X = ( X.replace( [ np.inf, -np.inf  ], np.nan).fillna(0)  )
+     print( f"[ML] Dataset AFTER CLEAN: X={X.shape}, y={y.shape}" )
+    # =====================================================
+    # Encode categoricals
+    # =====================================================
+     X_encoded = self._encode_categoricals( X,  fit=True  )
+    # =====================================================
+    # Train
+    # =====================================================
+     trained_model, metrics = self.fit(
+        X_encoded,
+        y,
+        self.params
+       )
+     self.model = trained_model
+     self.feature_schema = list(X.columns   )
+     return {
+        "model": trained_model,
+        "X": X,
+        "y": y,
+        "features": list(X.columns),
+        "metrics": metrics,
+        "results": train_package.get("results"),
+        "formula_outputs": train_package.get("formula_outputs"),
+        "params": self.params,
+        "label_encoders": self.label_encoders,
+        "scaler": self.scaler
+     }
+
+    def extract_metric(df, category, metric):
+      cols = [
+        c for c in df.columns
+        if len(c) >= 3
+        and c[1] == category
+        and c[2] == metric
+      ]
+
+      if not cols:
+        return None
+
+      out = df[cols].copy()
+
+      # keep only symbol names
+      out.columns = [c[0] for c in cols]
+      return out
 
     def build_feature_matrix(self, strategy_results, formula_outputs, raw_data, params=None):
         X, y, feature_names = self.build_features(strategy_results, formula_outputs, raw_data, params or {})
@@ -227,211 +375,318 @@ class MLTrainEngine:
             raise ValueError(f"build_features returned empty feature matrix: X.shape={X.shape}")
         return X, y
 
-    def _lookup_multiindex(self, df, category, metric, case_sensitive=False):
-        if not isinstance(df, pd.DataFrame) or len(df.columns) == 0:
-            return None
-        cat_norm = str(category).lower() if not case_sensitive else str(category)
-        met_norm = str(metric).lower() if not case_sensitive else str(metric)
-        if isinstance(df.columns, pd.MultiIndex):
-            for col in df.columns:
-                if isinstance(col, tuple) and len(col) >= 2:
-                    col_cat = str(col[0]).lower() if not case_sensitive else str(col[0])
-                    col_met = str(col[1]).lower() if not case_sensitive else str(col[1])
-                    if col_cat == cat_norm and col_met == met_norm:
-                        return df[col].copy()
-            return None
-        target_combined = f"{cat_norm}_{met_norm}"
-        for col in df.columns:
-            col_str = str(col).lower()
-            if col_str == target_combined:
-                return df[col].copy()
-            if cat_norm in col_str and met_norm in col_str:
-                return df[col].copy()
+    def _lookup_multiindex(self,df, df_easy, category, metric=None, mode="df_multi", lookup="index", case_sensitive=False,):
+      """
+      Generic report lookup.
+      Parameters
+      ----------
+      df : pd.DataFrame
+        MultiIndex report dataframe.
+      df_easy : pd.DataFrame
+        Flat index dataframe.
+      category : str
+        Category name or full key depending on mode.
+      metric : str, optional
+        Metric name for MultiIndex lookup.
+      mode : str
+        "df_multi" -> use df
+        "df_easy"  -> use df_easy
+      lookup : str
+        "index"   -> lookup rows
+        "columns" -> lookup columns
+      case_sensitive : bool
+      Returns
+      -------
+      pd.Series or None
+      """
+
+      import pandas as pd
+
+      # ----------------------------------------------------
+      # Select dataframe
+      # ----------------------------------------------------
+      if mode == "df_multi":
+        report = df
+      elif mode == "df_easy":
+        report = df_easy
+      else:
+        raise ValueError(
+            "mode must be 'df_multi' or 'df_easy'"
+        )
+      if not isinstance(report, pd.DataFrame) or report.empty:
         return None
 
-    def build_features(self, strategy_results, formula_outputs, raw_data, params=None):
-        frames = []
-        ret_series = None
-        
-        # === Phase 1: Extract features and ret_series from formula_outputs ===
-        if formula_outputs is not None:
-            if isinstance(formula_outputs, pd.DataFrame):
-                formula_outputs = [formula_outputs]
-            for fo in formula_outputs:
-                if not isinstance(fo, pd.DataFrame) or fo.empty:
-                    continue
-                    
-                idx_is_multi = isinstance(fo.index, pd.MultiIndex)
-                col_is_multi = isinstance(fo.columns, pd.MultiIndex)
-                
-                if col_is_multi:
-                    if ret_series is None:
-                        ret_series = self._lookup_multiindex(fo, "market", "ret")
-                    temp = fo.stack(level=[0, 1]).reset_index()
-                    if temp.shape[1] == 3:
-                        temp.columns = ["symbol", "category_metric", "value"]
-                        temp[["category", "metric"]] = temp["category_metric"].str.split("_", n=1, expand=True)
-                        temp = temp.drop(columns=["category_metric"])
-                    elif temp.shape[1] >= 4:
-                        cols = list(temp.columns)
-                        temp.columns = ["symbol", "category", "metric", "value"] + cols[4:]
-                    else:
+      # Normalize
+      cat = str(category)
+      met = None if metric is None else str(metric)
+      if not case_sensitive:
+        cat = cat.lower()
+        if met is not None:
+            met = met.lower()
+
+      # ====================================================
+      # INDEX LOOKUP
+      # ====================================================
+      if lookup == "index":
+
+        # -----------------------------------------------
+        # df_multi:
+        #
+        # df.index:
+        #   ('market','price')
+        # -----------------------------------------------
+        if mode == "df_multi":
+            if isinstance(report.index, pd.MultiIndex):
+                for idx in report.index:
+                    if len(idx) < 2:
                         continue
-                    temp["feature"] = "fo_" + temp["category"].astype(str) + "_" + temp["metric"].astype(str)
-                    formula_df = temp.pivot_table(index="symbol", columns="feature", values="value", aggfunc="last").reset_index()
-                    formula_df = formula_df.drop(columns=["fo_market_ret"], errors="ignore")
-                    if not formula_df.empty:
-                        frames.append(formula_df)
-                        
-                elif idx_is_multi:
-                    if ret_series is None:
-                        for idx in fo.index:
-                            if isinstance(idx, tuple) and len(idx) >= 2:
-                                if str(idx[1]).lower() == "ret":
-                                    ret_series = fo.loc[idx]
-                                    if isinstance(ret_series, pd.DataFrame):
-                                        ret_series = ret_series.iloc[:, 0]
-                                    break
-                    for idx in fo.index:
-                        if isinstance(idx, tuple) and len(idx) >= 2:
-                            cat, metric = idx[0], idx[1]
-                        else:
-                            continue
-                        if str(metric).lower() == "ret":
-                            continue
-                        col_name = f"fo_{cat}_{metric}"
-                        series = fo.loc[idx]
-                        if isinstance(series, pd.DataFrame):
-                            series = series.iloc[:, 0]
-                        if not isinstance(series, pd.Series):
-                            continue
-                        feat_rows = []
-                        for symbol, value in series.items():
-                            if pd.isna(value):
-                                continue
-                            feat_rows.append({"symbol": str(symbol), col_name: value})
-                        if feat_rows:
-                            frames.append(pd.DataFrame(feat_rows))
-                            
-                else:
-                    # Simple DataFrames
-                    fo_cols_lower = {str(c).lower(): c for c in fo.columns}
-                    ret_col = None
-                    for key in ["ret", "return", "returns", "y", "target"]:
-                        if key in fo_cols_lower:
-                            ret_col = fo_cols_lower[key]
-                            break
-                    
-                    symbol_col = None
-                    for key in ["symbol", "ticker", "asset", "name"]:
-                        if key in fo_cols_lower:
-                            symbol_col = fo_cols_lower[key]
-                            break
-                    
-                    if ret_col is not None:
-                        if symbol_col is not None:
-                            ret_series = fo.set_index(symbol_col)[ret_col]
-                        else:
-                            ret_series = fo[ret_col]
-                            if not isinstance(ret_series.index, pd.MultiIndex):
-                                ret_series.index.name = "symbol"
-                    
-                    feature_cols = [c for c in fo.columns if c not in [ret_col, symbol_col] and c is not None]
-                    if feature_cols and symbol_col is not None:
-                        formula_df = fo[[symbol_col] + feature_cols].copy()
-                        formula_df.columns = ["symbol"] + [f"fo_{c}" for c in feature_cols]
-                        frames.append(formula_df)
-                    elif feature_cols and len(fo) > 0:
-                        formula_df = fo[feature_cols].copy()
-                        formula_df = formula_df.reset_index()
-                        if formula_df.columns[0] != "symbol":
-                            formula_df.columns = ["symbol"] + list(formula_df.columns[1:])
-                        rename_map = {c: f"fo_{c}" for c in feature_cols if c in formula_df.columns}
-                        formula_df = formula_df.rename(columns=rename_map)
-                        frames.append(formula_df)
-        
-        # === Phase 2: Strategy results ===
-        sr_idx = 0
-        for result in strategy_results or []:
-            if getattr(result, "metrics", None):
-                rows = []
-                for symbol, values in result.metrics.items():
-                    if isinstance(values, dict):
-                        row = {"symbol": symbol}
-                        for k, v in values.items():
-                            row[f"sr_{k}"] = v
-                        rows.append(row)
-                if rows:
-                    frames.append(pd.DataFrame(rows))
-            if getattr(result, "signals", None):
-                signal_df = pd.DataFrame([{"symbol": symbol, f"sr_signal_{sr_idx}": signal} for symbol, signal in result.signals.items()])
-                frames.append(signal_df)
-                sr_idx += 1
-        
-        if not frames:
-            raise ValueError("No features generated from formula outputs or strategy results")
-            
-        feature_df = frames[0]
-        for frame in frames[1:]:
-            feature_df = feature_df.merge(frame, on="symbol", how="outer")
-            
-        # === Phase 3: Clean ret_series ONCE ===
-        if ret_series is None:
-            raise ValueError("Missing target variable ('ret'/'return'/'y') in formula outputs")
+                    idx_cat = str(idx[0])
+                    idx_met = str(idx[1])
+                    if not case_sensitive:
+                        idx_cat = idx_cat.lower()
+                        idx_met = idx_met.lower()
+                    if idx_cat == cat and idx_met == met:
+                        return report.loc[idx].copy()
+                return None
 
-        # Ensure it's a clean Series
-        if isinstance(ret_series, pd.DataFrame):
-            ret_series = ret_series.iloc[:, 0]
-        ret_series = pd.Series(ret_series).squeeze()
-        
-        # Flatten MultiIndex if needed
-        if isinstance(ret_series.index, pd.MultiIndex):
-            level_names = ret_series.index.names
-            if len(level_names) >= 2 and any('symbol' in str(n).lower() for n in level_names if n):
-                symbol_level = next(i for i, n in enumerate(level_names) if n and 'symbol' in str(n).lower())
-                ret_series = ret_series.reset_index(level=symbol_level, drop=False)
-                if isinstance(ret_series, pd.DataFrame):
-                    ret_series = ret_series.iloc[:, 0]
-            else:
-                ret_series = ret_series.reset_index(level=0)
-                if isinstance(ret_series, pd.DataFrame):
-                    ret_series = ret_series.iloc[:, 0]
-            ret_series = pd.Series(ret_series).squeeze()
-        
-        # Name index
-        if ret_series.index.name is None or ret_series.index.name == "":
-            ret_series.index.name = "symbol"
-        
-        # Drop NaN targets
-        ret_series = ret_series.dropna()
-        if len(ret_series) == 0:
-            raise ValueError("ret_series contains all NaN values after extraction")
-            
-        # === Phase 4: Build y_df and merge ONCE ===
-        y_df = ret_series.rename_axis("symbol").reset_index(name="y")
-        
-        feature_df = feature_df.merge(y_df, on="symbol", how="inner")
-        if len(feature_df) == 0:
-            f_syms = set(feature_df["symbol"].astype(str).unique()) if "symbol" in feature_df.columns else set()
-            y_syms = set(y_df["symbol"].astype(str).unique())
-            overlap = f_syms & y_syms
-            raise ValueError(
-                f"Merge produced 0 rows. Feature symbols: {len(f_syms)}, "
-                f"Target symbols: {len(y_syms)}, Overlap: {len(overlap)}. "
-                f"Sample feature: {list(f_syms)[:3]}, Sample target: {list(y_syms)[:3]}"
-            )
-        
-        feature_df = feature_df.dropna(subset=["y"])
-        if len(feature_df) == 0:
-            raise ValueError(f"All {len(y_df)} rows dropped: y contains all NaN after merge")
-            
-        # === Phase 5: Extract X, y ===
-        y = feature_df["y"]
-        X = feature_df.drop(columns=["symbol", "y"], errors="ignore")
-        X = self.encode_features(X)
-        X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
-        return X, y, list(X.columns)
+        # -----------------------------------------------
+        # df_easy:
+        #
+        # df_easy.index:
+        #   market_price
+        # -----------------------------------------------
+        elif mode == "df_easy":
+            target = cat
+            if met is not None:
+                target = f"{cat}_{met}"
+            for idx in report.index:
+                idx_val = str(idx)
+                if not case_sensitive:
+                    idx_val = idx_val.lower()
+                if idx_val == target:
+                    return report.loc[idx].copy()
+            return None
 
+      # ====================================================
+      # COLUMN LOOKUP (legacy support)
+      # ====================================================
+      elif lookup == "columns":
+        if isinstance(report.columns, pd.MultiIndex):
+            for col in report.columns:
+                if len(col) < 2:
+                    continue
+                col_cat = str(col[0])
+                col_met = str(col[1])
+                if not case_sensitive:
+                    col_cat = col_cat.lower()
+                    col_met = col_met.lower()
+                if col_cat == cat and col_met == met:
+                    return report[col].copy()
+            return None
+        else:
+            target = cat
+            if met is not None:
+                target = f"{cat}_{met}"
+            for col in report.columns:
+                col_val = str(col)
+                if not case_sensitive:
+                    col_val = col_val.lower()
+                if col_val == target:
+                    return report[col].copy()
+            return None
+      else:
+        raise ValueError(
+            "lookup must be 'index' or 'columns'"
+        )
+    def build_features(self, strategy_results, formula_outputs, raw_data, params=None):
+  
+      frames = []
+      ret_series = None
+  
+      # =====================================================
+      # PHASE 0 — Diagnostic
+      # =====================================================
+      print(
+          f"[FEATURE BUILD] "
+          f"strategy_results={len(strategy_results or [])}, "
+          f"formula_outputs={len(formula_outputs or [])}, "
+          f"raw_data={'YES' if raw_data is not None else 'NO'}"
+      )
+  
+      if strategy_results and formula_outputs:
+          print("[FEATURE BUILD] Mode: PURE SRFO (strategies + formula outputs)")
+      elif formula_outputs:
+          print("[FEATURE BUILD] Mode: FORMULA OUTPUT ONLY")
+      elif raw_data is not None:
+          print("[FEATURE BUILD] Mode: RAW/FALLBACK FEATURE BUILD")
+      else:
+          print("[FEATURE BUILD] Mode: UNKNOWN")
+  
+      # =====================================================
+      # PHASE 1
+      # Formula outputs from report()
+      #
+      # Structure:
+      #   index   = symbol
+      #   columns = MultiIndex(category, metric)
+      # =====================================================
+      if formula_outputs is not None:
+  
+          if isinstance(formula_outputs, pd.DataFrame):
+              formula_outputs = [formula_outputs]
+          elif isinstance(formula_outputs, tuple):
+              formula_outputs = list(formula_outputs)
+  
+          for fo in formula_outputs:
+              if not isinstance(fo, pd.DataFrame):
+                  continue
+              if fo.empty:
+                  continue
+  
+              fo_df = formula_report(
+                  fo,
+                  mode="df_multi",
+                  lookup="columns",
+              )
+  
+              if not isinstance(fo_df, pd.DataFrame):
+                  continue
+              if fo_df.empty:
+                  continue
+  
+              # -------------------------------------------------
+              # REPORT FORMAT
+              #   index   = symbol
+              #   columns = MultiIndex(category, metric)
+              # -------------------------------------------------
+              if isinstance(fo_df.columns, pd.MultiIndex):
+  
+                  feature_df = fo_df.copy()
+  
+                  # extract target (only once)
+                  if ret_series is None:
+                      if ("market", "ret") in feature_df.columns:
+                          ret_series = feature_df[("market", "ret")].copy()
+  
+                  # flatten columns
+                  feature_df.columns = [
+                      f"fo_{c[0]}_{c[1]}"
+                      for c in feature_df.columns
+                  ]
+                  feature_df.index.name = "symbol"
+                  feature_df = feature_df.reset_index()
+  
+                  # remove target
+                  feature_df = feature_df.drop(
+                      columns=["fo_market_ret"],
+                      errors="ignore"
+                  )
+                  frames.append(feature_df)
+  
+      # =====================================================
+      # PHASE 2
+      # Strategy Results
+      # =====================================================
+      for idx, result in enumerate(strategy_results or []):
+  
+          metrics = getattr(result, "metrics", None)
+  
+          if isinstance(metrics, dict):
+  
+              rows = []
+              for symbol, values in metrics.items():
+                  if isinstance(values, dict):
+                      row = {"symbol": symbol}
+                      for k, v in values.items():
+                          row[f"sr_{k}"] = v
+                      rows.append(row)
+  
+              if rows:
+                  frames.append(pd.DataFrame(rows))
+  
+          signals = getattr(result, "signals", None)
+  
+          if signals:
+              frames.append(
+                  pd.DataFrame([
+                      {"symbol": s, f"signal_{idx}": v}
+                      for s, v in signals.items()
+                  ])
+              )
+  
+      if not frames:
+          raise ValueError("No features generated")
+  
+      # =====================================================
+      # PHASE 3
+      # Merge features
+      # =====================================================
+      feature_df = frames[0]
+  
+      for df in frames[1:]:
+          feature_df = feature_df.merge(
+              df,
+              on="symbol",
+              how="outer"
+          )
+  
+      # =====================================================
+      # PHASE 4
+      # Clean target
+      # =====================================================
+      if ret_series is None:
+          raise ValueError("Missing market.ret target")
+  
+      if isinstance(ret_series, pd.DataFrame):
+          ret_series = ret_series.iloc[:, 0]
+  
+      ret_series = (
+          pd.Series(ret_series)
+          .astype(float)
+          .replace([np.inf, -np.inf], np.nan)
+          .dropna()
+      )
+  
+      if ret_series.empty:
+          raise ValueError("market.ret contains only NaN")
+  
+      ret_series.index = ret_series.index.astype(str)
+      ret_series.index.name = "symbol"
+  
+      # =====================================================
+      # PHASE 5
+      # Join X / y
+      # =====================================================
+      y_df = ret_series.rename("y").reset_index()
+  
+      feature_df["symbol"] = feature_df["symbol"].astype(str)
+      y_df["symbol"] = y_df["symbol"].astype(str)
+  
+      feature_df = feature_df.merge(
+          y_df,
+          on="symbol",
+          how="inner"
+      )
+  
+      if feature_df.empty:
+          raise ValueError("No symbol overlap between features and target")
+  
+      y = feature_df["y"]
+  
+      X = feature_df.drop(
+          columns=["symbol", "y"],
+          errors="ignore"
+      )
+  
+      X = self.encode_features(X)
+  
+      X = (
+          X
+          .replace([np.inf, -np.inf], np.nan)
+          .fillna(0)
+      )
+  
+      return X, y, list(X.columns)
     def _encode_categoricals(self, X, fit=True):
         X_encoded = X.copy()
         for col in X_encoded.columns:
@@ -449,34 +704,108 @@ class MLTrainEngine:
                     else:
                         X_encoded[col] = 0
         return X_encoded
-
     def fit(self, X, y, params=None):
+       if params is None:
+          params = {}
+
+       # no internal split - caller controls train/validation
+       X_train = X
+       y_train = y
+
+       model_type = params.get("model", "random_forest")
+       n_jobs = params.get("n_jobs", -1)
+
+       if model_type == "random_forest":
+        model = RandomForestRegressor(
+            n_estimators=params.get("trees", 500),
+            max_depth=params.get("depth", 12),
+            min_samples_split=params.get("min_samples_split", 2),
+            max_features=params.get("max_features", "sqrt"),
+            random_state=42,
+            n_jobs=n_jobs
+        )
+
+       elif model_type == "gradient_boosting":
+         model = GradientBoostingRegressor(
+            n_estimators=params.get("trees", 500),
+            max_depth=params.get("depth", 6),
+            min_samples_split=params.get("min_samples_split", 2),
+            max_features=params.get("max_features", "sqrt"),
+            random_state=42
+         )
+       elif model_type == "ridge":
+          model = Ridge(alpha=1.0)
+       else:
+         model = RandomForestRegressor(
+            n_estimators=params.get("trees", 500),
+            max_depth=params.get("depth", 12),
+            random_state=42,
+            n_jobs=n_jobs
+         )
+       model.fit(X_train, y_train)
+
+       # evaluate on training data because no split here
+       pred = model.predict(X_train)
+
+       metrics = {
+        "rmse": float(np.sqrt(mean_squared_error(y_train, pred))),
+        "r2": float(r2_score(y_train, pred)),
+        "samples": len(X_train),
+        "features": len(X_train.columns),
+        "model_type": model_type
+       }
+
+       return {
+        "model": model,
+        "features": list(X.columns),
+        "metrics": metrics
+       }, metrics
+
+    def fit0(self, X, y, params=None):
         if params is None:
             params = {}
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        # dont split and just use val set
+        X_train = X
+        y_train = y
         model_type = params.get("model", "random_forest")
+        n_jobs = params.get("n_jobs", -1)   # ← allow override
+
         if model_type == "random_forest":
             model = RandomForestRegressor(
-                n_estimators=params.get("trees", 500), max_depth=params.get("depth", 12),
+                n_estimators=params.get("trees", 500),
+                max_depth=params.get("depth", 12),
                 min_samples_split=params.get("min_samples_split", 2),
-                max_features=params.get("max_features", "sqrt"), random_state=42, n_jobs=-1)
+                max_features=params.get("max_features", "sqrt"),
+                random_state=42,
+                n_jobs=n_jobs          # ← use param instead of hardcoded -1
+            )
         elif model_type == "gradient_boosting":
             model = GradientBoostingRegressor(
-                n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
+                n_estimators=params.get("trees", 500),
+                max_depth=params.get("depth", 6),
                 min_samples_split=params.get("min_samples_split", 2),
-                max_features=params.get("max_features", "sqrt"), random_state=42)
+                max_features=params.get("max_features", "sqrt"),
+                random_state=42
+            )
         elif model_type == "ridge":
             model = Ridge(alpha=1.0, random_state=42)
         else:
             model = RandomForestRegressor(
-                n_estimators=params.get("trees", 500), max_depth=params.get("depth", 12),
-                random_state=42, n_jobs=-1)
+                n_estimators=params.get("trees", 500),
+                max_depth=params.get("depth", 12),
+                random_state=42,
+                n_jobs=n_jobs
+            )
+
         model.fit(X_train, y_train)
         pred = model.predict(X_test)
         metrics = {
             "rmse": float(np.sqrt(mean_squared_error(y_test, pred))),
             "r2": float(r2_score(y_test, pred)),
-            "samples": len(X), "features": len(X.columns), "model_type": model_type
+            "samples": len(X),
+            "features": len(X.columns),
+            "model_type": model_type
         }
         return {"model": model, "features": list(X.columns), "metrics": metrics}, metrics
 
@@ -506,6 +835,7 @@ class ProcessEngine:
         if not isinstance(train_package, dict):
             raise TypeError("ProcessEngine.train expects package dict")
         print("[PROCESS] Training package received, keys:", train_package.keys())
+        
         required = ["X", "y", "results", "formula_outputs"]
         for key in required:
             if key not in train_package:
@@ -622,35 +952,262 @@ class BacktestEngine:
         return prediction
 
     def evaluate(self, package, signal):
-        if "y" not in package:
-            raise KeyError("Package missing y")
-        y = np.asarray(package["y"], dtype=float).ravel()
-        signal = np.asarray(signal, dtype=float).ravel()
-        # EMPTY GUARD
-        if len(signal) == 0:
-            return {"hit": 0.0, "sharpe": 0.0, "cvar": 0.0, "corr": 0.0, "r2": 0.0,
-                    "t_beta": 0.0, "score": 0.0, "signal": signal, "pnl": np.array([])}
-        if len(signal) != len(y):
-            raise ValueError(f"Signal length {len(signal)} != target length {len(y)}")
-        pnl = signal * y
-        hit = np.mean(np.sign(signal) == np.sign(y))
-        sharpe = np.mean(pnl) / (np.std(pnl) + 1e-9)
-        var = np.percentile(pnl, 5)
-        tail = pnl[pnl <= var]
-        cvar = tail.mean() if len(tail) > 0 else 0
-        if np.std(signal) == 0 or np.std(y) == 0:
-            corr = 0
-        else:
-            corr = np.corrcoef(signal, y)[0, 1]
-        slope, intercept, r, _, stderr = stats.linregress(signal, y)
-        r2 = r * r
-        t_beta = slope / (stderr + 1e-9)
-        score = 0.4 * sharpe + 0.2 * corr + 0.2 * hit + 0.2 * r2
-        return {
-            "hit": float(hit), "sharpe": float(sharpe), "cvar": float(cvar),
-            "corr": float(corr), "r2": float(r2), "t_beta": float(t_beta),
-            "score": float(score), "signal": signal, "pnl": pnl
-        }
+          """
+          Collect precomputed metrics.
+
+          Priority:
+            1. formula_outputs -> formula_report()
+            2. fallback -> X dataframe (_build_raw output)
+
+          Returns scalar metrics required by SRFO.
+          """
+
+          metric_map = {
+              "alpha": "alpha_alpha",
+              "beta": "alpha_beta",
+              "ret": "market_ret",
+              "corr": "basic_corr",
+              "hit": "basic_hit_ratio",
+              "tstat": "basic_tstat",
+              "turnover": "execution_turnover",
+              "tcost": "execution_transaction_cost",
+              "ic": "intel_ic",
+              "volatility": "risk_volatility",
+              "cvar": "risk_cvar",
+              "sharpe": "risk_sharpe",
+              "drawdown": "risk_drawdown",
+              "max_drawdown": "risk_max_drawdown",
+              "score": "decision_score",
+              "signal": "decision_psignal",
+          }
+
+
+          metrics = {}
+
+
+          # =====================================================
+          # PATH 1: formula_outputs -> formula_report
+          # =====================================================
+
+          formula_outputs = package.get("formula_outputs", [])
+
+
+          if formula_outputs:
+
+              for fo in formula_outputs:
+
+                  if not hasattr(fo, "reporting"):
+                      continue
+
+
+                  try:
+                      report_out = fo.reporting()
+
+                      report = formula_report(
+                          report_out,
+                          mode="df_multi",
+                          lookup="columns",
+                      )
+
+                  except Exception:
+                      continue
+
+
+                  if not isinstance(report, pd.DataFrame):
+                      continue
+
+                  if report.empty:
+                      continue
+
+                  if not isinstance(report.columns, pd.MultiIndex):
+                      continue
+
+
+                  for col in report.columns:
+
+                      # FormulaOutput.reporting()
+                      # columns are (category, metric)
+
+                      if isinstance(col, tuple) and len(col) == 2:
+                          source_key = f"{col[0]}_{col[1]}".lower()
+                      else:
+                          source_key = str(col).lower()
+
+
+                      for output_key, lookup_key in metric_map.items():
+
+                          if source_key != lookup_key.lower():
+                              continue
+
+
+                          value = report[col]
+
+
+                          # symbol series -> scalar
+                          if isinstance(value, pd.Series):
+
+                              value = (
+                                  value
+                                  .replace([np.inf, -np.inf], np.nan)
+                                  .dropna()
+                              )
+
+
+                              if value.empty:
+                                  continue
+
+
+                              value = value.mean()
+
+
+                          if pd.isna(value):
+                              continue
+
+
+                          try:
+                              metrics[output_key] = float(value)
+
+                          except Exception:
+                              pass
+
+
+
+          # =====================================================
+          # PATH 2: fallback from X after _build_raw
+          # =====================================================
+
+          X = package.get("X")
+
+
+          if isinstance(X, pd.DataFrame):
+
+              for output_key, column_name in metric_map.items():
+
+                  # preserve formula_report values
+                  if output_key in metrics:
+                      continue
+
+
+                  if column_name not in X.columns:
+                      continue
+
+
+                  value = (
+                      X[column_name]
+                      .replace([np.inf, -np.inf], np.nan)
+                      .dropna()
+                  )
+
+
+                  if value.empty:
+                      continue
+
+
+                  # symbol metrics -> portfolio scalar
+                  metrics[output_key] = float(value.mean())
+
+
+
+          # =====================================================
+          # FINAL VALIDATION
+          # =====================================================
+
+          if "score" not in metrics:
+              print(
+                  "[EVALUATE] Missing score. "
+                  f"Available metrics={list(metrics.keys())}"
+              )
+
+          return metrics
+    def evaluate0(self, package, signal):
+      """
+      Collect precomputed metrics.
+      No calculations. No failures for missing metrics.
+      """
+      metric_map = {
+        "alpha": "alpha_alpha",
+        "beta": "alpha_beta",
+        "ret" : "market_ret",
+        "corr": "basic_corr",
+        "hit": "basic_hitratio",
+        "tstat": "basic_tstat",
+        "turnover": "execution_turnover",
+        "tcost": "execution_transaction_cost",
+        "ic": "intel_ic",
+        "volatility": "risk_volatility",
+        "cvar": "risk_cvar",
+        "sharpe": "risk_sharpe",
+        "drawdown": "risk_drawdown",
+        "max_drawdown": "risk_max_drawdown",
+        "score": "decision_score",
+        "signal": "decision_psignal",
+      }
+      metrics = {}
+      formula_outputs = package.get("formula_outputs", [])
+      if not formula_outputs:
+        print("WARN: Missing formula_outputs")
+        return metrics
+
+      for fo in formula_outputs:
+        if not hasattr(fo, "reporting"):
+            continue
+        try:
+          report_out = fo.reporting()
+          report = formula_report(
+                report_out,
+                mode="df_multi",
+                lookup="columns",
+          )
+        except Exception:
+            continue
+        if not isinstance(report, pd.DataFrame):
+            continue
+        if report.empty:
+            continue
+        if not isinstance( report.columns, pd.MultiIndex  ):
+            continue
+        # =============================================
+        # Extract metrics
+        # =============================================
+        for col in report.columns:
+            if ( isinstance(col, tuple) and len(col) == 2  ):
+                source_key = (  f"{col[0]}_{col[1]}".lower() )
+            else:
+                source_key = (  str(col).lower() )
+        for col in report.columns:
+            # FormulaOutput.reporting() uses MultiIndex(category, metric)
+            if isinstance(col, tuple) and len(col) == 2:
+                source_key = f"{col[0]}_{col[1]}"
+            else:
+                source_key = str(col)
+            for output_key, lookup_key in metric_map.items():
+                if source_key != lookup_key.lower():
+                    continue
+                value = report[col]
+                # -----------------------------------------
+                # report[col] is usually:
+                #
+                # index = symbol
+                # value = metric value
+                #
+                # Take first valid observation
+                # -----------------------------------------
+                if isinstance( value, pd.Series ):
+                    valid = ( value.dropna() )
+                    if valid.empty:
+                        continue
+                    value = valid.iloc[0]
+                if pd.isna(value):
+                    continue
+                try:
+                    metrics[output_key] = float(value)
+                except Exception:
+                    pass
+      # preserve signal output
+      #metrics["signal"] = signal
+
+      return metrics
+      
 
 
 # =====================================================
@@ -888,12 +1445,15 @@ class CombinatorialScenarioOptimizer:
             formula_outputs = []
             for s in engine.strategy:
                 if hasattr(s, "formulaOutput"):
-                    formula_outputs.append(s.formulaOutput.report())
+                    #formula_outputs.append(s.formulaOutput.reporting())
+                    report_out = formula_output.reporting()
+                    report = formula_report( report_out,mode="df_easy",lookup="index",  )
+                    formula_outputs.append(  report )
             ml = MLTrainEngine()
             X, y = ml.build_feature_matrix(strategy_results=engine.results, formula_outputs=formula_outputs, raw_data=stressed_data)
         except Exception as e:
             ml = MLTrainEngine()
-            X, y = self._build_features_from_raw(stressed_data)
+            X,y = self._build_features_from_raw(stressed_data)
         if X.shape[0] == 0 or len(y) == 0:
             return None
         package = {"X": X, "y": y, "features": list(X.columns)}
@@ -903,6 +1463,38 @@ class CombinatorialScenarioOptimizer:
                 "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]}
 
     def _build_features_from_raw(self, data):
+        """
+        Fallback feature builder.
+
+        Returns a DataFrame with MultiIndex columns
+        (category, metric) so build_features() can
+        flatten them to fo_category_metric and extract
+        the ("market", "ret") target.
+        Build fallback features using FormulaInfo and the
+        same ML feature parser used by the SRFO engine.
+        """
+        run_fo = FormulaInfo(data)
+        # Generate assembled formula output
+        assemble = run_fo.assemble()
+        foreport_out = formula_output.reporting()
+        formula_outputs = formula_report( foreport_out,mode="df_easy",lookup="index",  )
+
+        # Apply SRFO unique namespace
+        #formula_outputs = [
+        #   SRFORegistry.wrap_formula_output(assemble)
+        #]
+
+        # Use same parser as SRFO engine
+        ml = MLTrainEngine()
+        X, y = ml.build_feature_matrix(
+          strategy_results=[],
+          formula_outputs=formula_outputs,
+          raw_data=data,
+        )
+
+        return X, y
+
+    def _build_features_from_raw0(self, data):
         rows, targets = [], []
         for symbol, df in data.items():
             if not isinstance(df, pd.DataFrame) or len(df) < 30:
@@ -914,6 +1506,7 @@ class CombinatorialScenarioOptimizer:
                 ret = close.pct_change().dropna()
                 if len(ret) < 5:
                     continue
+                """
                 features = {
                     "symbol": symbol, "market_price": close.iloc[-1],
                     "market_volume": volume.iloc[-1] if len(volume) > 0 else 0,
@@ -932,6 +1525,61 @@ class CombinatorialScenarioOptimizer:
                     "transform_tanh": np.tanh(ret.iloc[-1]),
                     "transform_detrend": close.iloc[-1] - close.rolling(20).mean().iloc[-1],
                     "market_symbol": symbol,
+                }
+                """
+                # After building rpt with MultiIndex columns, flatten them:
+                formulaOutput.columns = ['_'.join(col).strip('_') for col in formulaOutput.columns.values]
+
+                # Now each row is a plain Series with attribute access
+                for symbol in formulaOutput.index:
+                  ffo = formulaOutput.loc[symbol]
+
+                  features = {
+                  "symbol": ffo.market_symbol,
+                  "market_price": ffo.market_price,
+                  "market_volume": ffo.market_volume,
+        
+                  "market_structure_liq_adj_vol": ffo.market_structure_liq_adj_vol,
+                  "market_structure_regime": ffo.market_structure_regime,
+        
+                  "risk_volatility": ffo.risk_volatility,
+                  "risk_sharpe": ffo.risk_sharpe,
+                  "risk_drawdown": ffo.risk_drawdown,
+                  "risk_cvar": ffo.risk_cvar,
+                  "risk_max_drawdown" : ffo.risk_max_drawdown,
+        
+                  "alpha_pure": ffo.alpha_pure,
+                  "alpha_ts": ffo.alpha_ts,
+                  "alpha_beta": ffo.alpha_beta,
+                  "alpha_residual": ffo.alpha_residual,
+                  "alpha_xs": ffo.alpha_xs,
+         
+                  "transform_zscore": ffo.transform_zscore,
+                  "transform_rank": ffo.transform_rank,
+                  "transform_winsor": ffo.transform_winsor,
+                  "transform_tanh": ffo.transform_tanh,
+                  "transform_detrend": ffo.transform_detrend,
+        
+                  "portfolio_entropy": ffo.portfolio_entropy,
+                  "portfolio_inv_vol": ffo.portfolio_inv_vol,
+                  "portfolio_kelly": ffo.portfolio_kelly,
+                  "portfolio_mvo": ffo.portfolio_mvo,
+                  "portfolio_risk_parity": ffo.portfolio_risk_parity,
+                  "portfolio_weight": ffo.portfolio_weight,
+        
+                  "intel_ic": ffo.intel_ic,
+        
+                  "execution_impact": ffo.execution_impact,
+                  "execution_slippage": ffo.execution_slippage,
+                  "execution_turnover": ffo.execution_turnover,
+        
+                  "decision_score": ffo.decision_score,
+                  "decision_signal": ffo.decision_signal,
+        
+                  "basic_corr": ffo.basic_corr,
+                  "basic_hit_ratio": ffo.basic_hit_ratio,
+                  "basic_r_squared": ffo.basic_r_squared,
+                  "basic_tstat": ffo.basic_tstat,
                 }
                 defaults = ["basic_corr", "basic_hit_ratio", "basic_r_squared", "basic_tstat",
                             "decision_score", "decision_signal", "execution_impact",
@@ -1273,7 +1921,110 @@ class TrueValidationEngine:
         self.validation_history.append(result)
         return result
 
+# =====================================================
+# SRFO static registry of sr and fo instances
+# =====================================================
+class SRFORegistry:
+    """
+    SRFO uniqueness manager.
 
+    Purpose:
+    - Assign unique IDs to formulaOutput instances.
+    - Prevent duplicate report column names.
+    - No object storage.
+    - No caching.
+    - Objects live only in the current pipeline scope.
+    """
+    _counter = 0
+
+    @classmethod
+    def reset(cls):
+        """
+        Reset namespace for a new SRFO generation.
+        """
+        cls._counter = 0
+    @classmethod
+    def next_id(cls):
+        """
+        Generate unique formulaOutput namespace.
+        """
+        cls._counter += 1
+        return f"fo_{cls._counter}"
+    @classmethod
+    def collect_formula_outputs(cls, strategies, reset=False):
+        """
+        Collect formulaOutput objects and assign unique IDs.
+        Returns:
+           [
+                {
+                    "id": "fo_1",
+                    "strategy_id": 1,
+                    "object": formulaOutput
+                }
+            ]
+        """
+
+        if reset:
+            cls.reset()
+        outputs = []
+        for idx, strategy in enumerate(strategies, start=1):
+            fo = getattr(
+                strategy,
+                "formulaOutput",
+                getattr(strategy, "formula_output", None)
+            )
+            if fo is None:
+                continue
+            outputs.append(
+                {
+                    "id": cls.next_id(),
+                    "strategy_id": idx,
+                    "object": fo
+                }
+            )
+        return outputs
+
+    @classmethod
+    def wrap_formula_output(cls, fo, strategy_id=None):
+        """
+        Used for raw FormulaInfo fallback path.
+        """
+        return {
+            "id": cls.next_id(),
+            "strategy_id": strategy_id,
+            "object": fo
+        }
+
+    @classmethod
+    def reports(cls, formula_outputs):
+        """
+        Convert formulaOutput.report() into uniquely named feature frames.
+        Each report receives:
+            fo_1_market_price
+            fo_2_market_price
+            ...
+
+        preventing merge collisions.
+        """
+        reports = []
+        for item in formula_outputs:
+            fo_id = item["id"]
+            fo = item["object"]
+            if not hasattr(fo, "reporting"):
+                continue
+            df = fo.reporting().copy()
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [
+                    f"{fo_id}_{c[0]}_{c[1]}"
+                    for c in df.columns
+                ]
+            else:
+                df.columns = [
+                    f"{fo_id}_{c}"
+                    for c in df.columns
+                ]
+            reports.append(df)
+        return reports
 # =====================================================
 # AGENTIC PIPELINE (MAIN ORCHESTRATOR)
 # =====================================================
@@ -1304,7 +2055,7 @@ class AgenticPipeline:
         self.optimized_model_package = None
         self.baseline_val_metrics = None
         self.optimized_val_metrics = None
-
+        self._formula_outputs_raw = None
 
         # ... existing init code ...
         
@@ -1314,6 +2065,84 @@ class AgenticPipeline:
         self._Xy_val = None
 
     def _generate_srfo(self, data):
+      """
+      Run QuantXEngine ONCE.
+      Returns:
+        {
+            results,
+            formula_outputs_raw,
+            raw_data
+        }
+
+      Raw formulaOutput objects are preserved for downstream consumers.
+      ML feature extraction should create namespaced .report() copies separately.
+      """
+      try:
+        from ..qxEngine import QuantXEngine
+        engine = QuantXEngine()
+        strategies = engine.qxStrategyList(  data, interval="4y" )
+        """
+        formula_outputs_raw = ( SRFORegistry.collect_formula_outputs( engine.strategy ) )
+        print(
+            f"[SRFO] Engine: "
+            f"{len(strategies)} strategies, "
+            f"{len(formula_outputs_raw)} raw formulaOutput objects"
+        )
+        formula_outputs_report = ( SRFORegistry.reports( formula_outputs_raw )  )
+        
+        return {
+            "results": engine.results,
+            #"formula_outputs_raw": formula_outputs_raw,
+            #"formula_outputs_report": formula_outputs_report,
+            formula_outputs=formula_outputs
+            "raw_data": data
+        }
+        """
+        formula_outputs = []
+        for strategy in engine.strategy:
+           formula_output = getattr(strategy, "formulaOutput", None )
+           formula_output.assemble()
+           report_out = formula_output.reporting()
+           report = formula_report( report_out,mode="df_easy",lookup="index",  )
+                    
+           if formula_output is None:
+              continue
+           formula_outputs.append( report )
+        return {
+            "results": engine.results,
+            "formula_outputs": formula_outputs,
+            "raw_data": data
+        }
+
+      except Exception as e:
+        print( f"[SRFO] Engine failed: {e}" )
+        return None
+
+    def _generate_srfo1(self, data):
+        """Run QuantXEngine ONCE. Returns {results, formula_outputs_raw, raw_data}."""
+        try:
+            from ..qxEngine import QuantXEngine
+            engine = QuantXEngine()
+            strategies = engine.qxStrategyList(data, interval="4y")
+
+            # Cache the LIVE formulaOutput objects (raw — not .report() or .assemble())
+            formula_outputs_raw = []
+            for s in engine.strategy:
+                fo = getattr(s, "formulaOutput", getattr(s, "formula_output", None))
+                if fo is not None:
+                    formula_outputs_raw.append(fo)
+
+            print(f"[SRFO] Engine: {len(strategies)} strategies, {len(formula_outputs_raw)} raw formulaOutput objects")
+            return {
+                "results": engine.results,
+                "formula_outputs_raw": formula_outputs_raw,
+                "raw_data": data
+            }
+        except Exception as e:
+            print(f"[SRFO] Engine failed: {e}")
+            return None
+
+    def _generate_srfo0(self, data):
         """Run QuantXEngine ONCE. Returns {results, formula_outputs, raw_data}."""
         try:
             from ..qxEngine import QuantXEngine
@@ -1329,7 +2158,7 @@ class AgenticPipeline:
             print(f"[SRFO] Engine failed: {e}")
             return None
 
-    def _ensure_srfo(self):
+    def _ensure_srfo0(self):
         """Lazy init: generate SRFO once. If engine output fails to parse, use fallback."""
         if self._srfo_full is not None:
             return
@@ -1357,21 +2186,103 @@ class AgenticPipeline:
 
         # Fallback if engine parsing failed or produced empty data
         if X is None or len(X) == 0:
-            print("[SRFO] Using fallback feature extraction...")
-            X, y = self._build_features_from_raw(self.data)
-            results, formula_outputs = None, []  # Clear engine artifacts
-            print(f"[SRFO] Fallback feature matrix: {X.shape}")
+           print("[SRFO] Using fallback feature extraction...")
+           X, y = self._build_features_from_raw(self.data)
+           # DO NOT erase cached formula outputs
+           if results is None:
+              results = self._srfo_full.get("results")
+           print(f"[SRFO] Fallback feature matrix: {X.shape}")
 
+        # ============================================================
+        # TEMPORAL 50/50 SPLIT  (chronological, no look-ahead)
+        # ============================================================
         n = len(y)
-        split_idx = int(n * 0.8)
+        split_idx = n // 2   # integer division, exact 50/50 or off by 1
+
         self._Xy_train = {
-            "X": X.iloc[:split_idx].copy(), "y": y.iloc[:split_idx].copy(),
-            "features": list(X.columns), "results": results, "formula_outputs": formula_outputs
+            "X": X.iloc[:split_idx].copy(),
+            "y": y.iloc[:split_idx].copy(),
+            "features": list(X.columns),
+            "results": results,
+            "formula_outputs": formula_outputs
         }
         self._Xy_val = {
-            "X": X.iloc[split_idx:].copy(), "y": y.iloc[split_idx:].copy(),
-            "features": list(X.columns), "results": results, "formula_outputs": formula_outputs
+            "X": X.iloc[split_idx:].copy(),
+            "y": y.iloc[split_idx:].copy(),
+            "features": list(X.columns),
+            "results": results,
+            "formula_outputs": formula_outputs
         }
+        print(f"[SRFO] Split: train={len(self._Xy_train['y'])}, val={len(self._Xy_val['y'])}")
+
+        # Store full X,y for potential scenario stress testing
+        self._Xy_full = {"X": X.copy(), "y": y.copy(), "features": list(X.columns)}
+
+    def _ensure_srfo(self):
+        """Lazy init: generate SRFO once. If engine output fails to parse, use fallback."""
+        if self._srfo_full is not None:
+            return
+
+        print("[SRFO] Generating raw SRFO from full dataset...")
+        self._srfo_full = self._generate_srfo(self.data)
+        print("[DEBUG SRFO]",self._srfo_full)
+        results, formula_outputs_raw = None, []
+        X, y = None, None
+
+        if self._srfo_full:
+            results = self._srfo_full.get("results")
+            #formula_outputs_raw = self._srfo_full.get("formula_outputs_raw", [])
+            # ML needs .report() DataFrames
+            #formula_outputs_report = ( self._srfo_full.get( "formula_outputs_report", [] ))
+            formula_outputs = ( self._srfo_full.get( "formula_outputs", [] ))
+
+            ml = MLTrainEngine()
+            try:
+                X, y = ml.build_feature_matrix(       
+                    strategy_results=results,
+                    formula_outputs=formula_outputs,   #####formula_outputs_report,
+                    raw_data=self._srfo_full["raw_data"]
+                )
+                print(f"[SRFO] Engine feature matrix: {X.shape}")
+            except Exception as e:
+                print(f"[SRFO] Engine output failed: {e}")
+                X, y = None, None
+
+        # Fallback if engine parsing failed or produced empty data
+        if X is None or len(X) == 0:
+            print("[SRFO] Using fallback feature extraction...")
+            X, y = self._build_features_from_raw(self.data)
+            results, formula_outputs_raw = None, []
+            print(f"[SRFO] Fallback feature matrix: {X.shape}")
+
+        # Temporal 50/50 split
+        n = len(y)
+        split_idx = n // 2
+
+        self._Xy_train = {
+            "X": X.iloc[:split_idx].copy(),
+            "y": y.iloc[:split_idx].copy(),
+            "features": list(X.columns),
+            "results": results,
+            "formula_outputs": formula_outputs
+        }
+        self._Xy_val = {
+            "X": X.iloc[split_idx:].copy(),
+            "y": y.iloc[split_idx:].copy(),
+            "features": list(X.columns),
+            "results": results,
+            "formula_outputs": formula_outputs
+        }
+        # Cache raw objects for .assemble() in portfolio construction
+        if formula_outputs_raw:
+           self._formula_outputs_raw = formula_outputs_raw
+        else:
+           self._formula_outputs_raw = (
+             self._srfo_full.get("formula_outputs", [])
+             if self._srfo_full
+              else []
+           )
+        print(f"[SRFO] Cached raw formulaOutput objects: {len(self._formula_outputs_raw)}")
         print(f"[SRFO] Split: train={len(self._Xy_train['y'])}, val={len(self._Xy_val['y'])}")
 
         # Store full X,y for potential scenario stress testing
@@ -1379,8 +2290,9 @@ class AgenticPipeline:
 
     def _run_combinatorial_srfo(self, param_grid, max_combinations=500, scenarios=None):
         """Combinatorial search using cached SRFO X,y. No engine re-runs."""
-        
-        import time  # ← ADD HERE
+        import time
+        import gc
+
         if scenarios is None:
             scenarios = ["BULL", "BEAR", "HIGH_VOL", "CRASH", "STABLE"]
 
@@ -1397,19 +2309,22 @@ class AgenticPipeline:
         for combo in selected:
             d = dict(zip(keys, combo))
             d["_hash"] = hashlib.md5(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:8]
+            d["n_jobs"] = 1          # ← FORCE SINGLE-THREAD
             combinations.append(d)
 
         print(f"[OPTIMIZER] {len(combinations)} combos × {len(scenarios)} scenarios = {len(combinations)*len(scenarios)} evals")
 
-        X_train = deepcopy(self._Xy_train["X"])
-        y_train = deepcopy(self._Xy_train["y"])
-        X_val = deepcopy(self._Xy_val["X"])
-        y_val = deepcopy(self._Xy_val["y"])
+        # Shallow copies — we never mutate these frames
+        X_train = self._Xy_train["X"].copy()
+        y_train = self._Xy_train["y"].copy()
+        X_val   = self._Xy_val["X"].copy()
+        y_val   = self._Xy_val["y"].copy()
 
         all_results = []
         best_params = None
         best_resiliency = -float("inf")
-        start_time = time.time()  # ← ADD THIS LINE
+        start_time = time.time()
+
         for idx, params in enumerate(combinations):
             combo_start = time.time()
             scenario_scores = []
@@ -1422,6 +2337,7 @@ class AgenticPipeline:
                 y_tr_s = mu_mult * y_train.mean() + vol_mult * (y_train - y_train.mean())
                 y_val_s = mu_mult * y_val.mean() + vol_mult * (y_val - y_val.mean())
 
+                # Train — single-threaded, small memory footprint
                 ml = MLTrainEngine()
                 trained = ml.train({"X": X_train, "y": y_tr_s, "params": params})
                 model_pkg = {"model": trained["model"], "label_encoders": trained.get("label_encoders", {})}
@@ -1432,40 +2348,45 @@ class AgenticPipeline:
                 scenario_scores.append(metrics["score"])
                 scenario_sharpes.append(metrics["sharpe"])
                 all_results.append({
-                    "scenario": scenario, "params": params,
-                    "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]
+                    "scenario": scenario,
+                    "params": {k: v for k, v in params.items() if k != "_hash"},
+                    "sharpe": metrics["sharpe"],
+                    "score": metrics["score"],
+                    "corr": metrics["corr"]
                 })
 
-            # === ALWAYS PRINT PROGRESS ===
+                # === CRITICAL: free memory immediately ===
+                del trained, model_pkg, signal, metrics
+                self.backtest.last_signal = None
+                self.backtest.last_features = None
+                gc.collect()
+
+            # === PROGRESS ===
             resiliency = 0.6 * min(scenario_sharpes) + 0.4 * np.mean(scenario_scores) if scenario_scores else -999
             elapsed = time.time() - start_time
             avg_per_combo = elapsed / (idx + 1)
             remaining = avg_per_combo * (len(combinations) - idx - 1)
-            
+
             new_best_flag = ""
             if resiliency > best_resiliency:
                 best_resiliency = resiliency
                 best_params = params
                 new_best_flag = " *** NEW BEST ***"
 
-            print(f"  [{idx+1:3d}/{len(combinations)}] "
-                  f"res={resiliency:.4f} best={best_resiliency:.4f} "
-                  f"min_sharpe={min(scenario_sharpes):.4f} avg_score={np.mean(scenario_scores):.4f} "
-                  f"elapsed={elapsed/60:.1f}m ETA={remaining/60:.1f}m{new_best_flag}")            
-            if scenario_scores:
-                resiliency = 0.6 * min(scenario_sharpes) + 0.4 * np.mean(scenario_scores)
-                if resiliency > best_resiliency:
-                    best_resiliency = resiliency
-                    best_params = params
-                    print(f"  [NEW BEST] Combo {idx+1}: Resiliency={resiliency:.4f}")
+            if (idx + 1) % 10 == 0 or idx == 0 or idx == len(combinations) - 1:
+                print(f"  [{idx+1:3d}/{len(combinations)}] "
+                      f"res={resiliency:.4f} best={best_resiliency:.4f} "
+                      f"min_sharpe={min(scenario_sharpes):.4f} avg_score={np.mean(scenario_scores):.4f} "
+                      f"elapsed={elapsed/60:.1f}m ETA={remaining/60:.1f}m{new_best_flag}")
 
         self.storage.save_json({
-            "best_params": best_params, "best_resiliency_score": float(best_resiliency),
-            "total_combinations": len(combinations), "timestamp": datetime.now().isoformat()
+            "best_params": {k: v for k, v in best_params.items() if k != "_hash"} if best_params else None,
+            "best_resiliency_score": float(best_resiliency),
+            "total_combinations": len(combinations),
+            "timestamp": datetime.now().isoformat()
         }, "combinatorial_optimization.json")
 
-        return {"best_params": best_params, "best_resiliency_score": best_resiliency, "all_results": all_results}
-
+        return {"best_params": best_params, "best_resiliency_score": best_resiliency, "all_results": all_results}    
     def get_train_package(self, params=None):
         self._ensure_srfo()
         pkg = deepcopy(self._Xy_train)
@@ -1489,7 +2410,11 @@ class AgenticPipeline:
             formula_outputs = []
             for s in engine.strategy:
                 if hasattr(s, "formulaOutput"):
-                    formula_outputs.append(s.formulaOutput.report())
+                   s.formulaOutput.assemble()
+                   report_out = s.formulaOutput.reporting()
+                   report = formula_report( report_out,mode="df_easy",lookup="index",  )
+                   formula_outputs.append(report)
+
             print(f"[ML] Formula outputs: {len(formula_outputs)}")
             if len(formula_outputs) == 0:
                 raise ValueError("No formula outputs generated")
@@ -1513,8 +2438,218 @@ class AgenticPipeline:
                 "X": X, "y": y, "features": list(X.columns), 
                 "results": {}, "formula_outputs": []
             }
+    def _build_features_from_raw(self,data):
+      # Create raw FormulaInfo
+ 
+        run_fo = FormulaInfo(data)
+        rpt_out, rpt_out_easy = run_fo.reporting()
+        rpt = formula_report( (rpt_out, rpt_out_easy), "df_easy", "symbol_features")
+        print(rpt.index)
+        print(rpt.columns)
+        y = rpt["market_ret"].copy()
+        X = rpt.drop( columns=["market_ret"],  errors="ignore")
+        X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
+        y = y.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    def _build_features_from_raw(self, data):
+        print(y.dtype)   # should be float64
+        return X, y
+
+    def _build_features_from_rawNotWork(self, data):
+      """
+      Fallback feature builder.
+
+      Uses FormulaInfo.reporting() only.
+      report() returns:
+        index   = symbol
+        columns = MultiIndex(category, metric)
+
+      It is NOT a timeseries.
+      It is one metric value per symbol.
+
+      Returns:
+        X : feature dataframe
+        y : target series
+      """
+      # Create raw FormulaInfo
+      run_fo = FormulaInfo(data)
+      
+      # Wrap through SRFORegistry to enforce unique namespace
+      formula_outputs_raw = [
+        SRFORegistry.wrap_formula_output(run_fo)
+      ]
+
+      # Generate unique report columns:
+      # fo_1_market_price
+      # fo_1_risk_sharpe
+      # ...
+      reports = SRFORegistry.reports(formula_outputs_raw)
+      if not reports:
+        raise ValueError(
+            "FormulaInfo.report() returned empty dataframe"
+        )
+      rpt = reports[0]
+      if not isinstance(rpt, pd.DataFrame) or rpt.empty:
+        raise ValueError(
+            "FormulaInfo.reporting() returned empty dataframe"
+        )
+      # Ensure symbol index
+      rpt.index.name = "symbol"
+      ret = None
+      if isinstance(rpt.columns, pd.MultiIndex):
+        target_col = None
+        for c in rpt.columns:
+            if (
+                str(c[0]).lower() == "market"
+                and str(c[1]).lower() == "ret"
+            ):
+                target_col = c
+                break
+
+        if target_col is not None:
+            ret = rpt[target_col]
+
+        feature_df = rpt.drop(
+            columns=[target_col] if target_col else [],
+            errors="ignore"
+        )
+
+        feature_df.columns = [
+            f"fo_{c[0]}_{c[1]}"
+            for c in feature_df.columns
+        ]
+
+      else:
+
+        # SRFORegistry.reports() flattens columns,
+        # so handle fallback flattened names.
+        target_col = None
+
+        for c in rpt.columns:
+            if "market_ret" in str(c).lower():
+                target_col = c
+                break
+
+        if target_col is not None:
+            ret = rpt[target_col]
+
+        feature_df = rpt.drop(
+            columns=[target_col] if target_col else [],
+            errors="ignore"
+        )
+
+
+      if ret is None:
+        raise ValueError(
+            "Missing ('market','ret') target from FormulaInfo.report()"
+        )
+      # Convert index to symbol column
+      X = feature_df.reset_index()
+      y = ret.copy()
+      y.index.name = "symbol"
+      # Remove symbol string from ML features
+      X = X.drop(  columns=["symbol"],  errors="ignore"   )
+      # Clean values
+      X = X.replace( [np.inf, -np.inf], np.nan ).fillna(0)
+      y = y.replace( [np.inf, -np.inf],  np.nan ).fillna(0)
+      return X, y
+
+    def _build_features_from_raw0(self, data):
+        """
+        Fallback feature builder.
+
+        Uses FormulaInfo.report() only.
+        report() returns:
+            index   = symbol
+            columns = MultiIndex(category, metric)
+
+        It is NOT a timeseries.
+        It is one metric value per symbol.
+
+        Returns:
+            X : feature dataframe
+            y : target series
+        """
+
+        run_fo = FormulaInfo(data)
+
+        # IMPORTANT:
+        # reporting(), not assemble()
+        run_fo.assemble()
+        rpt_out = run_fo.reporting()
+        rpt =  formula_report( rpt_out,mode="df_easy",lookup="columns",  )
+        
+        if not isinstance(rpt, pd.DataFrame) or rpt.empty:
+            raise ValueError("FormulaInfo.report() returned empty dataframe")
+
+        # Ensure symbol index
+        rpt.index.name = "symbol"
+
+        # Find target
+        ret = None
+
+        if isinstance(rpt.columns, pd.MultiIndex):
+
+            target_col = None
+
+            for c in rpt.columns:
+                if (
+                    str(c[0]).lower() == "market"
+                    and str(c[1]).lower() == "ret"
+                ):
+                    target_col = c
+                    break
+
+            if target_col is not None:
+                ret = rpt[target_col]
+
+            # Remove target from features
+            feature_df = rpt.drop(
+                columns=[target_col] if target_col else [],
+                errors="ignore"
+            )
+
+            # Flatten columns
+            feature_df.columns = [
+                f"fo_{c[0]}_{c[1]}"
+                for c in feature_df.columns
+            ]
+
+        else:
+            raise ValueError(
+                "FormulaInfo.report() must return MultiIndex columns"
+            )
+
+        if ret is None:
+            raise ValueError(
+                "Missing ('market','ret') target from FormulaInfo.report()"
+            )
+
+        # Convert index to symbol column
+        X = feature_df.reset_index()
+
+        y = ret.copy()
+        y.index.name = "symbol"
+
+        # remove symbol string from ML features
+        X = X.drop(
+            columns=["symbol"],
+            errors="ignore"
+        )
+
+        # Clean
+        X = X.replace(
+            [np.inf, -np.inf],
+            np.nan
+        ).fillna(0)
+
+        y = y.replace(
+            [np.inf, -np.inf],
+            np.nan
+        ).fillna(0)
+
+        return X, y
+
+    def _build_features_from_rawX(self, data):
         rows, targets = [], []
         for symbol, df in data.items():
             if not isinstance(df, pd.DataFrame) or len(df) < 30:
@@ -1566,6 +2701,607 @@ class AgenticPipeline:
         return X, y
 
     def run_agent(self, params=None, max_iters=5, run_combinatorial=True, param_grid=None):
+          if params is None:
+            params = {}
+
+          # === CREATE RUN FOLDER ===
+          self.current_run_idx, run_path = self.storage.create_run()
+          self.current_run_dir = str(run_path)
+          print(f"\n{'='*60}")
+          print(f"PIPELINE RUN {self.current_run_idx:06d}")
+          print(f"Run directory: {self.current_run_dir}")
+          print(f"{'='*60}")
+
+          # === PHASE 0: SRFO ONCE ===
+          print(f"\n{'='*60}")
+          print("PHASE 0: GENERATING SRFO")
+          print(f"{'='*60}")
+          self._ensure_srfo()
+          self.storage.save(self._Xy_train, f"{self.current_run_dir}/srfo/srfo_train.pkl")
+          self.storage.save(self._Xy_val, f"{self.current_run_dir}/srfo/srfo_val.pkl")
+
+          # === PHASE 1: BASELINE ===
+          print(f"\n{'='*60}")
+          print("PHASE 1: BASELINE MODEL")
+          print(f"{'='*60}")
+          baseline_params = {
+            "trees": params.get("trees", 500), "depth": params.get("depth", 12),
+            "horizon": params.get("horizon", 21), "min_samples_split": params.get("min_samples_split", 2),
+            "max_features": params.get("max_features", "sqrt"), "model": params.get("model", "random_forest")
+          }
+          baseline_train = self.strategy.train(self.get_train_package(baseline_params))
+          self.baseline_model_package = deepcopy(baseline_train)
+          self.storage.save(self.baseline_model_package, f"{self.current_run_dir}/baseline/baseline_model.pkl")
+
+          baseline_val_pkg = self.get_val_package()
+          baseline_signal = self.backtest.signal(self.baseline_model_package, baseline_val_pkg)
+          self.baseline_val_metrics = self.backtest.evaluate(baseline_val_pkg, baseline_signal)
+          print(f"[BASELINE] Score: {self.baseline_val_metrics.get('score', 0):.4f}")
+          self.storage.save(self.baseline_val_metrics, f"{self.current_run_dir}/baseline/baseline_val_metrics.pkl")
+
+          # === PHASE 2: COMBINATORIAL ===
+          if run_combinatorial:
+            print(f"\n{'='*60}")
+            print("PHASE 2: COMBINATORIAL SEARCH (SRFO-CACHED)")
+            print(f"{'='*60}")
+            if param_grid is None:
+                param_grid = PARAM_GRID_INSIDE
+            opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=100)
+            best_params = opt_result["best_params"]
+            if best_params:
+                for k in ["trees", "depth", "horizon", "min_samples_split", "max_features", "model"]:
+                    if k in best_params:
+                        params[k] = best_params[k]
+                print(f"[OPTIMIZER] Best: {best_params}, Resiliency: {opt_result['best_resiliency_score']:.4f}")
+            self.storage.save_json(opt_result, f"{self.current_run_dir}/combinatorial/combinatorial_optimization.json")
+
+          # === PHASE 3: OPTIMIZED ===
+          print(f"\n{'='*60}")
+          print("PHASE 3: OPTIMIZED MODEL")
+          print(f"{'='*60}")
+          opt_train = self.strategy.train(self.get_train_package(params))
+          self.optimized_model_package = deepcopy(opt_train)
+          self.storage.save(self.optimized_model_package, f"{self.current_run_dir}/optimized/optimized_model.pkl")
+
+          opt_val_pkg = self.get_val_package()
+          opt_signal = self.backtest.signal(self.optimized_model_package, opt_val_pkg)
+          self.optimized_val_metrics = self.backtest.evaluate(opt_val_pkg, opt_signal)
+          print(f"[OPTIMIZED] Score: {self.optimized_val_metrics.get('score', 0):.4f}")
+          self.storage.save(self.optimized_val_metrics, f"{self.current_run_dir}/optimized/optimized_val_metrics.pkl")
+
+          # === PHASE 4: COMPARATOR ===
+          print(f"\n{'='*60}")
+          print("PHASE 4: COMPARATOR")
+          print(f"{'='*60}")
+          comparison = self.comparator.compare_models(
+            self.baseline_model_package, self.optimized_model_package,
+            self.baseline_val_metrics, self.optimized_val_metrics)
+          print(f"[COMPARE] {comparison['rating']['label']} | {comparison['prediction']['recommendation']}")
+          self.storage.save_json(comparison, f"{self.current_run_dir}/comparison/model_comparison.json")
+
+          # === PHASE 5: RESEARCH LOOP ===
+          print(f"\n{'='*60}")
+          print("PHASE 5: RESEARCH LOOP")
+          print(f"{'='*60}")
+          previous_val = None
+          for i in range(max_iters):
+            self.iteration += 1
+            iter_dir = f"{self.current_run_dir}/iter_{self.iteration:02d}"
+            os.makedirs(f"{self.base_dir}/{iter_dir}", exist_ok=True)
+            print(f"\n--- Iteration {self.iteration}/{max_iters} --> {iter_dir} ---")
+
+            train_pkg = self.strategy.train(self.get_train_package(params))
+            val_pkg = self.get_val_package()
+
+            train_signal = self.backtest.signal(train_pkg, train_pkg)
+            train_metrics = self.backtest.evaluate(train_pkg, train_signal)
+
+            val_signal = self.backtest.signal(train_pkg, val_pkg)
+            val_metrics = self.backtest.evaluate(val_pkg, val_signal)
+
+            print(f"Train: Sharpe={train_metrics.get('sharpe', 0):.3f} Score={train_metrics.get('score', 0):.3f}")
+            print(f"Val:   Sharpe={val_metrics.get('sharpe', 0):.3f} Score={val_metrics.get('score', 0):.3f}")
+
+            review = self.review_engine.compare(val_metrics, previous_val)
+            decision = self.evaluator.decide(review, train_metrics)
+
+            if val_metrics.get("score", 0) > self.best_score:
+                self.best_score = val_metrics.get("score", 0)
+                self.best_model = deepcopy(train_pkg)
+
+            research = {
+                "iteration": self.iteration,
+                "train": {k: v for k, v in train_metrics.items() if k not in ["signal", "pnl"]},
+                "validation": {k: v for k, v in val_metrics.items() if k not in ["signal", "pnl"]},
+                "decision": decision
+            }
+            self.research_history.append(research)
+
+            # Save all iteration artifacts
+            self.storage.save(train_pkg, f"{iter_dir}/train_package.pkl")
+            self.storage.save(val_pkg, f"{iter_dir}/val_package.pkl")
+            self.storage.save(train_signal, f"{iter_dir}/train_signal.pkl")
+            self.storage.save(val_signal, f"{iter_dir}/val_signal.pkl")
+            self.storage.save(train_metrics, f"{iter_dir}/train_metrics.pkl")
+            self.storage.save(val_metrics, f"{iter_dir}/val_metrics.pkl")
+            self.storage.save(research, f"{iter_dir}/research.pkl")
+            self.storage.save_json(research, f"{iter_dir}/research.json")
+            self.storage.save(review, f"{iter_dir}/review.pkl")
+            self.storage.save({"decision": decision}, f"{iter_dir}/eval.pkl")
+
+            golive = self.golive.assess(self.research_history, train_pkg)
+            self.storage.save(golive, f"{iter_dir}/golive.pkl")
+            self.storage.save_json(golive, f"{iter_dir}/golive.json")
+
+            print(f"Decision: {decision} | GoLive: {golive['stage']}")
+
+            if decision == "STOP":
+                break
+            if decision == "ACCEPT" and golive["ready"]:
+                self.storage.save(golive.get("deployment_package"), f"{self.current_run_dir}/deployment_package.pkl")
+                break
+            if decision == "MUTATE":
+                params = self._apply_mutations(params, review.get("recommendations", []))
+
+            previous_val = val_metrics
+
+        # ============================================================
+        # PORTFOLIO HELPERS (self-contained, no dependency on _formula_outputs_raw)
+        # ============================================================
+
+          def _run_engine_and_assemble(data, label="engine"):
+            """Run QuantXEngine on data and return assembled formulaOutput."""
+            try:
+                from ..qxEngine import QuantXEngine
+                engine = QuantXEngine()
+                strategies = engine.qxStrategyList(data, interval=params.get("interval", "4y"))
+                for s in engine.strategy:
+                    fo_obj = getattr(s, "formulaOutput", getattr(s, "formula_output", None))
+                    if fo_obj is not None:
+                        fo = fo_obj.assemble()
+                        print(f"[PORTFOLIO] [{label}] Engine OK, formulaOutput assembled.", fo_obj)
+                        return fo_obj
+                print(f"[PORTFOLIO] [{label}] No formulaOutput found on strategies.")
+                return None
+            except Exception as e:
+                print(f"[PORTFOLIO] [{label}] Engine failed: {e}")
+                return None
+
+          def _build_portfolio(fo, data_source, label="portfolio"):
+            """Build, invoke, and persist a Portfolio from assembled formula output."""
+            if fo is None:
+                print(f"[PORTFOLIO] [{label}] No formulaOutput. Skipping.")
+                return None
+
+            try:
+                # ---- returns -------------------------------------------------
+                ret_df = fo.get("ret")
+                if ret_df is None or not isinstance(ret_df, pd.DataFrame):
+                    ret_parts = []
+                    for sym, df in data_source.items():
+                        if isinstance(df, pd.DataFrame) and "close" in df.columns:
+                            ret_parts.append(df["close"].pct_change().fillna(0).rename(sym))
+                    ret_df = pd.concat(ret_parts, axis=1).fillna(0) if ret_parts else None
+
+                if ret_df is None or ret_df.empty:
+                    raise ValueError("No return data.")
+
+                # ---- weights from FORMULA_CONFIG -----------------------------
+                # ??? check if norm_weight or weight or executed_weight
+
+                weights =  fo.get("executed_weight") 
+
+                if weights is None:
+                    print(f"[PORTFOLIO] [{label}] No engine weights; using equal weight.")
+                    weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+                elif isinstance(weights, pd.Series):
+                    weights = pd.DataFrame(
+                        {col: weights for col in ret_df.columns},
+                        index=ret_df.index
+                    ).fillna(0)
+                elif isinstance(weights, pd.DataFrame):
+                    for c in ret_df.columns:
+                        if c not in weights.columns:
+                            weights[c] = 0.0
+                    weights = weights[ret_df.columns].fillna(0)
+                else:
+                    weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+
+                # ---- benchmark -----------------------------------------------
+                benchmark = fo.get("benchmark")
+                if benchmark is None:
+                    benchmark = ret_df["BTCUSDT"] if "BTCUSDT" in ret_df.columns else ret_df.mean(axis=1)
+                elif isinstance(benchmark, pd.DataFrame):
+                    benchmark = benchmark.iloc[:, 0]
+
+                # ---- transaction_cost (from FORMULA_CONFIG or fallback) ------
+                transaction_cost = fo.get("transaction_cost")
+                if transaction_cost is None:
+                    transaction_cost = 0.0005
+                if hasattr(transaction_cost, "iloc"):
+                    transaction_cost = float(transaction_cost.iloc[0]) if len(transaction_cost) > 0 else 0.0005
+                try:
+                    transaction_cost = float(transaction_cost)
+                except (TypeError, ValueError):
+                    transaction_cost = 0.0005
+
+                # ---- align ---------------------------------------------------
+                common_idx = (
+                    ret_df.index
+                    .intersection(weights.index)
+                    .intersection(benchmark.index)
+                )
+                ret_df = ret_df.loc[common_idx]
+                weights = weights.loc[common_idx]
+                benchmark = benchmark.loc[common_idx]
+
+                # ---- invoke Portfolio ----------------------------------------
+                portfolio = Portfolio()
+                result = portfolio.invoke(
+                    fo = fo,
+                    weights=weights,
+                    returns=ret_df,
+                    benchmark=benchmark,
+                    transaction_cost=transaction_cost,
+                    annualization=252
+                )
+
+                # ---- persist (headless-safe) ---------------------------------
+                chart_path = os.path.join(self.current_run_dir, f"{label}_chart.html")
+                result["chart"].write_html(chart_path)
+                print(f"[PORTFOLIO] [{label}] Chart saved: {chart_path}")
+                print(result["metrics"])
+
+                self.storage.save(result["metrics"], f"{self.current_run_dir}/{label}_metrics.pkl")
+                self.storage.save_json(result["metrics"], f"{self.current_run_dir}/{label}_metrics.json")
+                return result
+
+            except Exception as e:
+                print(f"[PORTFOLIO] [{label}] Failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+
+        # ============================================================
+        # PORTFOLIO 1 — TRAINED DATA (1st 50%)
+        # ============================================================
+          print(f"\n{'='*60}")
+          print("PORTFOLIO: TRAINED DATA (1st 50%)")
+          print(f"{'='*60}")
+          chk_formula_output = None
+          try:
+            trained_data = {}
+            for sym, df in self.data.items():
+                if isinstance(df, pd.DataFrame):
+                    split_idx = len(df) // 2
+                    trained_data[sym] = df.iloc[:split_idx].copy()
+
+            fo_train = None
+            # Try FormulaInfo first (user preference), fallback to engine
+            try:
+                from ..qxEngine import FormulaInfo
+                trained_fo = FormulaInfo(trained_data)
+                fo_train = trained_fo.assemble()
+                chk_formula_output = trained_fo
+                print("[PORTFOLIO] [train] Using FormulaInfo(trained_data).assemble()")
+            except Exception as e:
+                print(f"[PORTFOLIO] [train] FormulaInfo failed ({e}), falling back to QuantXEngine")
+                fo_train = _run_engine_and_assemble(trained_data, label="train")
+                chk_formula_output = fo_train
+            _build_portfolio(chk_formula_output, trained_data, label="portfolio_train")
+
+          except Exception as e:
+            print(f"[PORTFOLIO] [train] Outer exception: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # ============================================================
+        # PORTFOLIO 2 — MERGED / FULL DATA (complete dataset)
+        # ============================================================
+          print(f"\n{'='*60}")
+          print("PORTFOLIO: MERGED / FULL DATA")
+          print(f"{'='*60}")
+
+          fo_merged = None
+
+        # 1st try: instance cache (works if _ensure_srfo was updated)
+          raw_cache = getattr(self, '_formula_outputs_raw', None)
+          if raw_cache and len(raw_cache) > 0:
+            try:
+                fo_merged = raw_cache[0].assemble()
+                chk_formula_output = fo_merged
+                print("[PORTFOLIO] [merged] Using _formula_outputs_raw cache.")
+            except Exception as e:
+                print(f"[PORTFOLIO] [merged] Cache failed: {e}")
+
+        # 2nd try: SRFO dict (works if _generate_srfo was updated)
+          if fo_merged is None and getattr(self, '_srfo_full', None):
+            srfo_raw = self._srfo_full.get('formula_outputs_raw')
+            if srfo_raw and len(srfo_raw) > 0:
+                try:
+                    fo_merged = srfo_raw[0].assemble()
+                    chk_formula_output = srfo_raw[0]
+                    print("[PORTFOLIO] [merged] Using _srfo_full cache.")
+                except Exception as e:
+                    print(f"[PORTFOLIO] [merged] SRFO cache failed: {e}")
+
+        # 3rd try: run engine directly (always works, just slower)
+          if fo_merged is None:
+            fo_merged = _run_engine_and_assemble(self.data, label="merged")
+            chk_formula_output = fo_merged
+          _build_portfolio(chk_formula_output, self.data, label="portfolio_merged")
+
+        # === FINAL SUMMARY ===
+          return self._generate_final_summary()
+
+    def run_agent0(self, params=None, max_iters=5, run_combinatorial=True, param_grid=None):
+        if params is None:
+            params = {}
+
+        # === CREATE RUN FOLDER ===
+        self.current_run_idx, run_path = self.storage.create_run()
+        self.current_run_dir = str(run_path)
+        print(f"\n{'='*60}")
+        print(f"PIPELINE RUN {self.current_run_idx:06d}")
+        print(f"Run directory: {self.current_run_dir}")
+        print(f"{'='*60}")
+
+        # === PHASE 0: SRFO ONCE ===
+        print(f"\n{'='*60}")
+        print("PHASE 0: GENERATING SRFO")
+        print(f"{'='*60}")
+        self._ensure_srfo()
+        self.storage.save(self._Xy_train, f"{self.current_run_dir}/srfo/srfo_train.pkl")
+        self.storage.save(self._Xy_val, f"{self.current_run_dir}/srfo/srfo_val.pkl")
+
+        # === PHASE 1: BASELINE ===
+        print(f"\n{'='*60}")
+        print("PHASE 1: BASELINE MODEL")
+        print(f"{'='*60}")
+        baseline_params = {
+            "trees": params.get("trees", 500), "depth": params.get("depth", 12),
+            "horizon": params.get("horizon", 21), "min_samples_split": params.get("min_samples_split", 2),
+            "max_features": params.get("max_features", "sqrt"), "model": params.get("model", "random_forest")
+        }
+        baseline_train = self.strategy.train(self.get_train_package(baseline_params))
+        self.baseline_model_package = deepcopy(baseline_train)
+        self.storage.save(self.baseline_model_package, f"{self.current_run_dir}/baseline/baseline_model.pkl")
+
+        baseline_val_pkg = self.get_val_package()
+        baseline_signal = self.backtest.signal(self.baseline_model_package, baseline_val_pkg)
+        self.baseline_val_metrics = self.backtest.evaluate(baseline_val_pkg, baseline_signal)
+        print(f"[BASELINE] Score: {self.baseline_val_metrics.get('score', 0):.4f}")
+        self.storage.save(self.baseline_val_metrics, f"{self.current_run_dir}/baseline/baseline_val_metrics.pkl")
+
+        # === PHASE 2: COMBINATORIAL ===
+        if run_combinatorial:
+            print(f"\n{'='*60}")
+            print("PHASE 2: COMBINATORIAL SEARCH (SRFO-CACHED)")
+            print(f"{'='*60}")
+            if param_grid is None:
+                param_grid = PARAM_GRID_INSIDE
+            opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=100)
+            best_params = opt_result["best_params"]
+            if best_params:
+                for k in ["trees", "depth", "horizon", "min_samples_split", "max_features", "model"]:
+                    if k in best_params:
+                        params[k] = best_params[k]
+                print(f"[OPTIMIZER] Best: {best_params}, Resiliency: {opt_result['best_resiliency_score']:.4f}")
+            self.storage.save_json(opt_result, f"{self.current_run_dir}/combinatorial/combinatorial_optimization.json")
+
+        # === PHASE 3: OPTIMIZED ===
+        print(f"\n{'='*60}")
+        print("PHASE 3: OPTIMIZED MODEL")
+        print(f"{'='*60}")
+        opt_train = self.strategy.train(self.get_train_package(params))
+        self.optimized_model_package = deepcopy(opt_train)
+        self.storage.save(self.optimized_model_package, f"{self.current_run_dir}/optimized/optimized_model.pkl")
+
+        opt_val_pkg = self.get_val_package()
+        opt_signal = self.backtest.signal(self.optimized_model_package, opt_val_pkg)
+        self.optimized_val_metrics = self.backtest.evaluate(opt_val_pkg, opt_signal)
+        print(f"[OPTIMIZED] Score: {self.optimized_val_metrics.get('score', 0):.4f}")
+        self.storage.save(self.optimized_val_metrics, f"{self.current_run_dir}/optimized/optimized_val_metrics.pkl")
+
+        # === PHASE 4: COMPARATOR ===
+        print(f"\n{'='*60}")
+        print("PHASE 4: COMPARATOR")
+        print(f"{'='*60}")
+        comparison = self.comparator.compare_models(
+            self.baseline_model_package, self.optimized_model_package,
+            self.baseline_val_metrics, self.optimized_val_metrics)
+        print(f"[COMPARE] {comparison['rating']['label']} | {comparison['prediction']['recommendation']}")
+        self.storage.save_json(comparison, f"{self.current_run_dir}/comparison/model_comparison.json")
+
+        # === PHASE 5: RESEARCH LOOP ===
+        print(f"\n{'='*60}")
+        print("PHASE 5: RESEARCH LOOP")
+        print(f"{'='*60}")
+        previous_val = None
+        for i in range(max_iters):
+            self.iteration += 1
+            iter_dir = f"{self.current_run_dir}/iter_{self.iteration:02d}"
+            os.makedirs(f"{self.base_dir}/{iter_dir}", exist_ok=True)
+            print(f"\n--- Iteration {self.iteration}/{max_iters} → {iter_dir} ---")
+
+            train_pkg = self.strategy.train(self.get_train_package(params))
+            val_pkg = self.get_val_package()
+
+            train_signal = self.backtest.signal(train_pkg, train_pkg)
+            train_metrics = self.backtest.evaluate(train_pkg, train_signal)
+
+            val_signal = self.backtest.signal(train_pkg, val_pkg)
+            val_metrics = self.backtest.evaluate(val_pkg, val_signal)
+
+            print(f"Train: Sharpe={train_metrics.get('sharpe', 0):.3f} Score={train_metrics.get('score', 0):.3f}")
+            print(f"Val:   Sharpe={val_metrics.get('sharpe', 0):.3f} Score={val_metrics.get('score', 0):.3f}")
+
+            review = self.review_engine.compare(val_metrics, previous_val)
+            decision = self.evaluator.decide(review, train_metrics)
+
+            if val_metrics.get("score", 0) > self.best_score:
+                self.best_score = val_metrics.get("score", 0)
+                self.best_model = deepcopy(train_pkg)
+
+            research = {
+                "iteration": self.iteration,
+                "train": {k: v for k, v in train_metrics.items() if k not in ["signal", "pnl"]},
+                "validation": {k: v for k, v in val_metrics.items() if k not in ["signal", "pnl"]},
+                "decision": decision
+            }
+            self.research_history.append(research)
+
+            # Save all iteration artifacts
+            self.storage.save(train_pkg, f"{iter_dir}/train_package.pkl")
+            self.storage.save(val_pkg, f"{iter_dir}/val_package.pkl")
+            self.storage.save(train_signal, f"{iter_dir}/train_signal.pkl")
+            self.storage.save(val_signal, f"{iter_dir}/val_signal.pkl")
+            self.storage.save(train_metrics, f"{iter_dir}/train_metrics.pkl")
+            self.storage.save(val_metrics, f"{iter_dir}/val_metrics.pkl")
+            self.storage.save(research, f"{iter_dir}/research.pkl")
+            self.storage.save_json(research, f"{iter_dir}/research.json")
+            self.storage.save(review, f"{iter_dir}/review.pkl")
+            self.storage.save({"decision": decision}, f"{iter_dir}/eval.pkl")
+
+            golive = self.golive.assess(self.research_history, train_pkg)
+            self.storage.save(golive, f"{iter_dir}/golive.pkl")
+            self.storage.save_json(golive, f"{iter_dir}/golive.json")
+
+            print(f"Decision: {decision} | GoLive: {golive['stage']}")
+
+            if decision == "STOP":
+                break
+            if decision == "ACCEPT" and golive["ready"]:
+                self.storage.save(golive.get("deployment_package"), f"{self.current_run_dir}/deployment_package.pkl")
+                break
+            if decision == "MUTATE":
+                params = self._apply_mutations(params, review.get("recommendations", []))
+
+            previous_val = val_metrics
+
+        # ============================================================
+        # PORTFOLIO CONSTRUCTION — MERGED RESEARCH + VALIDATION DATA
+        # ============================================================
+        print(f"\n{'='*60}")
+        print("PORTFOLIO: MERGED DATA CONSTRUCTION")
+        print(f"{'='*60}")
+
+        try:
+            from ..qxEngine import QuantXEngine
+            engine_merged = QuantXEngine()
+            _ = engine_merged.qxStrategyList(self.data, interval=params.get("interval", "4y"))
+
+            fo = None
+            for s in engine_merged.strategy:
+                fo_obj = getattr(s, "formulaOutput", getattr(s, "formula_output", None))
+                if fo_obj is not None:
+                    fo = fo_obj.assemble()
+                    break
+
+            if fo is None:
+                print("[PORTFOLIO] No formulaOutput available on merged data.")
+            else:
+                # ---- returns -------------------------------------------------
+                ret_df = fo.get("ret")
+                if ret_df is None or not isinstance(ret_df, pd.DataFrame):
+                    # Fallback: build from raw close prices
+                    ret_parts = []
+                    for sym, df in self.data.items():
+                        if isinstance(df, pd.DataFrame) and "close" in df.columns:
+                            ret_parts.append(df["close"].pct_change().fillna(0).rename(sym))
+                    ret_df = pd.concat(ret_parts, axis=1).fillna(0) if ret_parts else None
+
+                if ret_df is None or ret_df.empty:
+                    raise ValueError("No return data available for portfolio construction.")
+
+                # ---- weights (unlagged so Portfolio.invoke() can lag internally) ---
+                # ??? check if norm_weight or weight or executed_weight
+                historical_weights = fo.get("executed_weight")
+
+                if historical_weights is None:
+                    print("[PORTFOLIO] No engine weights found; using equal weight.")
+                    historical_weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+                elif isinstance(historical_weights, pd.Series):
+                    # Broadcast single-period weights across the full time axis
+                    historical_weights = pd.DataFrame(
+                        {col: historical_weights for col in ret_df.columns},
+                        index=ret_df.index
+                    ).fillna(0)
+                elif isinstance(historical_weights, pd.DataFrame):
+                    missing_cols = [c for c in ret_df.columns if c not in historical_weights.columns]
+                    for c in missing_cols:
+                        historical_weights[c] = 0.0
+                    historical_weights = historical_weights[ret_df.columns].fillna(0)
+                else:
+                    historical_weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+
+                # ---- benchmark (BTCUSDT preferred, else cross-sectional mean) ----
+                btc_returns = fo.get("benchmark")
+                if btc_returns is None:
+                    if "BTCUSDT" in ret_df.columns:
+                        btc_returns = ret_df["BTCUSDT"]
+                    else:
+                        btc_returns = ret_df.mean(axis=1)
+                elif isinstance(btc_returns, pd.DataFrame):
+                    btc_returns = btc_returns.iloc[:, 0]
+
+                # ---- align & invoke -------------------------------------------
+                common_idx = (
+                    ret_df.index
+                    .intersection(historical_weights.index)
+                    .intersection(btc_returns.index)
+                )
+                ret_df = ret_df.loc[common_idx]
+                historical_weights = historical_weights.loc[common_idx]
+                btc_returns = btc_returns.loc[common_idx]
+
+                portfolio = Portfolio()
+                result = portfolio.invoke(
+                    fo=fo,
+                    weights=historical_weights,
+                    returns=ret_df,
+                    benchmark=btc_returns,
+                    transaction_cost=0.0005
+                )
+
+                # ---- persist & display ----------------------------------------
+                # ---- persist for headless & later viewing ----
+                chart_path = os.path.join(self.current_run_dir, "portfolio_chart.html")
+                result["chart"].write_html(chart_path)
+                print(f"[PORTFOLIO] Chart saved: {chart_path}")
+                
+                result["chart"].show()
+                print(result["metrics"])
+
+                self.storage.save(result["metrics"], f"{self.current_run_dir}/portfolio_metrics.pkl")
+                self.storage.save_json(result["metrics"], f"{self.current_run_dir}/portfolio_metrics.json")
+                self.storage.save(result["series"], f"{self.current_run_dir}/portfolio_series.pkl")
+
+        except Exception as e:
+            print(f"[PORTFOLIO] Portfolio construction skipped: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # === FINAL SUMMARY ===
+        return self._generate_final_summary()
+
+    def run_agent1(self, params=None, max_iters=5, run_combinatorial=True, param_grid=None):
         if params is None:
             params = {}
 
@@ -1802,6 +3538,228 @@ def create_sample_data(n_symbols=5, n_days=800):
         data[symbol] = df
     return data
 
+# =====================================================
+# Portfolio class
+# =====================================================
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+
+class Portfolio:
+
+      def invoke(
+        self,
+        fo,
+        weights: pd.DataFrame,
+        returns: pd.DataFrame,
+        benchmark: pd.Series,
+        transaction_cost: float = 0.0005,
+        annualization: int = 252
+        ):
+
+        # -----------------------------------------
+        # Align data
+        # -----------------------------------------
+        idx = (
+            weights.index
+            .intersection(returns.index)
+            .intersection(benchmark.index)
+        )
+
+        weights   = weights.loc[idx]
+        returns   = returns.loc[idx]
+        benchmark = benchmark.loc[idx]
+        fo = fo
+        # -----------------------------------------
+        # Lag weights
+        # -----------------------------------------
+        lagged_weights = weights.shift(1).fillna(0)
+
+        # -----------------------------------------
+        # Portfolio returns
+        # -----------------------------------------
+        gross_return = (
+            lagged_weights * returns
+        ).sum(axis=1)
+
+        # -----------------------------------------
+        # Turnover
+        # -----------------------------------------
+        turnover = (
+            weights.diff()
+            .abs()
+            .sum(axis=1)
+        )
+        turnover.iloc[0] = 0
+
+        # -----------------------------------------
+        # Transaction cost
+        # -----------------------------------------
+        costs = turnover * transaction_cost
+
+        # -----------------------------------------
+        # Net return
+        # -----------------------------------------
+        net_return = gross_return - costs
+
+        # -----------------------------------------
+        # Equity curves
+        # -----------------------------------------
+        gross_equity = (1 + gross_return).cumprod()
+        net_equity   = (1 + net_return).cumprod()
+        benchmark_equity = (1 + benchmark).cumprod()
+
+        # -----------------------------------------
+        # Risk statistics
+        # -----------------------------------------
+        volatility = (
+            net_return.std()
+            * np.sqrt(annualization)
+        )
+
+        sharpe = (
+            np.sqrt(annualization)
+            * net_return.mean()
+            / net_return.std()
+            if net_return.std() != 0
+            else np.nan
+        )
+
+        drawdown = (
+            net_equity /
+            net_equity.cummax()
+            - 1
+        )
+        max_drawdown = drawdown.min()
+
+        # -----------------------------------------
+        # BTC correlation
+        # -----------------------------------------
+        btc_corr = net_return.corr(benchmark)
+
+        # -----------------------------------------
+        # Alpha / Beta Regression  (pure numpy)
+        # -----------------------------------------
+        df = pd.concat(
+            [
+                net_return.rename("portfolio"),
+                benchmark.rename("benchmark")
+            ],
+            axis=1
+        ).dropna()
+
+        alpha       = fo.get("alpha")
+        beta        = fo.get("beta")
+        tstat_alpha = fo.get("tstat_alpha")
+
+        n = len(df)
+        if n > 5:
+            x = df["benchmark"].values
+            y = df["portfolio"].values
+
+            x_mean = x.mean()
+            y_mean = y.mean()
+
+            xm = x - x_mean
+            ym = y - y_mean
+
+            Sxx = np.dot(xm, xm)
+            if Sxx > 1e-12:
+                beta  = np.dot(xm, ym) / Sxx
+                alpha = y_mean - beta * x_mean
+
+                resid = y - (alpha + beta * x)
+                sse   = np.dot(resid, resid)
+                mse   = sse / (n - 2) if n > 2 else sse
+
+                var_alpha = mse * (1.0 / n + (x_mean ** 2) / Sxx)
+                if var_alpha > 0:
+                    se_alpha    = np.sqrt(var_alpha)
+                    tstat_alpha = alpha / se_alpha if se_alpha > 1e-12 else np.nan
+
+        # -----------------------------------------
+        # Plotly chart
+        # -----------------------------------------
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Scatter(
+                x=gross_equity.index,
+                y=gross_equity,
+                name="Gross Return",
+                mode="lines"
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=net_equity.index,
+                y=net_equity,
+                name="Net Return",
+                mode="lines"
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=benchmark_equity.index,
+                y=benchmark_equity,
+                name="Benchmark",
+                mode="lines",
+                line=dict(dash="dash")
+            )
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=drawdown.index,
+                y=drawdown,
+                name="Drawdown",
+                yaxis="y2"
+            )
+        )
+
+        fig.update_layout(
+            title="Portfolio Performance",
+            template="plotly_white",
+            hovermode="x unified",
+            yaxis=dict(title="Equity"),
+            yaxis2=dict(
+                title="Drawdown",
+                overlaying="y",
+                side="right"
+            )
+        )
+
+        # -----------------------------------------
+        # Output
+        # -----------------------------------------
+        return {
+            "chart": fig,
+            "metrics": {
+                "gross_return":    fo.get("ret"),
+                "net_return":      fo.get("net_ret"),
+                "sharpe":          fo.get("sharpe"),
+                "volatility":      fo.get("volatility"),
+                "max_drawdown":    fo.get("max_drawdown"),
+                "btc_correlation":  fo.get("corr_rm"),
+                "alpha":            fo.get("alpha"),
+                "beta":             fo.get("beta"),
+                "tstat_alpha":      fo.get("tstat_alpha"),
+                "turnover":         fo.get("turnover"),
+                "transaction_cost": costs
+            },
+            "series": {
+                "gross_return":   gross_return,
+                "net_return":     net_return,
+                "equity":         net_equity,
+                "benchmark":      benchmark_equity,
+                "drawdown":       drawdown,
+                "weights":        weights,
+                "lagged_weights": lagged_weights
+            }
+        }
+
 
 # =====================================================
 # MAIN EXECUTION
@@ -1822,3 +3780,8 @@ if __name__ == "__main__":
     print("Baseline model: runs/baseline_model.pkl")
     print("Optimized model: runs/optimized_model.pkl")
     print("Comparison report: runs/model_comparison.json")
+
+
+# ======================================================
+# END OF THE PIPELINE
+# ======================================================
