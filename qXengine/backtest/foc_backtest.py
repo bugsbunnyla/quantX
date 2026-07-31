@@ -44,34 +44,7 @@ def run():
         print("[DATA] Assets:", list(data.keys()))
         return data 
   
-def test1(data) :
-      legacy = FormulaOutput(data)
-      legacy_out = legacy.assemble()
 
-      new = cls(data)
-      new_out = new.report_new()
-
-      legacy_out, new_out = legacy_out.align(new_out)
-
-      comparison = {}
-
-      for idx in legacy_out.index:
-        comparison[idx] = {}
-
-        for sym in legacy_out.columns:
-            a = legacy_out.loc[idx, sym]
-            b = new_out.loc[idx, sym]
-
-            comparison[idx][sym] = (
-                np.isclose(a, b, atol=tol, rtol=tol)
-                if isinstance(a, (int, float, np.number))
-                else a == b
-            )
-      return {
-        "legacy": legacy_out,
-        "dag": new_out,
-        "comparison": pd.DataFrame(comparison),
-      }
 def test(data, tol=1e-6):
 
     legacy = FormulaOutput(data)
@@ -118,37 +91,6 @@ def test(data, tol=1e-6):
         "comparison": comparison
     }
 
-def test0(data, tol=1e-6):
-
-    legacy = FormulaOutput(data)
-    legacy_out = legacy.assemble()
-    #print("[DEBUG] legacy_out",legacy_out)
-
-    new = FormulaInfo(data)
-    new_out = new.report_new()
-
-    legacy_out, new_out = legacy_out.align(new_out)
-
-    comparison = {}
-
-    for idx in legacy_out.index:
-        comparison[idx] = {}
-
-        for sym in legacy_out.columns:
-            a = legacy_out.loc[idx, sym]
-            b = new_out.loc[idx, sym]
-
-            comparison[idx][sym] = (
-                np.isclose(a, b, atol=tol, rtol=tol)
-                if isinstance(a, (int, float, np.number))
-                else a == b
-            )
-
-    return {
-        "legacy": legacy_out,
-        "dag": new_out,
-        "comparison": pd.DataFrame(comparison),
-    }
 
 def main():
     testdata = run()

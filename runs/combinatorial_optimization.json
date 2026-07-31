@@ -1,0 +1,14 @@
+{
+  "best_params": {
+    "trees": 200,
+    "depth": 8,
+    "horizon": 21,
+    "min_samples_split": 2,
+    "max_features": "sqrt",
+    "model": "random_forest",
+    "n_jobs": 1
+  },
+  "best_resiliency_score": 0.0,
+  "total_combinations": 72,
+  "timestamp": "2026-07-31T13:16:32.817361"
+}
