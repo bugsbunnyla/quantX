@@ -2628,7 +2628,9 @@ class AgenticPipeline:
 # =====================================================
 
 def build_data():
-    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
+    #symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
+    symbols = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT","DOGEUSDT","ADAUSDT","TRXUSDT","HYPEUSDT","SUIUSDT","LINKUSDT","AVAXUSDT","XLMUSDT","HBARUSDT","BCHUSDT","LTCUSDT","SHIBUSDT","DOTUSDT","AAVEUSDT","PEPEUSDT","NEARUSDT","APTUSDT","ICPUSDT","ETCUSDT","ONDOUSDT","POLUSDT","CROUSDT","TONUSDT", "UNIUSDT"]
+
     try:
         from ..PickleDataManager import PickleDataManager
         dm = PickleDataManager("backtest")
@@ -2853,39 +2855,70 @@ class Portfolio:
         # ------------------------------------------------------------------
         # 8. Plottable metric series from fo (time-indexed only)
         # ------------------------------------------------------------------
-        plot_keys = ["drawdown", "sharpe", "alpha", "beta", "tstat_alpha", "weights", "turnover", "hit_ratio", "ic",  "volatility",]
+        plot_keys = ["corr_rm", "drawdown", "sharpe", "alpha", "beta", "tstat_alpha", "weights", "turnover", "hit_ratio", "ic",  "volatility",]
         plot_items = []
-
         for key in plot_keys:
-            if key == "drawdown":
-               obj = drawdown
-            elif key == "turnover":
-               obj = turnover_series
-            elif key == "weights":
-               obj = weights
-            elif key == "sharpe":
-               obj = sharpe
-            elif key == "tstat_alpha":
-               obj = tstat_alpha
-            elif key == "alpha":
-               obj = alpha
-            elif key == "beta":
-               obj = beta
-            elif key == "ic":
-               obj = ic
-            elif key == "hit_ratio" :
-               obj = hit_ratio
-            elif key == "volatility":
-               obj = volatility
-            elif key == "corr_rm":
-               obj = corr_rm
-            else:
-               obj = fo.get(key)
-            
-            if isinstance(obj, (pd.Series, pd.DataFrame)):
-               if isinstance(obj.index, pd.DatetimeIndex):
-                  plot_items.append((key, obj))
-     
+                if key == "drawdown":
+                   obj = drawdown
+                elif key == "turnover":
+                   obj = turnover_series
+                elif key == "weights":
+                   obj = weights
+                else:
+                   obj = fo.get(key)
+                if obj is None:
+                   continue
+
+                # ------------------------------
+                # DataFrame
+                # ------------------------------
+                if isinstance(obj, pd.DataFrame):
+
+                    obj = obj.copy()
+
+                    if not isinstance(obj.index, pd.DatetimeIndex):
+                        obj.index = pd.to_datetime(
+                            obj.index,
+                            errors="coerce"
+                        )
+
+                    obj = obj.dropna(how="all")
+
+                    if not obj.empty:
+                        plot_items.append((key, obj))
+
+
+                # ------------------------------
+                # Series
+                # ------------------------------
+                elif isinstance(obj, pd.Series):
+
+                    obj = obj.copy()
+
+                    if not isinstance(obj.index, pd.DatetimeIndex):
+                        obj.index = pd.to_datetime(
+                            obj.index,
+                            errors="coerce"
+                        )
+
+                    obj = obj.dropna()
+
+                    if len(obj):
+                        plot_items.append((key, obj))
+
+
+                # ------------------------------
+                # Scalar metrics
+                # ------------------------------
+                else:
+
+                    obj = pd.Series(
+                        obj,
+                        index=idx,
+                        name=key
+                    )
+
+                    plot_items.append((key, obj))     
         # ------------------------------------------------------------------
         # 9. Plotly chart
         # ------------------------------------------------------------------
@@ -2932,9 +2965,16 @@ class Portfolio:
                 line=dict(color="rgba(231, 76, 60, 0.55)", width=1),
             ), row=1, col=1,
         )
-
+    
         colors = plotly.colors.qualitative.Plotly
-
+        for key, obj in plot_items:
+           print(
+             key,
+             type(obj),
+             obj.shape if hasattr(obj, "shape") else len(obj),
+             obj.index[:3],
+             obj.isna().sum() if isinstance(obj, pd.Series) else obj.isna().sum().to_dict()
+        )
         for row, (key, obj) in enumerate(plot_items, start=2):
           print(" plotly ", obj ,type(obj))
           if isinstance(obj, pd.Series):

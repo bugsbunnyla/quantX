@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-07-31T21:31:54.690105",
+  "timestamp": "2026-08-01T18:34:14.428751",
   "model_comparison": {
     "rmse": {
       "baseline": 0.0,
@@ -14,8 +14,8 @@
       "pct_change": 0.0
     },
     "samples": {
-      "baseline": 3,
-      "optimized": 3,
+      "baseline": 14,
+      "optimized": 14,
       "absolute_change": 0,
       "pct_change": 0.0
     },
