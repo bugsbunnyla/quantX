@@ -2304,6 +2304,128 @@ class AgenticPipeline:
                 if ret_df is None or ret_df.empty:
                     raise ValueError("No return data.")
 
+                # ---- weights from fo -----------------------------------------
+                weights = fo.get("executed_weight")
+
+                if weights is None:
+                    print(f"[PORTFOLIO] [{label}] No engine weights; using equal weight.")
+                    weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+                elif isinstance(weights, pd.Series):
+                    weights = pd.DataFrame(
+                        {col: weights for col in ret_df.columns},
+                        index=ret_df.index
+                    ).fillna(0)
+                    weights = weights[ret_df.columns].fillna(0)
+                elif isinstance(weights, pd.DataFrame):
+                    for c in ret_df.columns:
+                        if c not in weights.columns:
+                            weights[c] = 0.0
+                    weights = weights[ret_df.columns].fillna(0)
+                else:
+                    weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+
+                # ---- benchmark -----------------------------------------------
+                benchmark = fo.get("benchmark")
+                if benchmark is None:
+                    benchmark = ret_df["BTCUSDT"] if "BTCUSDT" in ret_df.columns else ret_df.mean(axis=1)
+                elif isinstance(benchmark, pd.DataFrame):
+                    benchmark = benchmark.iloc[:, 0]
+                benchmark = benchmark.squeeze()
+
+                # ---- transaction_cost ----------------------------------------
+                transaction_cost = fo.get("transaction_cost")
+                if transaction_cost is None:
+                    transaction_cost = 0.0005
+                if hasattr(transaction_cost, "iloc"):
+                    transaction_cost = float(transaction_cost.iloc[0]) if len(transaction_cost) > 0 else 0.0005
+                try:
+                    transaction_cost = float(transaction_cost)
+                except (TypeError, ValueError):
+                    transaction_cost = 0.0005
+
+                # ---- align & sort chronologically ----------------------------
+                common_idx = (
+                    ret_df.index
+                    .intersection(weights.index)
+                    .intersection(benchmark.index)
+                )
+                ret_df    = ret_df.loc[common_idx].sort_index()
+                weights   = weights.loc[common_idx].sort_index()
+                benchmark = benchmark.loc[common_idx].sort_index()
+
+                # ---- invoke Portfolio ----------------------------------------
+                portfolio = Portfolio()
+                result = portfolio.invoke(
+                    fo=fo,
+                    weights=weights,
+                    returns=ret_df,
+                    benchmark=benchmark,
+                    transaction_cost=transaction_cost,
+                    annualization=252
+                )
+
+                # ---- persist -------------------------------------------------
+                chart_path = os.path.join(self.current_run_dir, f"{label}_chart.html")
+                result["chart"].write_html(chart_path)
+                print(f"[PORTFOLIO] [{label}] Chart saved: {chart_path}")
+
+                self.storage.save(result["metrics"], f"{self.current_run_dir}/{label}_metrics.pkl")
+                self.storage.save_json(result["metrics"], f"{self.current_run_dir}/{label}_metrics.json")
+                self.storage.save(result["series"], f"{self.current_run_dir}/{label}_series.pkl")
+
+                # ---- console metrics -----------------------------------------
+                m = result["metrics"]
+                print(f"[PORTFOLIO] [{label}] Metrics:")
+                print(f"  Gross Return:      {m.get('gross_return', 0):.4f}")
+                print(f"  Net Return:        {m.get('net_return', 0):.4f}")
+                print(f"  Sharpe:            {m.get('sharpe', 0):.4f}")
+                print(f"  Volatility:        {m.get('volatility', 0):.4f}")
+                print(f"  Max Drawdown:      {m.get('max_drawdown', 0):.4f}")
+                print(f"  BTC Correlation:   {m.get('btc_correlation', 0):.4f}")
+                print(f"  Alpha:             {m.get('alpha', 0):.6f}")
+                print(f"  Beta:              {m.get('beta', 0):.4f}")
+                print(f"  Alpha t-stat:      {m.get('tstat_alpha', 0):.4f}")
+                print(f"  Hit Ratio:         {m.get('hit_ratio', 0):.4f}")
+                print(f"  IC:                {m.get('ic', 0):.4f}")
+                print(f"  Mean Turnover:     {m.get('mean_turnover', 0):.4f}")
+                print(f"  Total Costs:       {m.get('total_costs', 0):.4f}")
+
+                return result
+
+            except Exception as e:
+                print(f"[PORTFOLIO] [{label}] Failed: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+
+
+          def _build_portfolio0(fo, data_source, label="portfolio"):
+            """Build, invoke, and persist a Portfolio from assembled formula output."""
+            if fo is None:
+                print(f"[PORTFOLIO] [{label}] No formulaOutput. Skipping.")
+                return None
+
+            try:
+                # ---- returns -------------------------------------------------
+                ret_df = fo.get("ret")
+                if ret_df is None or not isinstance(ret_df, pd.DataFrame):
+                    ret_parts = []
+                    for sym, df in data_source.items():
+                        if isinstance(df, pd.DataFrame) and "close" in df.columns:
+                            ret_parts.append(df["close"].pct_change().fillna(0).rename(sym))
+                    ret_df = pd.concat(ret_parts, axis=1).fillna(0) if ret_parts else None
+
+                if ret_df is None or ret_df.empty:
+                    raise ValueError("No return data.")
+
                 # ---- weights from FORMULA_CONFIG -----------------------------
                 # ??? check if norm_weight or weight or executed_weight
 
@@ -2559,8 +2681,350 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly
 import plotly.colors
+import os
+from typing import Dict, Any, Optional
+
 
 class Portfolio:
+    """
+    Portfolio backtest engine.
+    1. invoke()  — aligns data, reads fo metrics, produces chart + metrics dict.
+    2. build()   — wrapper that assembles inputs from fo, calls invoke(),
+                   and optionally persists to disk.
+    """
+
+    def __init__(self, run_dir: Optional[str] = None, storage: Optional[Any] = None):
+        self.run_dir = run_dir
+        self.storage = storage
+
+    # =====================================================================
+    # invoke — core backtest logic (reads from fo, minimal calculation)
+    # =====================================================================
+    def invoke(
+        self,
+        fo: Dict[str, Any],
+        weights: pd.DataFrame,
+        returns: pd.DataFrame,
+        benchmark: pd.Series,
+        transaction_cost: float = 0.0005,
+        annualization: int = 252,
+    ) -> Dict[str, Any]:
+        # ------------------------------------------------------------------
+        # 1. Align & sort chronologically
+        # ------------------------------------------------------------------
+        idx = (
+            weights.index
+            .intersection(returns.index)
+            .intersection(benchmark.index)
+        )
+        weights   = weights.loc[idx].sort_index()
+        returns   = returns.loc[idx].sort_index()
+        benchmark = benchmark.loc[idx].sort_index()
+
+        # ------------------------------------------------------------------
+        # 2. Executed weights — from fo
+        # ------------------------------------------------------------------
+        executed_weight = fo.get("executed_weight")
+        if isinstance(executed_weight, pd.DataFrame):
+            executed_weight = (
+                executed_weight
+                .loc[executed_weight.index.intersection(idx)]
+                .reindex(idx)
+                .fillna(0)
+                .sort_index()
+            )
+            for c in returns.columns:
+                if c not in executed_weight.columns:
+                    executed_weight[c] = 0.0
+            executed_weight = executed_weight[returns.columns].fillna(0)
+        else:
+            executed_weight = weights.shift(1).fillna(0)
+
+        lagged_weights = executed_weight.copy()
+
+        # ------------------------------------------------------------------
+        # 3. Gross return — PRIMARY: fo["strategy_ret"]
+        # ------------------------------------------------------------------
+        gross_return = fo.get("strategy_ret")
+        if isinstance(gross_return, pd.Series):
+            gross_return = gross_return.reindex(idx).fillna(0).sort_index()
+        elif isinstance(gross_return, pd.DataFrame) and gross_return.shape[1] == 1:
+            gross_return = gross_return.iloc[:, 0].reindex(idx).fillna(0).sort_index()
+        else:
+            gross_return = (executed_weight * returns).sum(axis=1)
+        gross_return.name = "gross_return"
+
+        # ------------------------------------------------------------------
+        # 4. Costs — scalar rate from fo, series = turnover * rate
+        # ------------------------------------------------------------------
+        tc_rate = fo.get("transaction_cost", transaction_cost)
+        if hasattr(tc_rate, "iloc"):
+            tc_rate = float(tc_rate.iloc[0]) if len(tc_rate) > 0 else 0.0005
+        try:
+            tc_rate = float(tc_rate)
+        except (TypeError, ValueError):
+            tc_rate = 0.0005
+
+        turnover_series = fo.get("turnover")
+        if isinstance(turnover_series, pd.Series):
+            turnover_series = turnover_series.reindex(idx).fillna(0).sort_index()
+        else:
+            turnover_series = weights.diff().abs().sum(axis=1)
+            turnover_series.iloc[0] = weights.iloc[0].abs().sum()
+        turnover_series.name = "turnover"
+
+        costs = turnover_series * tc_rate
+        costs.name = "costs"
+
+        # ------------------------------------------------------------------
+        # 5. Net return — PRIMARY: fo["net_ret"], fallback: gross - costs
+        # ------------------------------------------------------------------
+        net_return = fo.get("net_ret")
+        if isinstance(net_return, pd.Series):
+            net_return = net_return.reindex(idx).fillna(0).sort_index()
+        elif isinstance(net_return, pd.DataFrame) and net_return.shape[1] == 1:
+            net_return = net_return.iloc[:, 0].reindex(idx).fillna(0).sort_index()
+        else:
+            net_return = gross_return - costs
+        net_return.name = "net_return"
+
+        # ------------------------------------------------------------------
+        # 6. Equity & Drawdown — PRIMARY from fo, fallback compute
+        # ------------------------------------------------------------------
+        equity = fo.get("equity")
+        if isinstance(equity, pd.Series):
+            net_equity = equity.reindex(idx).fillna(0).sort_index()
+        else:
+            net_equity = (1 + net_return).cumprod()
+
+        gross_equity = (1 + gross_return).cumprod()
+        benchmark_equity = (1 + benchmark).cumprod()
+
+        drawdown = fo.get("drawdown")
+        if isinstance(drawdown, pd.Series):
+            drawdown = drawdown.reindex(idx).fillna(0).sort_index()
+        else:
+            running_max = net_equity.cummax()
+            drawdown = net_equity / running_max - 1
+        drawdown.name = "drawdown"
+
+        # ------------------------------------------------------------------
+        # 7. METRICS — READ DIRECTLY FROM fo (no calculation)
+        # ------------------------------------------------------------------
+        def _scalar(key, default=0.0):
+            v = fo.get(key)
+            if v is None:
+                return default
+            if isinstance(v, pd.Series):
+                return float(v.iloc[-1]) if len(v) > 0 else default
+            if isinstance(v, pd.DataFrame):
+                return float(v.iloc[-1, 0]) if v.size > 0 else default
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        #sharpe       = _scalar("sharpe")
+        #volatility   = _scalar("volatility")
+        #max_drawdown = _scalar("max_drawdown") if fo.get("max_drawdown") is not None else float(drawdown.min())
+        #btc_corr     = _scalar("corr_rm")
+        #alpha        = _scalar("alpha")
+        #beta         = _scalar("beta")
+        #tstat_alpha  = _scalar("tstat_alpha")
+        #hit_ratio    = _scalar("hit_ratio")
+        #ic           = _scalar("ic")
+        
+        ic= fo.get("ic")
+        hit_ratio = fo.get("hit_ratio")
+        tstat_alpha = fo.get("tstat_alpha")
+        beta = fo.get("beta").mean()
+        alpha = fo.get("alpha").mean()
+        btc_corr = fo.get("corr_rm").mean()
+        max_drawdown = fo.get("max_drawdown")
+        volatility  = fo.get("volatility")
+        sharpe = fo.get("sharpe")
+
+        gross_cumret = gross_equity.iloc[-1] - 1 if len(gross_equity) else 0.0
+        net_cumret   = net_equity.iloc[-1] - 1   if len(net_equity)   else 0.0
+        mean_turnover  = turnover_series.mean()
+        total_turnover = turnover_series.sum()
+        total_costs    = costs.sum()
+
+        # ------------------------------------------------------------------
+        # 8. Plottable metric series from fo (time-indexed only)
+        # ------------------------------------------------------------------
+        plot_keys = ["drawdown", "sharpe", "alpha", "beta", "tstat_alpha", "weights", "turnover", "hit_ratio", "ic",  "volatility",]
+        plot_items = []
+
+        for key in plot_keys:
+            if key == "drawdown":
+               obj = drawdown
+            elif key == "turnover":
+               obj = turnover_series
+            elif key == "weights":
+               obj = weights
+            elif key == "sharpe":
+               obj = sharpe
+            elif key == "tstat_alpha":
+               obj = tstat_alpha
+            elif key == "alpha":
+               obj = alpha
+            elif key == "beta":
+               obj = beta
+            elif key == "ic":
+               obj = ic
+            elif key == "hit_ratio" :
+               obj = hit_ratio
+            elif key == "volatility":
+               obj = volatility
+            elif key == "corr_rm":
+               obj = corr_rm
+            else:
+               obj = fo.get(key)
+            
+            if isinstance(obj, (pd.Series, pd.DataFrame)):
+               if isinstance(obj.index, pd.DatetimeIndex):
+                  plot_items.append((key, obj))
+     
+        # ------------------------------------------------------------------
+        # 9. Plotly chart
+        # ------------------------------------------------------------------
+        n_metric_rows = len(plot_items)
+        total_rows = 1 + max(n_metric_rows, 1)
+
+        fig = make_subplots(
+            rows=total_rows,
+            cols=1,
+            shared_xaxes=True,
+            row_heights=[0.55] + [0.45 / max(n_metric_rows, 1)] * max(n_metric_rows, 1),
+            vertical_spacing=0.08,
+            subplot_titles=["Portfolio Performance"] + [
+              k.replace("_", " ").title() for k, _ in plot_items
+            ],
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x=gross_equity.index, y=gross_equity,
+                name="Gross Return", mode="lines",
+                line=dict(color="#2E86AB", width=1.5),
+            ), row=1, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=net_equity.index, y=net_equity,
+                name="Net Return", mode="lines",
+                line=dict(color="#A23B72", width=1.5),
+            ), row=1, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=benchmark_equity.index, y=benchmark_equity,
+                name="Benchmark", mode="lines",
+                line=dict(color="#F18F01", width=1.5, dash="dash"),
+            ), row=1, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=drawdown.index, y=drawdown,
+                name="Drawdown", fill="tozeroy",
+                fillcolor="rgba(231, 76, 60, 0.12)",
+                line=dict(color="rgba(231, 76, 60, 0.55)", width=1),
+            ), row=1, col=1,
+        )
+
+        colors = plotly.colors.qualitative.Plotly
+
+        for row, (key, obj) in enumerate(plot_items, start=2):
+          print(" plotly ", obj ,type(obj))
+          if isinstance(obj, pd.Series):
+
+             fig.add_trace(
+                go.Scatter(
+                 x=obj.index,
+                 y=obj,
+                 mode="lines",
+                 name=key.replace("_", " ").title(),
+                 line=dict(width=1.5),
+                ),
+                row=row,
+                col=1,
+             )
+
+          else:
+
+            for j, col in enumerate(obj.columns):
+
+             fig.add_trace(
+                go.Scatter(
+                    x=obj.index,
+                    y=obj[col],
+                    mode="lines",
+                    name=f"{key}: {col}",
+                    legendgroup=key,
+                    line=dict(
+                        width=1,
+                        color=colors[j % len(colors)],
+                    ),
+                ),
+                row=row,
+                col=1,
+             )
+
+        fig.update_layout(
+            template="plotly_white",
+            hovermode="x unified",
+            height=300 + 250 * total_rows,
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom", y=1.02,
+                xanchor="right", x=1,
+            ),
+            margin=dict(l=60, r=60, t=100, b=40),
+        )
+        fig.update_yaxes(title_text="Equity", row=1, col=1)
+        for i in range(2, total_rows + 1):
+            fig.update_yaxes(title_text="Value", row=i, col=1)
+        fig.update_xaxes(title_text="Date", row=total_rows, col=1)
+
+        # ------------------------------------------------------------------
+        # 10. Output
+        # ------------------------------------------------------------------
+        metrics = {
+            "gross_return":     gross_cumret,
+            "net_return":       net_cumret,
+            "sharpe":           _scalar("sharpe"),
+            "volatility":       _scalar("volatility"),
+            "max_drawdown":     _scalar("max_drawdown") if fo.get("max_drawdown") is not None else float(drawdown.min()),
+            "btc_correlation":  _scalar("corr_rm"),
+            "alpha":            _scalar("alpha"),
+            "beta":             _scalar("beta"),
+            "tstat_alpha":      _scalar("tstat_alpha"),
+            "hit_ratio":        _scalar("hit_ratio"),
+            "ic":               _scalar("ic"),
+            "mean_turnover":    mean_turnover,
+            "total_turnover":   total_turnover,
+            "total_costs":      total_costs,
+        }
+        series = {
+            "gross_return":     gross_return,
+            "net_return":       net_return,
+            "gross_equity":     gross_equity,
+            "net_equity":       net_equity,
+            "benchmark_equity": benchmark_equity,
+            "drawdown":         drawdown,
+            "weights":          weights,
+            "executed_weight":  executed_weight,
+            "lagged_weights":   lagged_weights,
+            "turnover":         turnover_series,
+            "costs":            costs,
+        }
+
+        return {"chart": fig, "metrics": metrics, "series": series}
+
+
+class Portfolio0:
 
     def invoke(
         self,
@@ -2789,226 +3253,6 @@ class Portfolio:
                 "lagged_weights":   lagged_weights,
             },
         }
-
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-
-class Portfolio0:
-
-      def invoke(
-        self,
-        fo,
-        weights: pd.DataFrame,
-        returns: pd.DataFrame,
-        benchmark: pd.Series,
-        transaction_cost: float = 0.0005,
-        annualization: int = 252
-        ):
-
-        # -----------------------------------------
-        # Align data
-        # -----------------------------------------
-        idx = (
-            weights.index
-            .intersection(returns.index)
-            .intersection(benchmark.index)
-        )
-
-        weights   = weights.loc[idx]
-        returns   = returns.loc[idx]
-        benchmark = benchmark.loc[idx]
-        fo = fo
-        # -----------------------------------------
-        # Lag weights
-        # -----------------------------------------
-        lagged_weights = weights.shift(1).fillna(0)
-
-        # -----------------------------------------
-        # Portfolio returns
-        # -----------------------------------------
-        gross_return = (
-            lagged_weights * returns
-        ).sum(axis=1)
-
-        # -----------------------------------------
-        # Turnover
-        # -----------------------------------------
-        turnover = (
-            weights.diff()
-            .abs()
-            .sum(axis=1)
-        )
-        turnover.iloc[0] = 0
-
-        # -----------------------------------------
-        # Transaction cost
-        # -----------------------------------------
-        costs = turnover * transaction_cost
-
-        # -----------------------------------------
-        # Net return
-        # -----------------------------------------
-        net_return = gross_return - costs
-
-        # -----------------------------------------
-        # Equity curves
-        # -----------------------------------------
-        gross_equity = (1 + gross_return).cumprod()
-        net_equity   = (1 + net_return).cumprod()
-        benchmark_equity = (1 + benchmark).cumprod()
-
-        # -----------------------------------------
-        # Risk statistics
-        # -----------------------------------------
-        volatility = (
-            net_return.std()
-            * np.sqrt(annualization)
-        )
-
-        sharpe = (
-            np.sqrt(annualization)
-            * net_return.mean()
-            / net_return.std()
-            if net_return.std() != 0
-            else np.nan
-        )
-
-        drawdown = (
-            net_equity /
-            net_equity.cummax()
-            - 1
-        )
-        max_drawdown = drawdown.min()
-
-        # -----------------------------------------
-        # BTC correlation
-        # -----------------------------------------
-        btc_corr = net_return.corr(benchmark)
-
-        # -----------------------------------------
-        # Alpha / Beta Regression  (pure numpy)
-        # -----------------------------------------
-        df = pd.concat(
-            [
-                net_return.rename("portfolio"),
-                benchmark.rename("benchmark")
-            ],
-            axis=1
-        ).dropna()
-
-        alpha       = fo.get("alpha")
-        beta        = fo.get("beta")
-        tstat_alpha = fo.get("tstat_alpha")
-
-        n = len(df)
-        if n > 5:
-            x = df["benchmark"].values
-            y = df["portfolio"].values
-
-            x_mean = x.mean()
-            y_mean = y.mean()
-
-            xm = x - x_mean
-            ym = y - y_mean
-
-            Sxx = np.dot(xm, xm)
-            if Sxx > 1e-12:
-                beta  = np.dot(xm, ym) / Sxx
-                alpha = y_mean - beta * x_mean
-
-                resid = y - (alpha + beta * x)
-                sse   = np.dot(resid, resid)
-                mse   = sse / (n - 2) if n > 2 else sse
-
-                var_alpha = mse * (1.0 / n + (x_mean ** 2) / Sxx)
-                if var_alpha > 0:
-                    se_alpha    = np.sqrt(var_alpha)
-                    tstat_alpha = alpha / se_alpha if se_alpha > 1e-12 else np.nan
-
-        # -----------------------------------------
-        # Plotly chart
-        # -----------------------------------------
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Scatter(
-                x=gross_equity.index,
-                y=gross_equity,
-                name="Gross Return",
-                mode="lines"
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=net_equity.index,
-                y=net_equity,
-                name="Net Return",
-                mode="lines"
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=benchmark_equity.index,
-                y=benchmark_equity,
-                name="Benchmark",
-                mode="lines",
-                line=dict(dash="dash")
-            )
-        )
-
-        fig.add_trace(
-            go.Scatter(
-                x=drawdown.index,
-                y=drawdown,
-                name="Drawdown",
-                yaxis="y2"
-            )
-        )
-
-        fig.update_layout(
-            title="Portfolio Performance",
-            template="plotly_white",
-            hovermode="x unified",
-            yaxis=dict(title="Equity"),
-            yaxis2=dict(
-                title="Drawdown",
-                overlaying="y",
-                side="right"
-            )
-        )
-
-        # -----------------------------------------
-        # Output
-        # -----------------------------------------
-        return {
-            "chart": fig,
-            "metrics": {
-                "gross_return":    fo.get("ret"),
-                "net_return":      fo.get("net_ret"),
-                "sharpe":          fo.get("sharpe"),
-                "volatility":      fo.get("volatility"),
-                "max_drawdown":    fo.get("max_drawdown"),
-                "btc_correlation":  fo.get("corr_rm"),
-                "alpha":            fo.get("alpha"),
-                "beta":             fo.get("beta"),
-                "tstat_alpha":      fo.get("tstat_alpha"),
-                "turnover":         fo.get("turnover"),
-                "transaction_cost": costs
-            },
-            "series": {
-                "gross_return":   gross_return,
-                "net_return":     net_return,
-                "equity":         net_equity,
-                "benchmark":      benchmark_equity,
-                "drawdown":       drawdown,
-                "weights":        weights,
-                "lagged_weights": lagged_weights
-            }
-        }
-
 
 # =====================================================
 # MAIN EXECUTION

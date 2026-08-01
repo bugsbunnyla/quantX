@@ -1,0 +1,16 @@
+{
+  "gross_return": 1.7090743573589116,
+  "net_return": 1.7089960319315258,
+  "sharpe": 0.5910451670280479,
+  "volatility": "BTCUSDT     0.024909\nETHUSDT     0.034115\nSOLUSDT     0.046952\nBNBUSDT     0.027502\nXRPUSDT     0.043784\nDOGEUSDT    0.046556\ndtype: float64",
+  "max_drawdown": -0.6415023348171276,
+  "btc_correlation": "BTCUSDT     1.000000\nETHUSDT     0.833088\nSOLUSDT     0.757913\nBNBUSDT     0.712467\nXRPUSDT     0.690779\nDOGEUSDT    0.740497\ndtype: float64",
+  "alpha": 0.0009779827686682504,
+  "beta": -0.0448207762157036,
+  "tstat_alpha": "BTCUSDT     0.000418\nETHUSDT     0.000228\nSOLUSDT     0.000377\nBNBUSDT     0.000291\nXRPUSDT     0.000325\nDOGEUSDT    0.000239\ndtype: float64",
+  "hit_ratio": "BTCUSDT     1.0\nETHUSDT     1.0\nSOLUSDT     1.0\nBNBUSDT     1.0\nXRPUSDT     1.0\nDOGEUSDT    1.0\ndtype: object",
+  "ic": "BTCUSDT     0.021591\nETHUSDT     0.022827\nSOLUSDT     0.022760\nBNBUSDT    -0.018988\nXRPUSDT     0.031374\nDOGEUSDT    0.105436\ndtype: float64",
+  "mean_turnover": 0.0006839945280328736,
+  "total_turnover": 0.9999999999840611,
+  "total_costs": 0.0
+}
