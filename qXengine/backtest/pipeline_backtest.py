@@ -859,6 +859,7 @@ class BacktestEngine:
                 if not hasattr(fo, "reporting"):
                     continue
                 try:
+                    fo.assemble()              # <-- FIX: assemble before reporting
                     report_out = fo.reporting()
                     report = formula_report(report_out, mode="df_multi", lookup="columns")
                 except Exception:
@@ -1166,14 +1167,50 @@ class CombinatorialScenarioOptimizer:
         rpt_fo = FormulaInfo(data)
         rpt_fo.assemble()
         rpt = rpt_fo.reporting()
-        formula_outputs = formula_report(rpt, mode="df_easy", lookup="index")
-        ml = MLTrainEngine()
-        X, y = ml.build_feature_matrix(
-            strategy_results=[],
-            formula_outputs=[formula_outputs],
-            raw_data=data,
-        )
-        return X, y
+
+        # --- Robust extraction: try reporting first, fall back to fo.get("ret") ---
+        try:
+            formula_outputs = formula_report(rpt, mode="df_easy", lookup="index")
+            ml = MLTrainEngine()
+            X, y = ml.build_feature_matrix(
+                strategy_results=[],
+                formula_outputs=[formula_outputs],
+                raw_data=data,
+            )
+            if X.shape[0] > 0 and len(y) > 0 and y.std() > 0:
+                return X, y
+            raise ValueError("Empty or constant y from formula_report")
+        except Exception:
+            # Fallback: build directly from raw data
+            ret_raw = rpt_fo.get("ret")
+            if isinstance(ret_raw, pd.DataFrame):
+                y = ret_raw.iloc[-1].copy()
+            elif isinstance(ret_raw, pd.Series):
+                y = ret_raw.copy()
+            else:
+                y = pd.Series({
+                    sym: df["close"].pct_change().iloc[-1]
+                    for sym, df in data.items()
+                    if isinstance(df, pd.DataFrame) and "close" in df.columns
+                })
+            y.index = y.index.astype(str)
+            y.index.name = "symbol"
+            y = y.rename("market_ret")
+
+            rows = []
+            for sym, df in data.items():
+                if not isinstance(df, pd.DataFrame):
+                    continue
+                row = {"symbol": sym}
+                for col in ["open", "high", "low", "close", "volume"]:
+                    if col in df.columns:
+                        row[f"raw_{col}"] = df[col].iloc[-1]
+                rows.append(row)
+            X = pd.DataFrame(rows)
+            X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
+            y = y.replace([np.inf, -np.inf], np.nan).fillna(0)
+            print(f"[FALLBACK] X={X.shape}, y={len(y)}, ret_range=[{y.min():.4f}, {y.max():.4f}]")
+            return X, y
 
     def optimize(self, base_model_package, data, param_grid, scenarios=None):
         if scenarios is None:
@@ -1549,6 +1586,7 @@ class SRFORegistry:
             fo = item["object"]
             if not hasattr(fo, "reporting"):
                 continue
+            fo.assemble()                      # <-- FIX: assemble before reporting
             df = fo.reporting().copy()
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = [f"{fo_id}_{c[0]}_{c[1]}" for c in df.columns]
@@ -1828,14 +1866,53 @@ class AgenticPipeline:
         rpt_fo = FormulaInfo(data)
         rpt_fo.assemble()
         rpt = rpt_fo.reporting()
-        rpt = formula_report(rpt, mode="df_easy", lookup="symbol_features")
-        print(rpt.index)
-        print(rpt.columns)
-        y = rpt["market_ret"].copy()
-        X = rpt.drop(columns=["market_ret"], errors="ignore")
+
+        # --- Robust extraction: try reporting first, fall back to fo.get("ret") ---
+        y = None
+        try:
+            rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
+            if "market_ret" in rpt_norm.columns and not rpt_norm["market_ret"].isna().all():
+                y = rpt_norm["market_ret"].copy()
+                X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
+            else:
+                raise KeyError("market_ret missing or all-NaN")
+        except (KeyError, ValueError):
+            # Fallback: read ret directly from FormulaInfo.get()
+            ret_raw = rpt_fo.get("ret")
+            if isinstance(ret_raw, pd.DataFrame):
+                y = ret_raw.iloc[-1].copy()
+            elif isinstance(ret_raw, pd.Series):
+                y = ret_raw.copy()
+            else:
+                # Last resort: compute from close
+                y = pd.Series({
+                    sym: df["close"].pct_change().iloc[-1]
+                    for sym, df in data.items()
+                    if isinstance(df, pd.DataFrame) and "close" in df.columns
+                })
+            y.index = y.index.astype(str)
+            y.index.name = "symbol"
+            y = y.rename("market_ret")
+
+            # Build X from reporting if possible, else raw last-bar
+            try:
+                rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
+                X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
+            except Exception:
+                rows = []
+                for sym, df in data.items():
+                    if not isinstance(df, pd.DataFrame):
+                        continue
+                    row = {"symbol": sym}
+                    for col in ["open", "high", "low", "close", "volume"]:
+                        if col in df.columns:
+                            row[f"raw_{col}"] = df[col].iloc[-1]
+                    rows.append(row)
+                X = pd.DataFrame(rows)
+
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
         y = y.replace([np.inf, -np.inf], np.nan).fillna(0)
-        print(y.dtype)
+        print(f"[FALLBACK] X={X.shape}, y={len(y)}, ret_range=[{y.min():.4f}, {y.max():.4f}]")
         return X, y
 
     def run_agent(self, params=None, max_iters=5, run_combinatorial=True, param_grid=None):
