@@ -822,7 +822,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992096D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE596D0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -2660,7 +2660,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE9920AFD0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE5AFD0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -4502,7 +4502,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992028B0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE528B0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -6340,7 +6340,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEACB26450>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C26DA450>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -8178,7 +8178,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB33BC750>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8FF4750>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -10023,7 +10023,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99252270>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEA2270>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -11860,7 +11860,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEAB48A8B0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C10DE8B0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -13697,7 +13697,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEAB48AD70>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C10DED70>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -15534,7 +15534,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992AAE70>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEFAE70>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -17371,7 +17371,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99202470>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE52470>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -19208,7 +19208,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99266D50>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEB6D50>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -21045,7 +21045,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99266E40>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEB6E40>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -22882,7 +22882,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992FEA50>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEF4EA50>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -24719,7 +24719,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992FF4D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEF4F4D0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -26556,7 +26556,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB3060FC0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8CA8FC0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -28393,7 +28393,7 @@ TONUSDT     2.096189
 UNIUSDT     1.048209
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB33B71D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8FFF1D0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.389765
 ETHUSDT     1.650528
@@ -29450,7 +29450,7 @@ date                                ...
 
 [1462 rows x 29 columns] signal.shift(1)*ret ['signal', 'ret'] strategy_returns
 [SRFO] Engine: 16 strategies, 16 raw formulaOutput objects
-[DEBUG SRFO] {'results': [<qXengine.StrategyResult.StrategyResult object at 0x000001FE99252BA0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE9920B390>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEAB48A3F0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE99202140>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEACB24350>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE992676B0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE992FE7B0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE992CFE10>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEABA7BD10>, <qXengine.StrategyResult.StrategyResult object at 0x000001FE99609DE0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEB30CF750>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEB58B08D0>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEB5A0CD00>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEB7A49F60>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEB7ACD010>, <qXengine.StrategyResult.StrategyResult object at 0x000001FEBAAC3540>], 'formula_outputs': [(symbol                              BTCUSDT  ETHUSDT  ...  TONUSDT  UNIUSDT
+[DEBUG SRFO] {'results': [<qXengine.StrategyResult.StrategyResult object at 0x00000170AEEA2BA0>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AEE5B390>, <qXengine.StrategyResult.StrategyResult object at 0x00000170C10DE3F0>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AEE52140>, <qXengine.StrategyResult.StrategyResult object at 0x00000170C26D8350>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AEEB76B0>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AEF4E7B0>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AEF1FE10>, <qXengine.StrategyResult.StrategyResult object at 0x00000170C16CBD10>, <qXengine.StrategyResult.StrategyResult object at 0x00000170AF51B750>, <qXengine.StrategyResult.StrategyResult object at 0x00000170C8D8B750>, <qXengine.StrategyResult.StrategyResult object at 0x00000170CB5C88D0>, <qXengine.StrategyResult.StrategyResult object at 0x00000170CB4F4D00>, <qXengine.StrategyResult.StrategyResult object at 0x00000170CD695F60>, <qXengine.StrategyResult.StrategyResult object at 0x00000170CD71D010>, <qXengine.StrategyResult.StrategyResult object at 0x00000170D0713540>], 'formula_outputs': [(symbol                              BTCUSDT  ETHUSDT  ...  TONUSDT  UNIUSDT
 category         metric                               ...                  
 market           symbol                 NaN      NaN  ...      NaN      NaN
                  price                  NaN      NaN  ...      NaN      NaN
@@ -31178,7 +31178,7 @@ decision_score                          NaN      NaN  ...      NaN      NaN
 decision_signal                         NaN      NaN  ...      NaN      NaN
 decision_psignal                        NaN      NaN  ...      NaN      NaN
 
-[51 rows x 29 columns])], 'formula_outputs_raw': [<qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99252270>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992096D0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE9920AFD0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEAB48A8B0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEAB48AD70>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992AAE70>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99202470>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992028B0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEACB26450>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB33BC750>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99266D50>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE99266E40>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992FEA50>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FE992FF4D0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB3060FC0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB33B71D0>], 'raw_data': {'BTCUSDT':            date     adj close  ...       volume       ret
+[51 rows x 29 columns])], 'formula_outputs_raw': [<qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEA2270>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE596D0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE5AFD0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C10DE8B0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C10DED70>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEFAE70>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE52470>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEE528B0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C26DA450>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8FF4750>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEB6D50>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEEB6E40>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEF4EA50>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170AEF4F4D0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8CA8FC0>, <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8FFF1D0>], 'raw_data': {'BTCUSDT':            date     adj close  ...       volume       ret
 0    2022-08-03  22846.507812  ...  26288169966       NaN
 1    2022-08-04  22630.957031  ...  25120229769 -0.009435
 2    2022-08-05  23289.314453  ...  28881249043  0.029091
@@ -31558,7 +31558,7 @@ decision_psignal                        NaN      NaN  ...      NaN      NaN
 [989 rows x 8 columns]}}
 [FEATURE BUILD] strategy_results=16, formula_outputs=16, raw_data=YES
 [FEATURE BUILD] Mode: PURE SRFO (strategies + formula outputs)
-[SRFO] Engine output failed: Passing 'suffixes' which cause duplicate columns {'fo_market_mkt_price_y', 'fo_portfolio_weight_x', 'fo_decision_score_y', 'fo_portfolio_executed_weight_x', 'fo_market_volume_y', 'fo_execution_impact_y', 'fo_alpha_residual_x', 'fo_execution_tcost_x', 'fo_portfolio_net_ret_x', 'fo_portfolio_weight_y', 'fo_decision_psignal_x', 'fo_portfolio_net_ret_y', 'fo_decision_score_x', 'fo_risk_sharpe_y', 'fo_basic_tstat_beta_x', 'fo_market_structure_regime_x', 'fo_alpha_xs_x', 'fo_transform_winsor_x', 'fo_market_price_x', 'fo_execution_turnover_y', 'fo_execution_slippage_x', 'fo_market_price_y', 'fo_market_structure_liq_adj_vol_y', 'fo_intel_ic_x', 'fo_market_mkt_price_x', 'fo_basic_corr_rm_y', 'fo_alpha_xs_y', 'fo_risk_volatility_y', 'fo_execution_pturnover_x', 'fo_alpha_beta_x', 'fo_basic_tstat_alpha_x', 'fo_basic_r_squared_x', 'fo_basic_corr_x', 'fo_risk_cvar_y', 'fo_transform_zscore_x', 'fo_basic_corr_y', 'fo_transform_tanh_x', 'fo_market_symbol_x', 'fo_risk_cvar_x', 'fo_alpha_ts_x', 'fo_execution_slippage_y', 'fo_portfolio_kelly_y', 'fo_execution_impact_x', 'fo_portfolio_executed_weight_y', 'fo_basic_norm_weight_x', 'fo_decision_signal_y', 'fo_execution_pturnover_y', 'fo_market_volume_x', 'fo_transform_winsor_y', 'fo_transform_tanh_y', 'fo_alpha_alpha_x', 'fo_portfolio_mvo_x', 'fo_alpha_pure_x', 'fo_basic_tstat_y', 'fo_risk_max_drawdown_y', 'fo_basic_corr_rm_x', 'fo_market_structure_liquidity_adj_vol_x', 'fo_execution_turnover_x', 'fo_basic_tstat_x', 'fo_market_structure_liq_adj_vol_x', 'fo_basic_tstat_alpha_y', 'fo_market_structure_liquidity_adj_vol_y', 'fo_portfolio_entropy_y', 'fo_risk_volatility_x', 'fo_basic_hit_ratio_x', 'fo_alpha_beta_y', 'fo_execution_transaction_cost_x', 'fo_portfolio_mvo_y', 'fo_risk_sharpe_x', 'fo_market_symbol_y', 'fo_risk_max_drawdown_x', 'fo_transform_zscore_y', 'fo_basic_tstat_beta_y', 'fo_basic_hit_ratio_y', 'fo_transform_rank_y', 'fo_alpha_alpha_y', 'fo_portfolio_inv_vol_y', 'fo_alpha_pure_y', 'fo_alpha_residual_y', 'fo_risk_drawdown_y', 'fo_decision_psignal_y', 'fo_portfolio_kelly_x', 'fo_market_mkt_ret_x', 'fo_alpha_ts_y', 'fo_transform_rank_x', 'fo_portfolio_risk_parity_y', 'fo_portfolio_entropy_x', 'fo_basic_norm_weight_y', 'fo_transform_detrend_y', 'fo_transform_detrend_x', 'fo_basic_r_squared_y', 'fo_decision_signal_x', 'fo_intel_ic_y', 'fo_execution_tcost_y', 'fo_market_mkt_ret_y', 'fo_execution_transaction_cost_y', 'fo_market_structure_regime_y', 'fo_portfolio_inv_vol_x', 'fo_portfolio_risk_parity_x', 'fo_risk_drawdown_x'} is not allowed.
+[SRFO] Engine output failed: Passing 'suffixes' which cause duplicate columns {'fo_market_structure_liquidity_adj_vol_x', 'fo_basic_corr_x', 'fo_portfolio_kelly_y', 'fo_market_structure_liq_adj_vol_y', 'fo_alpha_pure_y', 'fo_basic_norm_weight_y', 'fo_transform_tanh_x', 'fo_basic_tstat_alpha_y', 'fo_decision_signal_x', 'fo_risk_cvar_x', 'fo_market_structure_liq_adj_vol_x', 'fo_decision_psignal_y', 'fo_intel_ic_x', 'fo_portfolio_entropy_x', 'fo_basic_corr_rm_y', 'fo_risk_sharpe_y', 'fo_market_structure_regime_y', 'fo_execution_tcost_y', 'fo_transform_rank_y', 'fo_basic_norm_weight_x', 'fo_alpha_xs_x', 'fo_transform_rank_x', 'fo_alpha_alpha_x', 'fo_alpha_xs_y', 'fo_risk_drawdown_y', 'fo_portfolio_mvo_x', 'fo_market_mkt_price_x', 'fo_basic_corr_y', 'fo_portfolio_mvo_y', 'fo_portfolio_weight_x', 'fo_alpha_beta_y', 'fo_alpha_residual_y', 'fo_execution_impact_y', 'fo_execution_turnover_y', 'fo_risk_cvar_y', 'fo_alpha_residual_x', 'fo_portfolio_executed_weight_x', 'fo_alpha_ts_x', 'fo_transform_zscore_y', 'fo_market_volume_x', 'fo_market_structure_liquidity_adj_vol_y', 'fo_execution_transaction_cost_x', 'fo_decision_score_y', 'fo_basic_tstat_beta_x', 'fo_execution_slippage_x', 'fo_basic_tstat_beta_y', 'fo_market_structure_regime_x', 'fo_decision_signal_y', 'fo_portfolio_net_ret_x', 'fo_transform_winsor_y', 'fo_execution_slippage_y', 'fo_portfolio_inv_vol_y', 'fo_decision_score_x', 'fo_alpha_pure_x', 'fo_risk_volatility_x', 'fo_transform_tanh_y', 'fo_transform_detrend_y', 'fo_portfolio_inv_vol_x', 'fo_intel_ic_y', 'fo_risk_drawdown_x', 'fo_basic_tstat_alpha_x', 'fo_execution_pturnover_x', 'fo_market_symbol_x', 'fo_basic_hit_ratio_y', 'fo_basic_r_squared_y', 'fo_transform_zscore_x', 'fo_risk_max_drawdown_y', 'fo_risk_volatility_y', 'fo_portfolio_weight_y', 'fo_portfolio_kelly_x', 'fo_portfolio_entropy_y', 'fo_execution_transaction_cost_y', 'fo_execution_impact_x', 'fo_market_mkt_ret_x', 'fo_basic_tstat_x', 'fo_transform_winsor_x', 'fo_execution_tcost_x', 'fo_risk_max_drawdown_x', 'fo_alpha_alpha_y', 'fo_transform_detrend_x', 'fo_basic_hit_ratio_x', 'fo_market_price_y', 'fo_market_volume_y', 'fo_execution_turnover_x', 'fo_basic_r_squared_x', 'fo_basic_tstat_y', 'fo_basic_corr_rm_x', 'fo_risk_sharpe_x', 'fo_market_symbol_y', 'fo_alpha_beta_x', 'fo_decision_psignal_x', 'fo_portfolio_risk_parity_y', 'fo_execution_pturnover_y', 'fo_alpha_ts_y', 'fo_market_mkt_price_y', 'fo_portfolio_net_ret_y', 'fo_market_price_x', 'fo_portfolio_executed_weight_y', 'fo_portfolio_risk_parity_x', 'fo_market_mkt_ret_y'} is not allowed.
 [SRFO] Using fallback feature extraction...
 close [] mkt_price
            BTCUSDT      ETHUSDT   XRPUSDT  ...   CROUSDT   TONUSDT   UNIUSDT
@@ -32311,7 +32311,7 @@ TONUSDT     2.082703
 UNIUSDT     1.018238
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEB33B7290>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170C8FFF290>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT     1.353599
 ETHUSDT     1.650225
@@ -33586,7 +33586,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [  1/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.0m ETA=2.0m
+ [  1/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.0m ETA=2.8m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -35342,7 +35342,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 10/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.3m ETA=1.7m
+ [ 10/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.4m ETA=2.4m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -37293,7 +37293,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 20/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.6m ETA=1.5m
+ [ 20/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=0.8m ETA=2.0m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -39244,7 +39244,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 30/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=1.0m ETA=1.4m
+ [ 30/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=1.4m ETA=2.0m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -41195,7 +41195,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 40/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=1.5m ETA=1.2m
+ [ 40/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=2.2m ETA=1.8m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -43146,7 +43146,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 50/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=2.1m ETA=0.9m
+ [ 50/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=5.6m ETA=2.5m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -45097,7 +45097,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 60/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=3.0m ETA=0.6m
+ [ 60/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=7.0m ETA=1.4m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -47048,7 +47048,7 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 70/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=3.8m ETA=0.1m
+ [ 70/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=8.2m ETA=0.2m
 [DEBUG] X type: <class 'pandas.DataFrame'>
 [DEBUG] y type: <class 'pandas.Series'>
 [DEBUG] X shape: (14, 50)
@@ -47439,8 +47439,8 @@ SOLUSDT    True
 Name: market_ret, dtype: bool
 [ML] Dataset AFTER CLEAN: X=(14, 50), y=(14,)
 [SANITY] Max |corr(X, y)| = nan
- [ 72/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=3.9m ETA=0.0m
-[OPTIMIZER] Complete: 72 combos in 3.9m
+ [ 72/72] res=0.0000 best=0.0000 min_sharpe=0.0000 avg_score=0.0000 elapsed=8.4m ETA=0.0m
+[OPTIMIZER] Complete: 72 combos in 8.4m
 [OPTIMIZER] Best resiliency: 0.0000
 [OPTIMIZER] Best params: {'trees': 200, 'depth': 8, 'horizon': 21, 'min_samples_split': 2, 'max_features': 'sqrt', 'model': 'random_forest', '_hash': '46c6d446', 'n_jobs': 1}
 [OPTIMIZER] Best: {'trees': 200, 'depth': 8, 'horizon': 21, 'min_samples_split': 2, 'max_features': 'sqrt', 'model': 'random_forest', '_hash': '46c6d446', 'n_jobs': 1}, Resiliency: 0.0000
@@ -48381,7 +48381,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC31A87E0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170D6D787E0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -50219,7 +50219,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC6422210>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DC076210>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -52061,7 +52061,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC89B76D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DE603650>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -53899,7 +53899,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC8AD60D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DE74A050>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -55737,7 +55737,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC8A955D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170E0B2B2D0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -57582,7 +57582,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC31A81B0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170D6D781B0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -59419,7 +59419,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC64D94F0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DC2514F0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -61256,7 +61256,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC1070C20>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170D6D4E3C0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -63093,7 +63093,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC66EBF50>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DC14FED0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -64930,7 +64930,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC77F1AD0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DD43D950>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -66767,7 +66767,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC8B6A8D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DE753350>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -68604,7 +68604,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FEC8BD0ED0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170DE80AF50>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -70441,7 +70441,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FECAF019D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170E0AD5950>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -72278,7 +72278,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FECAF8FF50>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170E0B48AD0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -74115,7 +74115,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FECB01FED0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170E0C63E50>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
@@ -75952,7 +75952,7 @@ TONUSDT     1.126277
 UNIUSDT     1.049970
 dtype: float64 mean(abs(residual)) ['residual'] mae
 build_X ['future_ret'] X
-<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x000001FECD03A6D0>> build_X ['future_ret'] X
+<bound method FormulaInfo.build_X of <qXengine.strategies.FormulaInfo.FormulaInfo object at 0x00000170E2C766D0>> build_X ['future_ret'] X
 np.sqrt(mse * np.linalg.pinv(transpose_(X, X))[1, 1]) ['mse', 'X'] stderr_beta
 BTCUSDT      2.088831
 ETHUSDT      2.302661
