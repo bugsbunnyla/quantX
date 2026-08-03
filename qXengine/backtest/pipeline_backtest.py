@@ -856,18 +856,31 @@ class BacktestEngine:
         formula_outputs = package.get("formula_outputs", [])
         if formula_outputs:
             for fo in formula_outputs:
-                if not hasattr(fo, "reporting"):
-                    continue
-                try:
-                    fo.assemble()              # <-- FIX: assemble before reporting
-                    report_out = fo.reporting()
-                    report = formula_report(report_out, mode="df_multi", lookup="columns")
-                except Exception:
-                    continue
+                report = None
+
+                # Case 1: FormulaInfo live object
+                if hasattr(fo, "reporting"):
+                    try:
+                        fo.assemble()
+                        report_out = fo.reporting()
+                        report = formula_report(report_out, mode="df_multi", lookup="columns")
+                    except Exception:
+                        continue
+
+                # Case 2: Already a normalized DataFrame (from run_quantx_engine)
+                elif isinstance(fo, pd.DataFrame):
+                    report = fo
+
+                # Case 3: Raw tuple (df_multi, df_easy)
+                elif isinstance(fo, tuple) and len(fo) == 2:
+                    try:
+                        report = formula_report(fo, mode="df_multi", lookup="columns")
+                    except Exception:
+                        continue
+
                 if not isinstance(report, pd.DataFrame) or report.empty:
                     continue
-                if not isinstance(report.columns, pd.MultiIndex):
-                    continue
+
                 for col in report.columns:
                     if isinstance(col, tuple) and len(col) == 2:
                         source_key = f"{col[0]}_{col[1]}".lower()
