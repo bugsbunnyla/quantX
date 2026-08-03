@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-08-03T15:09:33.106153",
+  "timestamp": "2026-08-03T15:53:39.559983",
   "model_comparison": {
     "rmse": {
       "baseline": 0.005211627814856727,
@@ -8,10 +8,10 @@
       "pct_change": 0.0
     },
     "r2": {
-      "baseline": -1.1499427280181607e-05,
-      "optimized": -1.1499427280403651e-05,
-      "absolute_change": -2.220446049250313e-16,
-      "pct_change": -1.9309188146066056e-11
+      "baseline": -1.1499427280403651e-05,
+      "optimized": -1.1499427280181607e-05,
+      "absolute_change": 2.220446049250313e-16,
+      "pct_change": 1.930918814569321e-11
     },
     "samples": {
       "baseline": 14,

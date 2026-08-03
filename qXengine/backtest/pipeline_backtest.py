@@ -243,8 +243,7 @@ def run_quantx_engine(data, interval="4y", params=None):
         rpt_fo.assemble()          # MUST always execute
         rpt = rpt_fo.reporting()   # MUST always execute
 
-        report = formula_report(rpt, mode="df_easy", lookup="index")
-        formula_outputs.append(report)
+        formula_outputs.append(rpt)                    # raw tuple for ML / evaluate
         formula_outputs_raw.append(rpt_fo)
 
     return {
@@ -540,31 +539,45 @@ class MLTrainEngine:
             elif isinstance(formula_outputs, tuple):
                 formula_outputs = list(formula_outputs)
 
-            for fo in formula_outputs:
-                if not isinstance(fo, pd.DataFrame):
-                    continue
-                if fo.empty:
-                    continue
-
+        for fo in formula_outputs:
+            # Accept raw tuple from reporting() OR pre-normalized DataFrame
+            if isinstance(fo, tuple) and len(fo) == 2:
                 fo_df = formula_report(fo, mode="df_multi", lookup="columns")
-                if not isinstance(fo_df, pd.DataFrame):
-                    continue
-                if fo_df.empty:
-                    continue
+            elif isinstance(fo, pd.DataFrame):
+                fo_df = fo
+            else:
+                continue
 
-                if isinstance(fo_df.columns, pd.MultiIndex):
-                    feature_df = fo_df.copy()
-                    if ret_series is None:
-                        if ("market", "ret") in feature_df.columns:
-                            ret_series = feature_df[("market", "ret")].copy()
-                    feature_df.columns = [
-                        f"fo_{c[0]}_{c[1]}"
-                        for c in feature_df.columns
-                    ]
-                    feature_df.index.name = "symbol"
-                    feature_df = feature_df.reset_index()
-                    feature_df = feature_df.drop(columns=["fo_market_ret"], errors="ignore")
-                    frames.append(feature_df)
+            if not isinstance(fo_df, pd.DataFrame) or fo_df.empty:
+                continue
+
+            if isinstance(fo_df.columns, pd.MultiIndex):
+                feature_df = fo_df.copy()
+                if ret_series is None:
+                    if ("market", "ret") in feature_df.columns:
+                        ret_series = feature_df[("market", "ret")].copy()
+                feature_df.columns = [
+                    f"fo_{c[0]}_{c[1]}"
+                    for c in feature_df.columns
+                ]
+                feature_df.index.name = "symbol"
+                feature_df = feature_df.reset_index()
+                feature_df = feature_df.drop(columns=["fo_market_ret"], errors="ignore")
+                frames.append(feature_df)
+            else:
+                # df_easy style: index = "category_metric", columns = symbols
+                feature_df = fo_df.copy()
+                if ret_series is None:
+                    for idx in feature_df.index:
+                        if str(idx).lower() in ["market_ret", "ret"]:
+                            ret_series = feature_df.loc[idx].copy()
+                            break
+                feature_df.index.name = "category_metric"
+                feature_df = feature_df.reset_index()
+                # Drop ret-like rows that were transposed into columns
+                drop_cols = [c for c in feature_df.columns if "ret" in str(c).lower()]
+                feature_df = feature_df.drop(columns=drop_cols, errors="ignore")
+                frames.append(feature_df)
 
         # =====================================================
         # PHASE 2 — Strategy Results
@@ -881,15 +894,23 @@ class BacktestEngine:
                 if not isinstance(report, pd.DataFrame) or report.empty:
                     continue
 
-                for col in report.columns:
-                    if isinstance(col, tuple) and len(col) == 2:
-                        source_key = f"{col[0]}_{col[1]}".lower()
+                # Determine orientation: MultiIndex columns (df_multi) vs flat index (df_easy)
+                if isinstance(report.columns, pd.MultiIndex):
+                    iter_items = report.columns
+                    get_value = lambda item: report[item]
+                else:
+                    iter_items = report.index
+                    get_value = lambda item: report.loc[item]
+
+                for item in iter_items:
+                    if isinstance(item, tuple) and len(item) == 2:
+                        source_key = f"{item[0]}_{item[1]}".lower()
                     else:
-                        source_key = str(col).lower()
+                        source_key = str(item).lower()
                     for output_key, lookup_key in metric_map.items():
                         if source_key != lookup_key.lower():
                             continue
-                        value = report[col]
+                        value = get_value(item)
                         if isinstance(value, pd.Series):
                             value = value.replace([np.inf, -np.inf], np.nan).dropna()
                             if value.empty:
@@ -902,14 +923,30 @@ class BacktestEngine:
                         except Exception:
                             pass
 
+        # Fallback: scan X columns (including fo_-prefixed features)
         X = package.get("X")
         if isinstance(X, pd.DataFrame):
             for output_key, column_name in metric_map.items():
                 if output_key in metrics:
                     continue
-                if column_name not in X.columns:
+                # Exact match
+                candidates = [column_name]
+                # Common prefixes from build_features
+                candidates += [f"fo_{column_name}", f"fo_{column_name.replace('_', '_', 1)}"]
+                # Substring match in column names
+                found_col = None
+                for cand in candidates:
+                    if cand in X.columns:
+                        found_col = cand
+                        break
+                if found_col is None:
+                    # Loose substring search
+                    matches = [c for c in X.columns if column_name in str(c)]
+                    if matches:
+                        found_col = matches[0]
+                if found_col is None:
                     continue
-                value = X[column_name].replace([np.inf, -np.inf], np.nan).dropna()
+                value = X[found_col].replace([np.inf, -np.inf], np.nan).dropna()
                 if value.empty:
                     continue
                 metrics[output_key] = float(value.mean())
@@ -1167,11 +1204,11 @@ class CombinatorialScenarioOptimizer:
             return {"scenario": scenario_name, "params": params, "metrics": metrics,
                     "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]}
 
-        package = {"X": X, "y": y, "features": list(X.columns)}
+        package = {"X": X, "y": y, "features": list(X.columns), "formula_outputs": formula_outputs}
         signal = self.backtest.signal(model_package, package)
         metrics = self.backtest.evaluate(package, signal)
         return {"scenario": scenario_name, "params": params, "metrics": metrics,
-                "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]}
+                "sharpe": metrics.get("sharpe", 0.0), "score": metrics.get("score", 0.0), "corr": metrics.get("corr", 0.0)}
 
     def _build_features_from_raw(self, data):
         """
