@@ -463,6 +463,9 @@ class IntradayReversal(BaseStrategy):
             return StrategyResult(
                 name=self.__class__.__name__,
                 data=self.data
+                metrics=None,
+                signals = None,
+                chart=None
             )
 
         # NOTE:

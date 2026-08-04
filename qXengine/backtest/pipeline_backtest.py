@@ -41,6 +41,8 @@ Changes:
   9. Simple portfolio-level summary table printed and saved.
 """
 
+
+
 import os
 import pickle
 import json
@@ -1102,13 +1104,19 @@ class BacktestEngine:
                 if n_valid >= 3:
                     # Correlation (Pearson)
                     if np.std(y_clean) > 1e-12 and np.std(s_clean) > 1e-12:
-                        corr = float(np.corrcoef(y_clean, s_clean)[0, 1])
+                        try:
+                            corr = float(np.corrcoef(y_clean, s_clean)[0, 1])
+                        except Exception:
+                            corr = 0.0
                     else:
                         corr = 0.0
                     # Information Coefficient (Spearman rank)
-                    try:
-                        ic = float(stats.spearmanr(y_clean, s_clean)[0])
-                    except Exception:
+                    if np.std(s_clean) > 1e-12 and np.std(y_clean) > 1e-12:
+                        try:
+                            ic = float(stats.spearmanr(y_clean, s_clean)[0])
+                        except Exception:
+                            ic = 0.0
+                    else:
                         ic = 0.0
                     # Hit ratio (directional accuracy)
                     hit = float(np.mean(np.sign(y_clean) == np.sign(s_clean)))
@@ -1156,9 +1164,7 @@ class BacktestEngine:
                     max_drawdown = float(np.min(drawdowns))
 
                     # Portfolio alpha t-stat: intercept from daily portfolio ret vs BTC ret
-                    # We use y_clean as proxy for BTC-aligned returns in cross-section
-                    # For time-series t-stat, we regress port_rets on y_clean (market proxy)
-                    if np.std(y_clean) > 1e-12 and len(port_rets) >= 3:
+                    if np.std(y_clean) > 1e-12 and len(port_rets) >= 3 and np.std(port_rets) > 1e-12:
                         # OLS: port_rets = alpha + beta*y_clean + epsilon
                         x_mean = np.mean(y_clean)
                         y_mean = np.mean(port_rets)
@@ -1172,13 +1178,17 @@ class BacktestEngine:
                         alpha_ols = alpha
                         tstat_alpha = float(alpha / (np.std(port_rets) / np.sqrt(n_valid) + 1e-12)) if np.std(port_rets) > 0 else 0.0
 
-                    # Composite score
+                    # Composite score — sanitize NaN/inf before weighting
+                    ic_safe = float(np.nan_to_num(ic, nan=0.0, posinf=0.0, neginf=0.0))
+                    corr_safe = float(np.nan_to_num(corr, nan=0.0, posinf=0.0, neginf=0.0))
+                    sharpe_safe = float(np.nan_to_num(sharpe, nan=0.0, posinf=0.0, neginf=0.0))
+                    r2_safe = float(np.nan_to_num(r2, nan=0.0, posinf=0.0, neginf=0.0))
                     score = (
-                        0.25 * abs(ic) +
-                        0.25 * abs(corr) +
+                        0.25 * abs(ic_safe) +
+                        0.25 * abs(corr_safe) +
                         0.20 * hit +
-                        0.15 * max(0, sharpe) +
-                        0.15 * max(0, r2)
+                        0.15 * max(0, sharpe_safe) +
+                        0.15 * max(0, r2_safe)
                     )
 
                     metrics = {
@@ -2129,19 +2139,54 @@ class AgenticPipeline:
         print(f"\n{'='*60}")
         print("DATA SUFFICIENCY CHECK")
         print(f"{'='*60}")
+        # NEW: configurable gate behavior
+        min_rows = params.get("min_rows", MIN_ROWS_PER_ASSET)
+        skip_insufficient = params.get("skip_insufficient", True)
+
         insufficient_assets = []
         for sym, df in self.data.items():
-            if not isinstance(df, pd.DataFrame) or len(df) < MIN_ROWS_PER_ASSET:
-                insufficient_assets.append(sym)
+            if not isinstance(df, pd.DataFrame) or len(df) < min_rows:
+                insufficient_assets.append({"symbol": sym, "rows": len(df) if isinstance(df, pd.DataFrame) else 0})
+
         if insufficient_assets:
-            print(f"[DATA_GATE] WARNING: {len(insufficient_assets)} assets below {MIN_ROWS_PER_ASSET} rows: {insufficient_assets}")
-            print(f"[DATA_GATE] Flagging DATA_INSUFFICIENT for human review.")
-            self.storage.save_json({
-                "flag": "DATA_INSUFFICIENT", "assets": insufficient_assets,
-                "min_required": MIN_ROWS_PER_ASSET, "timestamp": datetime.now().isoformat()
-            }, "data_insufficient_flag.json")
+            if skip_insufficient:
+                # FILTER MODE: drop young assets and continue
+                filtered_data = {
+                    sym: df for sym, df in self.data.items()
+                    if isinstance(df, pd.DataFrame) and len(df) >= min_rows
+                }
+                if not filtered_data:
+                    raise ValueError(
+                        f"[DATA_GATE] HALT: All {len(insufficient_assets)} assets filtered out. "
+                        f"No asset meets {min_rows} row minimum."
+                    )
+                print(f"[DATA_GATE] FILTERED: Removed {len(insufficient_assets)} assets below {min_rows} rows.")
+                print(f"[DATA_GATE] Removed: " + ", ".join(f"{a['symbol']}({a['rows']})" for a in insufficient_assets))
+                print(f"[DATA_GATE] Continuing with {len(filtered_data)} assets.")
+                self.storage.save_json({
+                    "flag": "DATA_FILTERED",
+                    "removed_assets": insufficient_assets,
+                    "min_required": min_rows,
+                    "remaining_count": len(filtered_data),
+                    "timestamp": datetime.now().isoformat()
+                }, "data_filtered_flag.json")
+                self.data = filtered_data
+            else:
+                # HALT MODE: original behavior (for strict production gates)
+                msg = (
+                    f"[DATA_GATE] HALT: {len(insufficient_assets)} assets below {min_rows} rows: "
+                    + ", ".join(f"{a['symbol']}({a['rows']})" for a in insufficient_assets)
+                )
+                print(msg)
+                self.storage.save_json({
+                    "flag": "DATA_INSUFFICIENT",
+                    "assets": insufficient_assets,
+                    "min_required": min_rows,
+                    "timestamp": datetime.now().isoformat()
+                }, "data_insufficient_flag.json")
+                raise ValueError(msg)
         else:
-            print(f"[DATA_GATE] All assets pass >= {MIN_ROWS_PER_ASSET} rows check.")
+            print(f"[DATA_GATE] All {len(self.data)} assets pass >= {min_rows} rows check.")
 
         # === CREATE RUN FOLDER ===
         self.current_run_idx, run_path = self.storage.create_run()
@@ -2240,8 +2285,21 @@ class AgenticPipeline:
             val_signal = self.backtest.signal(train_pkg, val_pkg)
             val_metrics = self.backtest.evaluate(val_pkg, val_signal)
 
-            print(f"Train: Sharpe={train_metrics.get('sharpe', 0):.3f} Score={train_metrics.get('score', 0):.3f}")
-            print(f"Val:   Sharpe={val_metrics.get('sharpe', 0):.3f} Score={val_metrics.get('score', 0):.3f}")
+            def _fmt_metrics(m, label):
+                keys = ["sharpe", "volatility", "max_drawdown", "alpha", "beta", "tstat_alpha",
+                        "corr", "ic", "hit", "r2", "turnover", "tcost_10bps", "tcost_20bps", "score", "samples"]
+                print(f"\n{'='*50}")
+                print(f"  {label} METRICS")
+                print(f"{'='*50}")
+                for k in keys:
+                    v = m.get(k, 0.0)
+                    if isinstance(v, float):
+                        print(f"  {k:<18} {v:>12.4f}")
+                    else:
+                        print(f"  {k:<18} {v:>12}")
+                print(f"{'='*50}")
+            _fmt_metrics(train_metrics, "TRAIN")
+            _fmt_metrics(val_metrics, "VALIDATION")
 
             review = self.review_engine.compare(val_metrics, previous_val)
             decision = self.evaluator.decide(review, train_metrics, iteration=self.iteration, max_iters=max_iters)
@@ -2294,6 +2352,16 @@ class AgenticPipeline:
                 return None
             try:
                 ret_df = fo.get("ret")
+                # Sanity-check: returns must be decimal daily returns, not price levels or percent-scale
+                if ret_df is not None and isinstance(ret_df, pd.DataFrame):
+                    sample = ret_df.values.flatten()
+                    sample = sample[~np.isnan(sample)]
+                    if len(sample) > 0:
+                        min_val, max_val = float(np.min(sample)), float(np.max(sample))
+                        if min_val < -0.99 or max_val > 10.0:
+                            print(f"[PORTFOLIO] [{label}] WARNING: ret values out of range [{min_val:.4f}, {max_val:.4f}]. "
+                                  f"Expected decimal daily returns. Forcing fallback pct_change().")
+                            ret_df = None  # force fallback
                 if ret_df is None or not isinstance(ret_df, pd.DataFrame):
                     ret_parts = []
                     for sym, df in data_source.items():
@@ -2463,6 +2531,7 @@ class AgenticPipeline:
 
     def _apply_mutations(self, params, recommendations, mutations):
         new_params = deepcopy(params)
+        cache_invalidated = False
         for mutation in mutations:
             if isinstance(mutation, dict):
                 if mutation.get("target") == "model_params":
@@ -2476,13 +2545,24 @@ class AgenticPipeline:
                 elif mutation.get("target") == "feature_set":
                     if mutation.get("action") == "toggle_microstructure":
                         new_params["_microstructure_enabled"] = not new_params.get("_microstructure_enabled", True)
-                        print(f"[MUTATION] Toggled microstructure: {new_params['_microstructure_enabled']}")
+                        self.use_feature_reduction = new_params["_microstructure_enabled"]
+                        print(f"[MUTATION] Toggled microstructure -> use_feature_reduction={self.use_feature_reduction}")
+                        cache_invalidated = True
                     elif mutation.get("action") == "toggle_reduction":
                         methods = ["pca", "ica", "none"]
-                        current = new_params.get("_reduction_method", "pca")
+                        current = new_params.get("_reduction_method", self.reduction_method)
                         idx = methods.index(current) if current in methods else 0
                         new_params["_reduction_method"] = methods[(idx + 1) % len(methods)]
-                        print(f"[MUTATION] Toggled reduction method: {new_params['_reduction_method']}")
+                        self.reduction_method = new_params["_reduction_method"]
+                        print(f"[MUTATION] Toggled reduction method -> {self.reduction_method}")
+                        cache_invalidated = True
+        # Invalidate cached feature matrices so _ensure_srfo rebuilds with new settings
+        if cache_invalidated:
+            self._srfo_full = None
+            self._Xy_train = None
+            self._Xy_val = None
+            self._Xy_full = None
+            print("[MUTATION] Cache invalidated. Feature matrices will be rebuilt next iteration.")
         return new_params
 
     def _generate_final_summary(self):
@@ -2503,11 +2583,29 @@ class AgenticPipeline:
         if self.best_model:
             self.storage.save(self.best_model, f"{self.current_run_dir}/best_model.pkl")
         self.storage.save_json(summary, f"{self.current_run_dir}/final_summary.json")
-        print(f"\n{'='*50}FINAL SUMMARY - RUN {self.current_run_idx:06d}{'='*50}")
+        print(f"\n{'='*60}")
+        print(f"FINAL SUMMARY - RUN {self.current_run_idx:06d}")
+        print(f"{'='*60}")
         print(f"Run directory: {self.current_run_dir}")
         print(f"Total iterations: {self.iteration}")
         print(f"Best validation score: {self.best_score:.4f}")
         print(f"GoLive ready: {summary['golive_ready']}")
+
+        # Print best validation metrics if available
+        if self.best_model and self.research_history:
+            best_iter = max(self.research_history, key=lambda r: r['validation'].get('score', 0))
+            print(f"\n{'='*60}")
+            print("BEST VALIDATION ITERATION")
+            print(f"{'='*60}")
+            keys = ["sharpe", "volatility", "max_drawdown", "alpha", "beta", "tstat_alpha",
+                    "corr", "ic", "hit", "r2", "turnover", "tcost_10bps", "tcost_20bps", "score", "samples"]
+            for k in keys:
+                v = best_iter['validation'].get(k, 0.0)
+                if isinstance(v, float):
+                    print(f"  {k:<18} {v:>12.4f}")
+                else:
+                    print(f"  {k:<18} {v:>12}")
+            print(f"{'='*60}")
         return summary
 
 # =====================================================
@@ -2646,7 +2744,42 @@ class Portfolio:
         drawdown = net_equity / running_max - 1
         drawdown.name = "drawdown"
 
-        # === CRITICAL FIX: compute metrics from series, not stale fo ===
+        # === ROLLING METRICS SERIES (DataFrames/Series for plotting) ===
+        window = 30
+
+        # Rolling Sharpe (annualized)
+        rolling_sharpe = (net_return.rolling(window).mean() / (net_return.rolling(window).std() + 1e-12)) * np.sqrt(annualization)
+        rolling_sharpe.name = "rolling_sharpe"
+
+        # Rolling Beta vs benchmark
+        rolling_cov = net_return.rolling(window).cov(benchmark)
+        rolling_var = benchmark.rolling(window).var()
+        rolling_beta = rolling_cov / (rolling_var + 1e-12)
+        rolling_beta.name = "rolling_beta"
+
+        # Rolling Alpha
+        rolling_alpha = net_return.rolling(window).mean() - rolling_beta * benchmark.rolling(window).mean()
+        rolling_alpha.name = "rolling_alpha"
+
+        # Rolling R² (Pearson squared)
+        rolling_corr = net_return.rolling(window).corr(benchmark)
+        rolling_r2 = rolling_corr ** 2
+        rolling_r2.name = "rolling_r2"
+
+        # Rolling IC (Spearman rank correlation)
+        def _rolling_spearman(s1, s2, w):
+            out = pd.Series(index=s1.index, dtype=float)
+            for i in range(w, len(s1) + 1):
+                try:
+                    out.iloc[i - 1] = stats.spearmanr(s1.iloc[i - w:i], s2.iloc[i - w:i])[0]
+                except Exception:
+                    out.iloc[i - 1] = np.nan
+            return out
+
+        rolling_ic = _rolling_spearman(net_return, benchmark, window)
+        rolling_ic.name = "rolling_ic"
+
+        # === CRITICAL FIX: compute scalar metrics from series, not stale fo ===
         metrics = self._compute_metrics_from_series(
             gross_return=gross_return,
             net_return=net_return,
@@ -2655,64 +2788,51 @@ class Portfolio:
             costs=costs
         )
 
-        # Plotting
-        plot_keys = ["drawdown", "turnover", "weights"]
-        plot_items = []
-        for key in plot_keys:
-            if key == "drawdown":
-                obj = drawdown
-            elif key == "turnover":
-                obj = turnover_series
-            elif key == "weights":
-                obj = weights
-            else:
-                obj = fo.get(key)
-            if obj is None:
-                continue
-            if isinstance(obj, pd.DataFrame):
-                obj = obj.copy()
-                if not isinstance(obj.index, pd.DatetimeIndex):
-                    obj.index = pd.to_datetime(obj.index, errors="coerce")
-                if not obj.empty:
-                    plot_items.append((key, obj))
-            elif isinstance(obj, pd.Series):
-                obj = obj.copy()
-                if not isinstance(obj.index, pd.DatetimeIndex):
-                    obj.index = pd.to_datetime(obj.index, errors="coerce")
-                if len(obj):
-                    plot_items.append((key, obj))
-
-        n_metric_rows = len(plot_items)
-        total_rows = 1 + max(n_metric_rows, 1)
+        # Plotting — 5-row subplot with metric series and fixed y-axis ticks
         fig = make_subplots(
-            rows=total_rows, cols=1, shared_xaxes=True,
-            row_heights=[0.55] + [0.45 / max(n_metric_rows, 1)] * max(n_metric_rows, 1),
-            vertical_spacing=0.08,
-            subplot_titles=["Portfolio Performance"] + [k.replace("_", " ").title() for k, _ in plot_items],
+            rows=5, cols=1, shared_xaxes=True,
+            row_heights=[0.32, 0.17, 0.17, 0.17, 0.17],
+            vertical_spacing=0.04,
+            subplot_titles=[
+                "Portfolio Performance",
+                "Drawdown",
+                "Rolling Sharpe (30d)",
+                "Rolling Alpha & Beta (30d)",
+                "Rolling R² & IC (30d)"
+            ],
         )
+
+        # Row 1: Performance
         fig.add_trace(go.Scatter(x=gross_equity.index, y=gross_equity, name="Gross Return", mode="lines", line=dict(color="#2E86AB", width=1.5)), row=1, col=1)
         fig.add_trace(go.Scatter(x=net_equity.index, y=net_equity, name="Net Return", mode="lines", line=dict(color="#A23B72", width=1.5)), row=1, col=1)
         fig.add_trace(go.Scatter(x=benchmark_equity.index, y=benchmark_equity, name="Benchmark", mode="lines", line=dict(color="#F18F01", width=1.5, dash="dash")), row=1, col=1)
-        fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.12)", line=dict(color="rgba(231, 76, 60, 0.55)", width=1)), row=1, col=1)
 
-        colors = plotly.colors.qualitative.Plotly
-        for row, (key, obj) in enumerate(plot_items, start=2):
-            if isinstance(obj, pd.Series):
-                fig.add_trace(go.Scatter(x=obj.index, y=obj, mode="lines", name=key.replace("_", " ").title(), line=dict(width=1.5)), row=row, col=1)
-            else:
-                for j, col in enumerate(obj.columns):
-                    fig.add_trace(go.Scatter(x=obj.index, y=obj[col], mode="lines", name=f"{key}: {col}", legendgroup=key, line=dict(width=1, color=colors[j % len(colors)])), row=row, col=1)
+        # Row 2: Drawdown
+        fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.15)", line=dict(color="rgba(231, 76, 60, 0.7)", width=1)), row=2, col=1)
+
+        # Row 3: Rolling Sharpe
+        fig.add_trace(go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe, name="Rolling Sharpe", mode="lines", line=dict(color="#27AE60", width=1.2)), row=3, col=1)
+
+        # Row 4: Rolling Alpha & Beta
+        fig.add_trace(go.Scatter(x=rolling_alpha.index, y=rolling_alpha, name="Rolling Alpha", mode="lines", line=dict(color="#8E44AD", width=1.2)), row=4, col=1)
+        fig.add_trace(go.Scatter(x=rolling_beta.index, y=rolling_beta, name="Rolling Beta", mode="lines", line=dict(color="#E67E22", width=1.2)), row=4, col=1)
+
+        # Row 5: Rolling R² & IC
+        fig.add_trace(go.Scatter(x=rolling_r2.index, y=rolling_r2, name="Rolling R²", mode="lines", line=dict(color="#2980B9", width=1.2)), row=5, col=1)
+        fig.add_trace(go.Scatter(x=rolling_ic.index, y=rolling_ic, name="Rolling IC", mode="lines", line=dict(color="#C0392B", width=1.2)), row=5, col=1)
 
         fig.update_layout(
             template="plotly_white", hovermode="x unified",
-            height=300 + 250 * total_rows, showlegend=True,
+            height=1400, showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=60, r=60, t=100, b=40),
         )
         fig.update_yaxes(title_text="Equity", row=1, col=1)
-        for i in range(2, total_rows + 1):
-            fig.update_yaxes(title_text="Value", row=i, col=1)
-        fig.update_xaxes(title_text="Date", row=total_rows, col=1)
+        fig.update_yaxes(title_text="Drawdown", row=2, col=1)
+        fig.update_yaxes(title_text="Sharpe", range=[-2, 5], dtick=1, row=3, col=1)
+        fig.update_yaxes(title_text="Alpha / Beta", range=[-1, 3], dtick=1, row=4, col=1)
+        fig.update_yaxes(title_text="R² / IC", range=[-1, 1.2], dtick=0.5, row=5, col=1)
+        fig.update_xaxes(title_text="Date", row=5, col=1)
 
         series = {
             "gross_return": gross_return, "net_return": net_return,
@@ -2721,6 +2841,11 @@ class Portfolio:
             "weights": weights, "executed_weight": executed_weight,
             "lagged_weights": lagged_weights, "turnover": turnover_series,
             "costs": costs,
+            "rolling_sharpe": rolling_sharpe,
+            "rolling_alpha": rolling_alpha,
+            "rolling_beta": rolling_beta,
+            "rolling_r2": rolling_r2,
+            "rolling_ic": rolling_ic,
         }
         return {"chart": fig, "metrics": metrics, "series": series}
 
@@ -2750,58 +2875,93 @@ class Portfolio0:
         benchmark_equity = (1 + benchmark).cumprod()
         drawdown = net_equity / net_equity.cummax() - 1
 
-        # Compute from series instead of stale fo
+        # === ROLLING METRICS SERIES (DataFrames/Series for plotting) ===
+        window = 30
+
+        # Rolling Sharpe (annualized)
+        rolling_sharpe = (net_return.rolling(window).mean() / (net_return.rolling(window).std() + 1e-12)) * np.sqrt(annualization)
+        rolling_sharpe.name = "rolling_sharpe"
+
+        # Rolling Beta vs benchmark
+        rolling_cov = net_return.rolling(window).cov(benchmark)
+        rolling_var = benchmark.rolling(window).var()
+        rolling_beta = rolling_cov / (rolling_var + 1e-12)
+        rolling_beta.name = "rolling_beta"
+
+        # Rolling Alpha
+        rolling_alpha = net_return.rolling(window).mean() - rolling_beta * benchmark.rolling(window).mean()
+        rolling_alpha.name = "rolling_alpha"
+
+        # Rolling R² (Pearson squared)
+        rolling_corr = net_return.rolling(window).corr(benchmark)
+        rolling_r2 = rolling_corr ** 2
+        rolling_r2.name = "rolling_r2"
+
+        # Rolling IC (Spearman rank correlation)
+        def _rolling_spearman(s1, s2, w):
+            out = pd.Series(index=s1.index, dtype=float)
+            for i in range(w, len(s1) + 1):
+                try:
+                    out.iloc[i - 1] = stats.spearmanr(s1.iloc[i - w:i], s2.iloc[i - w:i])[0]
+                except Exception:
+                    out.iloc[i - 1] = np.nan
+            return out
+
+        rolling_ic = _rolling_spearman(net_return, benchmark, window)
+        rolling_ic.name = "rolling_ic"
+
+        # Compute scalar metrics from series instead of stale fo
         portfolio = Portfolio()
         metrics = portfolio._compute_metrics_from_series(
             gross_return=gross_return, net_return=net_return,
             benchmark=benchmark, turnover=turnover, costs=costs
         )
 
-        metric_keys = ["sharpe", "alpha", "beta", "tstat_alpha", "hit_ratio", "ic", "volatility"]
-        plottable = {}
-        for k in metric_keys:
-            v = fo.get(k)
-            if v is None:
-                continue
-            if isinstance(v, pd.Series) and isinstance(v.index, pd.DatetimeIndex):
-                plottable[k] = v
-            elif isinstance(v, pd.DataFrame) and isinstance(v.index, pd.DatetimeIndex):
-                plottable[k] = v
-
-        n_metric_rows = len(plottable)
-        total_rows = 1 + max(n_metric_rows, 1)
+        # Plotting — 5-row subplot with metric series and fixed y-axis ticks
         fig = make_subplots(
-            rows=total_rows, cols=1, shared_xaxes=True,
-            row_heights=[0.55] + [0.45 / max(n_metric_rows, 1)] * max(n_metric_rows, 1),
-            vertical_spacing=0.08,
-            subplot_titles=["Portfolio Performance"] + [k.replace("_", " ").title() for k in plottable.keys()],
+            rows=5, cols=1, shared_xaxes=True,
+            row_heights=[0.32, 0.17, 0.17, 0.17, 0.17],
+            vertical_spacing=0.04,
+            subplot_titles=[
+                "Portfolio Performance",
+                "Drawdown",
+                "Rolling Sharpe (30d)",
+                "Rolling Alpha & Beta (30d)",
+                "Rolling R² & IC (30d)"
+            ],
         )
+
+        # Row 1: Performance
         fig.add_trace(go.Scatter(x=gross_equity.index, y=gross_equity, name="Gross Return", mode="lines", line=dict(color="#2E86AB", width=1.5)), row=1, col=1)
         fig.add_trace(go.Scatter(x=net_equity.index, y=net_equity, name="Net Return", mode="lines", line=dict(color="#A23B72", width=1.5)), row=1, col=1)
         fig.add_trace(go.Scatter(x=benchmark_equity.index, y=benchmark_equity, name="Benchmark", mode="lines", line=dict(color="#F18F01", width=1.5, dash="dash")), row=1, col=1)
-        fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.12)", line=dict(color="rgba(231, 76, 60, 0.55)", width=1)), row=1, col=1)
 
-        colors = plotly.colors.qualitative.Plotly
-        for i, (key, data) in enumerate(plottable.items(), start=2):
-            if isinstance(data, pd.Series):
-                fig.add_trace(go.Scatter(x=data.index, y=data, name=key.replace("_", " ").title(), mode="lines", line=dict(width=1.2)), row=i, col=1)
-            elif isinstance(data, pd.DataFrame):
-                final_vals = data.iloc[-1].abs().sort_values(ascending=False)
-                top_syms = final_vals.head(5).index.tolist()
-                sub_df = data[top_syms]
-                for j, sym in enumerate(sub_df.columns):
-                    fig.add_trace(go.Scatter(x=sub_df.index, y=sub_df[sym], name=f"{sym}", mode="lines", line=dict(width=1, color=colors[j % len(colors)]), showlegend=True, legendgroup=key, legendgrouptitle_text=key.replace("_", " ").title()), row=i, col=1)
+        # Row 2: Drawdown
+        fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.15)", line=dict(color="rgba(231, 76, 60, 0.7)", width=1)), row=2, col=1)
+
+        # Row 3: Rolling Sharpe
+        fig.add_trace(go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe, name="Rolling Sharpe", mode="lines", line=dict(color="#27AE60", width=1.2)), row=3, col=1)
+
+        # Row 4: Rolling Alpha & Beta
+        fig.add_trace(go.Scatter(x=rolling_alpha.index, y=rolling_alpha, name="Rolling Alpha", mode="lines", line=dict(color="#8E44AD", width=1.2)), row=4, col=1)
+        fig.add_trace(go.Scatter(x=rolling_beta.index, y=rolling_beta, name="Rolling Beta", mode="lines", line=dict(color="#E67E22", width=1.2)), row=4, col=1)
+
+        # Row 5: Rolling R² & IC
+        fig.add_trace(go.Scatter(x=rolling_r2.index, y=rolling_r2, name="Rolling R²", mode="lines", line=dict(color="#2980B9", width=1.2)), row=5, col=1)
+        fig.add_trace(go.Scatter(x=rolling_ic.index, y=rolling_ic, name="Rolling IC", mode="lines", line=dict(color="#C0392B", width=1.2)), row=5, col=1)
 
         fig.update_layout(
             template="plotly_white", hovermode="x unified",
-            height=300 + 250 * total_rows, showlegend=True,
+            height=1400, showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=60, r=60, t=100, b=40),
         )
         fig.update_yaxes(title_text="Equity", row=1, col=1)
-        for i in range(2, total_rows + 1):
-            fig.update_yaxes(title_text="Value", row=i, col=1)
-        fig.update_xaxes(title_text="Date", row=total_rows, col=1)
+        fig.update_yaxes(title_text="Drawdown", row=2, col=1)
+        fig.update_yaxes(title_text="Sharpe", range=[-2, 5], dtick=1, row=3, col=1)
+        fig.update_yaxes(title_text="Alpha / Beta", range=[-1, 3], dtick=1, row=4, col=1)
+        fig.update_yaxes(title_text="R² / IC", range=[-1, 1.2], dtick=0.5, row=5, col=1)
+        fig.update_xaxes(title_text="Date", row=5, col=1)
 
         return {
             "chart": fig,
@@ -2811,6 +2971,11 @@ class Portfolio0:
                 "equity": net_equity, "benchmark": benchmark_equity,
                 "drawdown": drawdown, "weights": weights,
                 "executed_weight": executed_weight, "lagged_weights": lagged_weights,
+                "rolling_sharpe": rolling_sharpe,
+                "rolling_alpha": rolling_alpha,
+                "rolling_beta": rolling_beta,
+                "rolling_r2": rolling_r2,
+                "rolling_ic": rolling_ic,
             },
         }
 
@@ -2892,7 +3057,6 @@ if __name__ == "__main__":
     print("Baseline model: runs/baseline_model.pkl")
     print("Optimized model: runs/optimized_model.pkl")
     print("Comparison report: runs/model_comparison.json")
-
 
 # ======================================================
 # END OF THE PIPELINE

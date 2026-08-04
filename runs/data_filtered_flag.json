@@ -1,0 +1,36 @@
+{
+  "flag": "DATA_FILTERED",
+  "removed_assets": [
+    {
+      "symbol": "HYPEUSDT",
+      "rows": 755
+    },
+    {
+      "symbol": "SUIUSDT",
+      "rows": 671
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "rows": 119
+    },
+    {
+      "symbol": "APTUSDT",
+      "rows": 1054
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "rows": 930
+    },
+    {
+      "symbol": "POLUSDT",
+      "rows": 454
+    },
+    {
+      "symbol": "UNIUSDT",
+      "rows": 988
+    }
+  ],
+  "min_required": 1460,
+  "remaining_count": 22,
+  "timestamp": "2026-08-04T19:38:45.192113"
+}
