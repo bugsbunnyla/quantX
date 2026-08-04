@@ -241,65 +241,82 @@ class SplitEngine_0:
 class SplitEngine:
     def split(self, data, split_ratio=DEFAULT_SPLIT_RATIO, explicit_split_date=None):
         """
-        Temporal split using a COMMON CUTOFF DATE across all symbols.
-        If explicit_split_date is provided (e.g. '2022-06-15'), it is used
-        directly. Otherwise cutoff is computed from split_ratio against the
-        union of all observed calendar dates.
+        Temporal split at a COMMON CALENDAR DATE across all symbols.
+
+        1. Finds the full calendar span (union of all asset date ranges).
+        2. Computes the cutoff date as split_ratio along that span.
+        3. Splits EVERY asset at that exact date.
+
+        Assets that start after the cutoff get 0%% train.
+        Assets that end before the cutoff get 0%% val.
+        The split wall is a single calendar date.
         """
-        # Gather all valid date indices
-        all_dates = set()
+        # Per-asset date ranges
+        ranges = {}
         for sym, df in data.items():
             if isinstance(df, pd.DataFrame) and len(df) > 0:
-                idx = df.index
-                if not isinstance(idx, pd.DatetimeIndex):
-                    idx = pd.to_datetime(idx, errors="coerce")
-                all_dates.update(idx.dropna())
-        if not all_dates:
+                idx = pd.to_datetime(df.index, errors="coerce").dropna()
+                if len(idx) > 0:
+                    ranges[sym] = (idx.min(), idx.max(), len(idx))
+
+        if not ranges:
             print("[SPLIT] No valid dates found; falling back to per-symbol row split.")
             return SplitEngine_0().split(data, split_ratio)
 
-        sorted_dates = sorted(all_dates)
-        n_total = len(sorted_dates)
+        # Union: overall calendar span across ALL assets
+        union_start = min(r[0] for r in ranges.values())
+        union_end = max(r[1] for r in ranges.values())
+        union_days = (union_end - union_start).days
 
-        # Use explicit date if given, else compute from ratio
+        # Determine cutoff date
         if explicit_split_date is not None:
             cutoff_date = pd.Timestamp(explicit_split_date)
-            # Find nearest actual date in data
-            cutoff_idx = min(range(n_total), key=lambda i: abs(sorted_dates[i] - cutoff_date))
-            cutoff_date = sorted_dates[cutoff_idx]
             print(f"[SPLIT] Explicit split date requested: {explicit_split_date}")
         else:
-            cutoff_idx = int(n_total * split_ratio)
-            if cutoff_idx < MIN_SPLIT_DAYS:
-                cutoff_idx = MIN_SPLIT_DAYS
-            if cutoff_idx >= n_total - MIN_SPLIT_DAYS:
-                cutoff_idx = n_total - MIN_SPLIT_DAYS - 1
-            cutoff_date = sorted_dates[cutoff_idx]
+            cutoff_offset = int(union_days * split_ratio)
+            cutoff_date = union_start + pd.Timedelta(days=cutoff_offset)
+            print(f"[SPLIT] Splitting union span at ratio={split_ratio}")
 
+        print(f"[SPLIT] Union range:   {union_start.strftime('%%Y-%%m-%%d')} to {union_end.strftime('%%Y-%%m-%%d')}  ({union_days} calendar days)")
+        print(f"[SPLIT] Cutoff date:   {cutoff_date.strftime('%%Y-%%m-%%d')}")
+
+        # Apply cutoff uniformly to EVERY asset
         train, val = {}, {}
-        for symbol, df in data.items():
+        per_asset_stats = []
+        for sym, df in data.items():
             if not isinstance(df, pd.DataFrame):
                 continue
-            idx = df.index
-            if not isinstance(idx, pd.DatetimeIndex):
-                idx = pd.to_datetime(idx, errors="coerce")
+            idx = pd.to_datetime(df.index, errors="coerce")
             train_mask = idx <= cutoff_date
             val_mask = idx > cutoff_date
-            train[symbol] = df.loc[train_mask].copy()
-            val[symbol] = df.loc[val_mask].copy()
+            train[sym] = df.loc[train_mask].copy()
+            val[sym] = df.loc[val_mask].copy()
+            n_total = len(df)
+            n_train = len(train[sym])
+            n_val = len(val[sym])
+            pct_train = n_train / n_total * 100 if n_total > 0 else 0
+            pct_val = n_val / n_total * 100 if n_total > 0 else 0
+            per_asset_stats.append({
+                "symbol": sym, "total": n_total, "train": n_train, "val": n_val,
+                "train_pct": pct_train, "val_pct": pct_val,
+                "start": ranges[sym][0].strftime('%%Y-%%m-%%d'),
+                "end": ranges[sym][1].strftime('%%Y-%%m-%%d')
+            })
 
-        train_start = min(sorted_dates)
-        train_end = cutoff_date
-        val_start = sorted_dates[cutoff_idx + 1] if cutoff_idx + 1 < len(sorted_dates) else cutoff_date
-        val_end = max(sorted_dates)
-        n_train_days = sum(1 for d in sorted_dates if d <= cutoff_date)
-        n_val_days = n_total - n_train_days
-        print(f"[SPLIT] Common cutoff: {cutoff_date.strftime('%Y-%m-%d')}")
-        print(f"[SPLIT] Train range: {train_start.strftime('%Y-%m-%d')} to {train_end.strftime('%Y-%m-%d')}  ({n_train_days} trading days)")
-        print(f"[SPLIT] Val   range: {val_start.strftime('%Y-%m-%d')} to {val_end.strftime('%Y-%m-%d')}  ({n_val_days} trading days)")
+        # Print per-asset diagnostics
+        print(f"\n[SPLIT] Per-asset split diagnostics (cutoff: {cutoff_date.strftime('%%Y-%%m-%%d')}):")
+        print(f"  {'Symbol':<12} {'Start':<12} {'End':<12} {'Total':>6} {'Train':>6} {'Val':>6} {'Train%%':>7} {'Val%%':>7}")
+        print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*6} {'-'*6} {'-'*6} {'-'*7} {'-'*7}")
+        for s in per_asset_stats:
+            print(f"  {s['symbol']:<12} {s['start']:<12} {s['end']:<12} {s['total']:>6} {s['train']:>6} {s['val']:>6} {s['train_pct']:>6.1f}%% {s['val_pct']:>6.1f}%%")
+
+        # Summary
+        total_obs = sum(s['total'] for s in per_asset_stats)
+        total_train = sum(s['train'] for s in per_asset_stats)
+        total_val = sum(s['val'] for s in per_asset_stats)
+        print(f"\n[SPLIT] GLOBAL SUMMARY: Train={total_train}/{total_obs} ({total_train/total_obs*100:.1f}%%), Val={total_val}/{total_obs} ({total_val/total_obs*100:.1f}%%)")
+
         return train, val
-
-
 class FeatureReducer:
     def __init__(self, n_components=TARGET_N_COMPONENTS, method="pca"):
         self.n_components = n_components
