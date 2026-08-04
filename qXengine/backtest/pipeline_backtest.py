@@ -2616,7 +2616,7 @@ class AgenticPipeline:
                 print(f"  Sharpe: {m.get('sharpe', 0):.4f}")
                 print(f"  Volatility: {m.get('volatility', 0):.4f}")
                 print(f"  Max Drawdown: {m.get('max_drawdown', 0):.4f}")
-                print(f"  BTC Correlation: {m.get('btc_correlation', 0):.4f}")
+                print(f"  BTC Correlation: {m.get('corr_rm', 0):.4f}")
                 print(f"  Alpha: {m.get('alpha', 0):.6f}")
                 print(f"  Beta: {m.get('beta', 0):.4f}")
                 print(f"  Alpha t-stat: {m.get('tstat_alpha', 0):.4f}")
@@ -2933,14 +2933,14 @@ class Portfolio:
         hit_ratio = fo.get("hit_ratio")
         tstat_alpha = fo.get("tstat_alpha")
         beta = fo.get("beta")
-        if hasattr(beta, "mean"):
-            beta = beta.mean()
+        #if hasattr(beta, "mean"):
+        #    beta = beta.mean()
         alpha = fo.get("alpha")
-        if hasattr(alpha, "mean"):
-            alpha = alpha.mean()
+        #if hasattr(alpha, "mean"):
+        #    alpha = alpha.mean()
         btc_corr = fo.get("corr_rm")
-        if hasattr(btc_corr, "mean"):
-            btc_corr = btc_corr.mean()
+        #if hasattr(btc_corr, "mean"):
+        #    btc_corr = btc_corr.mean()
         max_drawdown = fo.get("max_drawdown")
         volatility = fo.get("volatility")
         sharpe = fo.get("sharpe")
@@ -2968,14 +2968,14 @@ class Portfolio:
                 obj = obj.copy()
                 if not isinstance(obj.index, pd.DatetimeIndex):
                     obj.index = pd.to_datetime(obj.index, errors="coerce")
-                obj = obj.dropna(how="all")
+                #obj = obj.dropna(how="all")
                 if not obj.empty:
                     plot_items.append((key, obj))
             elif isinstance(obj, pd.Series):
                 obj = obj.copy()
                 if not isinstance(obj.index, pd.DatetimeIndex):
                     obj.index = pd.to_datetime(obj.index, errors="coerce")
-                obj = obj.dropna()
+                #obj = obj.dropna()
                 if len(obj):
                     plot_items.append((key, obj))
             else:
@@ -3021,8 +3021,8 @@ class Portfolio:
             "gross_return": gross_cumret, "net_return": net_cumret,
             "sharpe": _scalar("sharpe"), "volatility": _scalar("volatility"),
             "max_drawdown": _scalar("max_drawdown") if fo.get("max_drawdown") is not None else float(drawdown.min()),
-            "btc_correlation": _scalar("corr_rm"), "alpha": _scalar("alpha"),
-            "beta": _scalar("beta"), "tstat_alpha": _scalar("tstat_alpha"),
+            "btc_correlation": btc_corr.mean(), "alpha": alpha.mean(),
+            "beta": beta.mean(), "tstat_alpha": _scalar("tstat_alpha"),
             "hit_ratio": _scalar("hit_ratio"), "ic": _scalar("ic"),
             "mean_turnover": mean_turnover, "total_turnover": total_turnover,
             "total_costs": total_costs,
