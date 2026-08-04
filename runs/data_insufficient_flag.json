@@ -1,0 +1,14 @@
+{
+  "flag": "DATA_INSUFFICIENT",
+  "assets": [
+    "HYPEUSDT",
+    "SUIUSDT",
+    "PEPEUSDT",
+    "APTUSDT",
+    "ONDOUSDT",
+    "POLUSDT",
+    "UNIUSDT"
+  ],
+  "min_required": 1460,
+  "timestamp": "2026-08-03T20:13:59.375783"
+}
