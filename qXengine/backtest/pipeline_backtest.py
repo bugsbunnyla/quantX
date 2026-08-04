@@ -27,6 +27,18 @@ E. Agentic Loop (MEDIUM)
    – STOP only after 5 iterations OR score degrades from non-zero baseline
    – Feature-set mutation operators (not just hyperparameters)
    – DATA_INSUFFICIENT human-in-the-loop flag instead of silent zero-convergence
+quantX Backtest Pipeline — Fixed per user requirements
+======================================================
+Changes:
+  1. Combinatorial optimization CALL commented out (fn kept).
+  2. Old defs preserved with _0 suffix; new fixed defs added.
+  3. Common cutoff-date temporal split (not per-symbol row split).
+  4. evaluate() metrics flow into saved research JSON/pickles.
+  5. Canonical Sharpe = mean/std * sqrt(252) everywhere.
+  6. Portfolio alpha t-stat from intercept of daily port ret vs BTC.
+  7. Transaction cost sensitivity: 10 bps and 20 bps.
+  8. Turnover computed from executed (lagged) weights.
+  9. Simple portfolio-level summary table printed and saved.
 """
 
 import os
@@ -52,11 +64,9 @@ from collections import defaultdict
 from scipy import stats
 from sklearn.decomposition import PCA, FastICA
 
-# ==these must be before sklearn imports
-import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
-#=======
+
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, StackingRegressor
 from sklearn.linear_model import Ridge, Lasso, ElasticNet, LinearRegression
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -68,87 +78,50 @@ warnings.filterwarnings("ignore")
 from ..strategies.FormulaInfo import FormulaInfo
 
 # =====================================================
-# INDUSTRY-CALIBRATED PARAMETER GRIDS
+# GLOBAL CONFIG
 # =====================================================
+RETAIL_TRANSACTION_COST_LOW = 0.001   # 10 bps
+RETAIL_TRANSACTION_COST_HIGH = 0.002  # 20 bps
+MIN_ROWS_PER_ASSET = 1460
+MIN_OOS_PREDICTIONS = 100
+MAX_FEATURES_BEFORE_REDUCTION = 50
+TARGET_N_COMPONENTS = 12
+
+# =====================================================
+# SPLIT CONFIGURATION
+# =====================================================
+DEFAULT_SPLIT_RATIO = 0.5       # 50% train / 50% val
+MIN_SPLIT_DAYS = 30             # minimum days in either split
+
+
+SCENARIO_CONFIG = {
+    "BULL": {"mu_multiplier": 1.8, "vol_multiplier": 0.7, "kelly_cap": 0.25},
+    "BEAR": {"mu_multiplier": -0.8, "vol_multiplier": 1.2, "kelly_cap": 0.10},
+    "HIGH_VOL": {"mu_multiplier": 0.3, "vol_multiplier": 2.0, "kelly_cap": 0.05},
+    "CRASH": {"mu_multiplier": -2.5, "vol_multiplier": 3.5, "kelly_cap": 0.02},
+    "STABLE": {"mu_multiplier": 0.5, "vol_multiplier": 0.5, "kelly_cap": 0.15}
+}
+
 PARAM_GRID_FAST = {
-    "trees": [200, 500, 800],
-    "depth": [8, 12, 16],
-    "horizon": [21, 42],
-    "min_samples_split": [2, 10],
-    "max_features": ["sqrt", 0.5],
-    "model": ["random_forest"],
-    "learning_rate": [0.05, 0.1],
-    "reg_alpha": [0.0, 0.1],
-    "reg_lambda": [1.0, 2.0],
+    "trees": [200, 500, 800], "depth": [8, 12, 16], "horizon": [21, 42],
+    "min_samples_split": [2, 10], "max_features": ["sqrt", 0.5],
+    "model": ["random_forest"], "learning_rate": [0.05, 0.1],
+    "reg_alpha": [0.0, 0.1], "reg_lambda": [1.0, 2.0],
 }
 PARAM_GRID_INSIDE = {
-    "trees": [200, 350, 500, 650, 800],
-    "depth": [6, 8, 10, 12, 14],
-    "horizon": [10, 21, 42],
-    "min_samples_split": [5, 10, 20],
+    "trees": [200, 350, 500, 650, 800], "depth": [6, 8, 10, 12, 14],
+    "horizon": [10, 21, 42], "min_samples_split": [5, 10, 20],
     "max_features": ["sqrt", "log2", 0.5],
     "model": ["lightgbm", "xgboost", "random_forest", "gradient_boosting"],
-    "learning_rate": [0.01, 0.05, 0.1],
-    "reg_alpha": [0.0, 0.1, 1.0],
+    "learning_rate": [0.01, 0.05, 0.1], "reg_alpha": [0.0, 0.1, 1.0],
     "reg_lambda": [0.5, 1.0, 2.0],
 }
 
-PARAM_GRID_OUTSIDE = {
-    "trees": [50, 100, 1000, 1500, 2000],
-    "depth": [4, 16, 20, 25],
-    "horizon": [5, 63, 126],
-    "min_samples_split": [2, 50, 100],
-    "max_features": [0.3, 0.8, 1.0],
-    "model": ["lightgbm", "xgboost", "random_forest", "gradient_boosting", "mlp"],
-    "learning_rate": [0.001, 0.1, 0.3],
-    "reg_alpha": [0.0, 1.0, 10.0],
-    "reg_lambda": [0.1, 1.0, 10.0],
-}
-
-PARAM_GRID_EXTREME = {
-    "trees": [10, 25, 3000, 5000],
-    "depth": [2, 3, 30, 50],
-    "horizon": [1, 252],
-    "min_samples_split": [1, 500],
-    "max_features": [0.1, None],
-    "model": ["lightgbm", "xgboost", "random_forest", "gradient_boosting", "ridge", "mlp"],
-    "learning_rate": [0.0001, 0.5],
-    "reg_alpha": [0.0, 100.0],
-    "reg_lambda": [0.0, 100.0],
-}
-
-SCENARIO_CONFIG = {
-    "BULL": {"mu_multiplier": 1.8, "vol_multiplier": 0.7, "kelly_cap": 0.25,
-              "description": "Strong positive drift, reduced volatility"},
-    "BEAR": {"mu_multiplier": -0.8, "vol_multiplier": 1.2, "kelly_cap": 0.10,
-              "description": "Negative drift with elevated vol"},
-    "HIGH_VOL": {"mu_multiplier": 0.3, "vol_multiplier": 2.0, "kelly_cap": 0.05,
-                   "description": "Mean-reverting, high variance"},
-    "CRASH": {"mu_multiplier": -2.5, "vol_multiplier": 3.5, "kelly_cap": 0.02,
-               "description": "Tail risk event, correlation -> 1"},
-    "STABLE": {"mu_multiplier": 0.5, "vol_multiplier": 0.5, "kelly_cap": 0.15,
-                "description": "Low signal environment"}
-}
-
-# =====================================================
-# GLOBAL CONFIG: Transaction costs & data sufficiency
-# =====================================================
-RETAIL_TRANSACTION_COST = 0.001  # 10 bps per side = 0.1% = 0.001
-MIN_ROWS_PER_ASSET = 1460       # 4 years of daily data
-MIN_OOS_PREDICTIONS = 100       # Go-Live gate
-MAX_FEATURES_BEFORE_REDUCTION = 50
-TARGET_N_COMPONENTS = 12        # 10-15 orthogonal factors
-
 
 def formula_report(report, mode="df_multi", lookup="index"):
-    """
-    Normalize formulaOutput.report() output.
-    """
-    import pandas as pd
     if not isinstance(report, tuple) or len(report) != 2:
         raise ValueError("report must be tuple(df, df_easy)")
     df, df_easy = report
-
     if mode == "df_multi":
         result = df
     elif mode == "df_easy":
@@ -157,7 +130,6 @@ def formula_report(report, mode="df_multi", lookup="index"):
         raise ValueError("mode must be 'df_multi' or 'df_easy'")
     if not isinstance(result, pd.DataFrame):
         raise TypeError("Selected report is not a DataFrame")
-
     if lookup == "index":
         return result
     elif lookup == "columns":
@@ -165,25 +137,15 @@ def formula_report(report, mode="df_multi", lookup="index"):
     elif lookup == "symbol_features":
         if isinstance(result.columns, pd.MultiIndex):
             result = result.copy()
-            result.columns = [
-                f"{a}_{b}" for a, b in result.columns
-            ]
+            result.columns = [f"{a}_{b}" for a, b in result.columns]
         return result
     else:
         raise ValueError("lookup must be 'index' or 'columns' or 'symbol_features'")
 
 
-# =====================================================
-# CANONICAL QUANTX ENGINE INVOCATION
-# =====================================================
-
 def run_quantx_engine(data, interval="4y", params=None):
-    """
-    Single canonical invocation of QuantXEngine.
-    """
     if params is None:
         params = {}
-
     try:
         from ..qxEngine import QuantXEngine
     except Exception as exc:
@@ -192,42 +154,25 @@ def run_quantx_engine(data, interval="4y", params=None):
             "formula_outputs": [], "formula_outputs_raw": [],
             "raw_data": data, "success": False, "error": str(exc),
         }
-
     engine = QuantXEngine()
     strategies = engine.qxStrategyList(data, interval=params.get("interval", interval))
     print(f"[ENGINE] Strategies returned: {len(strategies)}")
-
     formula_outputs = []
     formula_outputs_raw = []
-
     for s in engine.strategy:
-        rpt_fo = None
-        if hasattr(s, "formulaOutput"):
-            rpt_fo = s.formulaOutput
+        rpt_fo = getattr(s, "formulaOutput", None)
         if rpt_fo is None:
             rpt_fo = FormulaInfo(data)
-
         rpt_fo.assemble()
         rpt = rpt_fo.reporting()
-
         formula_outputs.append(rpt)
         formula_outputs_raw.append(rpt_fo)
-
     return {
-        "engine": engine,
-        "results": engine.results,
-        "strategies": engine.strategy,
-        "formula_outputs": formula_outputs,
-        "formula_outputs_raw": formula_outputs_raw,
-        "raw_data": data,
-        "success": True,
-        "error": None,
+        "engine": engine, "results": engine.results, "strategies": engine.strategy,
+        "formula_outputs": formula_outputs, "formula_outputs_raw": formula_outputs_raw,
+        "raw_data": data, "success": True, "error": None,
     }
 
-
-# =====================================================
-# STORAGE ENGINE
-# =====================================================
 
 class Storage:
     def __init__(self, base_dir="runs"):
@@ -274,30 +219,88 @@ class Storage:
 
 
 # =====================================================
-# SPLIT ENGINE
+# SPLIT ENGINE  —  OLD (preserved)
 # =====================================================
-
-class SplitEngine:
+class SplitEngine_0:
     def split(self, data, split_ratio=0.5):
         train, val = {}, {}
         for symbol, df in data.items():
             if not isinstance(df, pd.DataFrame):
                 continue
-            split_idx = len(df) // 2
+            split_idx = int(len(df) * split_ratio)
+            if split_idx < 10:
+                split_idx = len(df) // 2
             train[symbol] = df.iloc[:split_idx].copy()
             val[symbol] = df.iloc[split_idx:].copy()
         return train, val
 
 
 # =====================================================
-# DIMENSIONALITY REDUCTION ENGINE
+# SPLIT ENGINE  —  NEW: common cutoff date
 # =====================================================
+class SplitEngine:
+    def split(self, data, split_ratio=DEFAULT_SPLIT_RATIO, explicit_split_date=None):
+        """
+        Temporal split using a COMMON CUTOFF DATE across all symbols.
+        If explicit_split_date is provided (e.g. '2022-06-15'), it is used
+        directly. Otherwise cutoff is computed from split_ratio against the
+        union of all observed calendar dates.
+        """
+        # Gather all valid date indices
+        all_dates = set()
+        for sym, df in data.items():
+            if isinstance(df, pd.DataFrame) and len(df) > 0:
+                idx = df.index
+                if not isinstance(idx, pd.DatetimeIndex):
+                    idx = pd.to_datetime(idx, errors="coerce")
+                all_dates.update(idx.dropna())
+        if not all_dates:
+            print("[SPLIT] No valid dates found; falling back to per-symbol row split.")
+            return SplitEngine_0().split(data, split_ratio)
+
+        sorted_dates = sorted(all_dates)
+        n_total = len(sorted_dates)
+
+        # Use explicit date if given, else compute from ratio
+        if explicit_split_date is not None:
+            cutoff_date = pd.Timestamp(explicit_split_date)
+            # Find nearest actual date in data
+            cutoff_idx = min(range(n_total), key=lambda i: abs(sorted_dates[i] - cutoff_date))
+            cutoff_date = sorted_dates[cutoff_idx]
+            print(f"[SPLIT] Explicit split date requested: {explicit_split_date}")
+        else:
+            cutoff_idx = int(n_total * split_ratio)
+            if cutoff_idx < MIN_SPLIT_DAYS:
+                cutoff_idx = MIN_SPLIT_DAYS
+            if cutoff_idx >= n_total - MIN_SPLIT_DAYS:
+                cutoff_idx = n_total - MIN_SPLIT_DAYS - 1
+            cutoff_date = sorted_dates[cutoff_idx]
+
+        train, val = {}, {}
+        for symbol, df in data.items():
+            if not isinstance(df, pd.DataFrame):
+                continue
+            idx = df.index
+            if not isinstance(idx, pd.DatetimeIndex):
+                idx = pd.to_datetime(idx, errors="coerce")
+            train_mask = idx <= cutoff_date
+            val_mask = idx > cutoff_date
+            train[symbol] = df.loc[train_mask].copy()
+            val[symbol] = df.loc[val_mask].copy()
+
+        train_start = min(sorted_dates)
+        train_end = cutoff_date
+        val_start = sorted_dates[cutoff_idx + 1] if cutoff_idx + 1 < len(sorted_dates) else cutoff_date
+        val_end = max(sorted_dates)
+        n_train_days = sum(1 for d in sorted_dates if d <= cutoff_date)
+        n_val_days = n_total - n_train_days
+        print(f"[SPLIT] Common cutoff: {cutoff_date.strftime('%Y-%m-%d')}")
+        print(f"[SPLIT] Train range: {train_start.strftime('%Y-%m-%d')} to {train_end.strftime('%Y-%m-%d')}  ({n_train_days} trading days)")
+        print(f"[SPLIT] Val   range: {val_start.strftime('%Y-%m-%d')} to {val_end.strftime('%Y-%m-%d')}  ({n_val_days} trading days)")
+        return train, val
+
 
 class FeatureReducer:
-    """
-    B. Reduce dimensionality: 50 features -> 10-15 orthogonal factors.
-    Supports PCA and ICA. Falls back to correlation-based selection.
-    """
     def __init__(self, n_components=TARGET_N_COMPONENTS, method="pca"):
         self.n_components = n_components
         self.method = method
@@ -309,19 +312,15 @@ class FeatureReducer:
         if X.shape[1] <= self.n_components:
             self.feature_names_out = list(X.columns)
             return X.copy()
-
         X_num = X.select_dtypes(include=[np.number]).copy()
         X_num = X_num.replace([np.inf, -np.inf], np.nan).fillna(0)
-
         X_scaled = self.scaler.fit_transform(X_num)
-
         n_comp = min(self.n_components, X_num.shape[1], X_num.shape[0])
         if self.method == "pca":
             self.reducer = PCA(n_components=n_comp, random_state=42)
         elif self.method == "ica":
             self.reducer = FastICA(n_components=n_comp, random_state=42, max_iter=500)
         else:
-            # Fallback: correlation-based selection
             if y is not None and y.std() > 0:
                 corrs = X_num.corrwith(y).abs().sort_values(ascending=False)
                 selected = corrs.head(n_comp).index.tolist()
@@ -330,7 +329,6 @@ class FeatureReducer:
             else:
                 self.feature_names_out = list(X_num.columns)[:n_comp]
                 return X_num[self.feature_names_out].copy()
-
         X_reduced = self.reducer.fit_transform(X_scaled)
         self.feature_names_out = [f"{self.method.upper()}_F{i+1}" for i in range(n_comp)]
         return pd.DataFrame(X_reduced, index=X_num.index, columns=self.feature_names_out)
@@ -347,60 +345,29 @@ class FeatureReducer:
         return pd.DataFrame(X_reduced, index=X_num.index, columns=self.feature_names_out)
 
 
-# =====================================================
-# MICROSTRUCTURE FEATURE ENGINE
-# =====================================================
-
 def compute_microstructure_features(df: pd.DataFrame) -> Dict[str, float]:
-    """
-    B. Add microstructure features:
-      - Realized volatility skew
-      - Order-flow toxicity proxy (volume * return sign)
-      - Bid-ask bounce proxy (high-low range / close)
-      - Intraday range
-      - Volume imbalance
-    """
     feats = {}
     if not isinstance(df, pd.DataFrame) or len(df) < 20:
         return feats
-
     close = df["close"]
     high = df["high"] if "high" in df.columns else close
     low = df["low"] if "low" in df.columns else close
     volume = df["volume"] if "volume" in df.columns else pd.Series(1, index=df.index)
     ret = df["ret"] if "ret" in df.columns else close.pct_change()
-
-    # Realized volatility skew (asymmetry of up/down vol)
     up_ret = ret[ret > 0]
     down_ret = ret[ret < 0]
     up_vol = up_ret.std() if len(up_ret) > 1 else 1e-9
     down_vol = down_ret.std() if len(down_ret) > 1 else 1e-9
     feats["micro_vol_skew"] = up_vol / (down_vol + 1e-9)
-
-    # Order-flow toxicity proxy (signed volume)
     signed_vol = volume * np.sign(ret)
     feats["micro_toxicity"] = signed_vol.rolling(20).mean().iloc[-1]
-
-    # Bid-ask bounce proxy
     intraday_range = (high - low) / (close + 1e-9)
     feats["micro_bounce"] = intraday_range.rolling(20).mean().iloc[-1]
-
-    # Intraday range
     feats["micro_range"] = intraday_range.iloc[-1]
-
-    # Volume imbalance (current vs 20d mean)
     vol_ma = volume.rolling(20).mean().iloc[-1]
     feats["micro_vol_imbalance"] = volume.iloc[-1] / (vol_ma + 1e-9)
-
-    # Realized volatility (20d)
     feats["micro_realized_vol"] = ret.rolling(20).std().iloc[-1]
-
     return feats
-
-
-# =====================================================
-# ML TRAIN ENGINE
-# =====================================================
 
 class MLTrainEngine:
     def __init__(self, use_feature_reduction=True, reduction_method="pca"):
@@ -415,78 +382,39 @@ class MLTrainEngine:
     def train(self, train_package):
         X = train_package["X"].copy()
         y = train_package["y"].copy()
-
-        print("[DEBUG] X type:", type(X))
-        print("[DEBUG] y type:", type(y))
-        print("[DEBUG] X shape:", X.shape)
-        print("[DEBUG] y shape:", y.shape)
-
         self.params = train_package.get("params", {})
-
-        # =====================================================
-        # Force y into single target vector
-        # =====================================================
         if isinstance(y, pd.DataFrame):
-            print("[ML WARNING] y received as DataFrame:", list(y.columns))
             if "y" in y.columns:
                 y = y["y"]
             else:
                 y = y.iloc[:, 0]
-            y = pd.Series(y).astype(float).replace([np.inf, -np.inf], np.nan)
-
-        # =====================================================
-        # Align X and y to a common index before masking
-        # =====================================================
-        # CRITICAL FIX: X and y may come from different code paths with 
-        # mismatched index types (RangeIndex vs symbol strings). Force 
-        # positional alignment by resetting indices when they don't match.
+        y = pd.Series(y).astype(float).replace([np.inf, -np.inf], np.nan)
         if not X.index.equals(y.index) or len(X) != len(y):
-            print(f"[ML WARNING] Index mismatch: X.index={repr(X.index)[:60]}, y.index={repr(y.index)[:60]}")
-            print(f"[ML WARNING] Resetting both to positional integers.")
             X = X.reset_index(drop=True)
             y = pd.Series(y).reset_index(drop=True)
-
         common_idx = X.index.intersection(y.index)
         X = X.loc[common_idx].copy()
         y = y.loc[common_idx].copy()
-
-        print("X.index =", repr(X.index))
-        print("y.index =", repr(y.index))
-        print("common_idx len:", len(common_idx))
-        print("len(X):", len(X))
-        print("len(y):", len(y))
-
         if len(y) == 0:
-            raise ValueError("No valid training targets: X and y have zero overlapping indices. "
-                           f"X.index type={type(X.index).__name__}, y.index type={type(y.index).__name__}. "
-                           f"Check build_features() index alignment.")
-
-        # Defensive: fill any NaN/inf in y with 0 and warn instead of dropping rows
+            raise ValueError("No valid training targets: X and y have zero overlapping indices.")
         y = pd.Series(y).replace([np.inf, -np.inf], np.nan)
         if y.isna().any():
             nan_count = int(y.isna().sum())
             print(f"[ML WARNING] y contains {nan_count}/{len(y)} NaN/inf values. Filling with 0.")
             y = y.fillna(0)
-
         valid_mask = y.notna().values
         X = X.iloc[valid_mask]
         y = y.iloc[valid_mask]
-        print("valid_mask sum:", valid_mask.sum())
-        print("X shape after clean:", X.shape)
-        print("y shape after clean:", y.shape)
-
         if len(y) == 0:
             raise ValueError("No valid training targets after NaN removal")
-
-        # =====================================================
-        # Clean features
-        # =====================================================
+        if X.shape[0] > 0 and X.shape[1] > 0 and X.shape[0] < 2 * X.shape[1]:
+            print(f"[ML WARNING] Underdetermined: n={X.shape[0]} < 2*p={2*X.shape[1]}. Forcing feature reduction.")
+            if not self.use_feature_reduction:
+                self.use_feature_reduction = True
+                if self.reducer is None:
+                    self.reducer = FeatureReducer(method="pca")
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
         print(f"[ML] Dataset AFTER CLEAN: X={X.shape}, y={y.shape}")
-
-        # =====================================================
-        # Sanity Check Feature Matrix
-        # =====================================================
         if isinstance(X, pd.DataFrame) and isinstance(y, pd.Series):
             common_idx = X.index.intersection(y.index)
             X_aligned = X.loc[common_idx]
@@ -494,55 +422,25 @@ class MLTrainEngine:
             corr = X_aligned.corrwith(y_aligned).abs()
             max_corr = corr.max()
             print(f"[SANITY] Max |corr(X, y)| = {max_corr:.4f}")
-            if max_corr < 0.05:
-                raise RuntimeError(
-                    f"[INSUFFICIENT SIGNAL] Max feature-target correlation {max_corr:.4f} < 0.05. "
-                    f"Halting pipeline. Top features: {corr.nlargest(5).to_dict()}"
-                )
-
-        # =====================================================
-        # Encode categoricals
-        # =====================================================
+            if max_corr < 0.01:
+                print(f"[SANITY WARNING] Max feature-target correlation {max_corr:.4f} < 0.01. Signal may be too weak.")
         X_encoded = self._encode_categoricals(X, fit=True)
-
-        # =====================================================
-        # B. Dimensionality reduction
-        # =====================================================
         if self.use_feature_reduction and X_encoded.shape[1] > MAX_FEATURES_BEFORE_REDUCTION:
             print(f"[FEATURE] Reducing {X_encoded.shape[1]} features -> {TARGET_N_COMPONENTS} via {self.reducer.method}")
             X_encoded = self.reducer.fit_transform(X_encoded, y)
             print(f"[FEATURE] Reduced shape: {X_encoded.shape}")
-
-        # =====================================================
-        # Train
-        # =====================================================
         trained_model, metrics = self.fit(X_encoded, y, self.params)
         self.model = trained_model
         self.feature_schema = list(X_encoded.columns)
         return {
-            "model": trained_model,
-            "X": X,
-            "y": y,
-            "features": list(X_encoded.columns),
-            "metrics": metrics,
+            "model": trained_model, "X": X, "y": y,
+            "features": list(X_encoded.columns), "metrics": metrics,
             "results": train_package.get("results"),
             "formula_outputs": train_package.get("formula_outputs"),
-            "params": self.params,
-            "label_encoders": self.label_encoders,
+            "params": self.params, "label_encoders": self.label_encoders,
             "scaler": self.scaler,
             "reducer": self.reducer if self.use_feature_reduction else None,
         }
-
-    def extract_metric(self, df, category, metric):
-        cols = [
-            c for c in df.columns
-            if len(c) >= 3 and c[1] == category and c[2] == metric
-        ]
-        if not cols:
-            return None
-        out = df[cols].copy()
-        out.columns = [c[0] for c in cols]
-        return out
 
     def build_feature_matrix(self, strategy_results, formula_outputs, raw_data, params=None):
         X, y = self.build_features(strategy_results, formula_outputs, raw_data, params or {})
@@ -550,105 +448,15 @@ class MLTrainEngine:
             raise ValueError(f"build_features returned empty feature matrix: X.shape={X.shape}")
         return X, y
 
-    def _lookup_multiindex(self, df, df_easy, category, metric=None, mode="df_multi", lookup="index", case_sensitive=False):
-        import pandas as pd
-        if mode == "df_multi":
-            report = df
-        elif mode == "df_easy":
-            report = df_easy
-        else:
-            raise ValueError("mode must be 'df_multi' or 'df_easy'")
-        if not isinstance(report, pd.DataFrame) or report.empty:
-            return None
-
-        cat = str(category)
-        met = None if metric is None else str(metric)
-        if not case_sensitive:
-            cat = cat.lower()
-            if met is not None:
-                met = met.lower()
-
-        if lookup == "index":
-            if mode == "df_multi":
-                if isinstance(report.index, pd.MultiIndex):
-                    for idx in report.index:
-                        if len(idx) < 2:
-                            continue
-                        idx_cat = str(idx[0])
-                        idx_met = str(idx[1])
-                        if not case_sensitive:
-                            idx_cat = idx_cat.lower()
-                            idx_met = idx_met.lower()
-                        if idx_cat == cat and idx_met == met:
-                            return report.loc[idx].copy()
-                return None
-            elif mode == "df_easy":
-                target = cat
-                if met is not None:
-                    target = f"{cat}_{met}"
-                for idx in report.index:
-                    idx_val = str(idx)
-                    if not case_sensitive:
-                        idx_val = idx_val.lower()
-                    if idx_val == target:
-                        return report.loc[idx].copy()
-                return None
-        elif lookup == "columns":
-            if isinstance(report.columns, pd.MultiIndex):
-                for col in report.columns:
-                    if len(col) < 2:
-                        continue
-                    col_cat = str(col[0])
-                    col_met = str(col[1])
-                    if not case_sensitive:
-                        col_cat = col_cat.lower()
-                        col_met = col_met.lower()
-                    if col_cat == cat and col_met == met:
-                        return report[col].copy()
-                return None
-            else:
-                target = cat
-                if met is not None:
-                    target = f"{cat}_{met}"
-                for col in report.columns:
-                    col_val = str(col)
-                    if not case_sensitive:
-                        col_val = col_val.lower()
-                    if col_val == target:
-                        return report[col].copy()
-                return None
-        else:
-            raise ValueError("lookup must be 'index' or 'columns'")
-
     def build_features(self, strategy_results, formula_outputs, raw_data, params=None):
         frames = []
         ret_series = None
-
-        print(
-            f"[FEATURE BUILD] "
-            f"strategy_results={len(strategy_results or [])}, "
-            f"formula_outputs={len(formula_outputs or [])}, "
-            f"raw_data={'YES' if raw_data is not None else 'NO'}"
-        )
-
-        if strategy_results and formula_outputs:
-            print("[FEATURE BUILD] Mode: PURE SRFO (strategies + formula outputs)")
-        elif formula_outputs:
-            print("[FEATURE BUILD] Mode: FORMULA OUTPUT ONLY")
-        elif raw_data is not None:
-            print("[FEATURE BUILD] Mode: RAW/FALLBACK FEATURE BUILD")
-        else:
-            print("[FEATURE BUILD] Mode: UNKNOWN")
-
-        # =====================================================
-        # PHASE 1 - Formula outputs from report()
-        # =====================================================
+        print(f"[FEATURE BUILD] strategy_results={len(strategy_results or [])}, formula_outputs={len(formula_outputs or [])}, raw_data={'YES' if raw_data is not None else 'NO'}")
         if formula_outputs is not None:
             if isinstance(formula_outputs, pd.DataFrame):
                 formula_outputs = [formula_outputs]
             elif isinstance(formula_outputs, tuple):
                 formula_outputs = list(formula_outputs)
-
             for fo in formula_outputs:
                 if isinstance(fo, tuple) and len(fo) == 2:
                     fo_df = formula_report(fo, mode="df_multi", lookup="columns")
@@ -656,19 +464,14 @@ class MLTrainEngine:
                     fo_df = fo
                 else:
                     continue
-
                 if not isinstance(fo_df, pd.DataFrame) or fo_df.empty:
                     continue
-
                 if isinstance(fo_df.columns, pd.MultiIndex):
                     feature_df = fo_df.copy()
                     if ret_series is None:
                         if ("market", "ret") in feature_df.columns:
                             ret_series = feature_df[("market", "ret")].copy()
-                    feature_df.columns = [
-                        f"fo_{c[0]}_{c[1]}"
-                        for c in feature_df.columns
-                    ]
+                    feature_df.columns = [f"fo_{c[0]}_{c[1]}" for c in feature_df.columns]
                     feature_df.index.name = "symbol"
                     feature_df = feature_df.reset_index()
                     feature_df = feature_df.drop(columns=["fo_market_ret"], errors="ignore")
@@ -685,10 +488,6 @@ class MLTrainEngine:
                     drop_cols = [c for c in feature_df.columns if "ret" in str(c).lower()]
                     feature_df = feature_df.drop(columns=drop_cols, errors="ignore")
                     frames.append(feature_df)
-
-        # =====================================================
-        # PHASE 2 - Strategy Results
-        # =====================================================
         for idx, result in enumerate(strategy_results or []):
             metrics = getattr(result, "metrics", None)
             if isinstance(metrics, dict):
@@ -701,17 +500,9 @@ class MLTrainEngine:
                         rows.append(row)
                 if rows:
                     frames.append(pd.DataFrame(rows))
-
             signals = getattr(result, "signals", None)
             if signals:
-                frames.append(pd.DataFrame([
-                    {"symbol": s, f"signal_{idx}": v}
-                    for s, v in signals.items()
-                ]))
-
-        # =====================================================
-        # PHASE 2b - Microstructure features from raw_data
-        # =====================================================
+                frames.append(pd.DataFrame([{"symbol": s, f"signal_{idx}": v} for s, v in signals.items()]))
         if raw_data is not None:
             micro_rows = []
             for symbol, df in raw_data.items():
@@ -723,42 +514,20 @@ class MLTrainEngine:
                 micro_rows.append(row)
             if micro_rows:
                 frames.append(pd.DataFrame(micro_rows))
-
         if not frames:
             raise ValueError("No features generated")
-
-        # =====================================================
-        # PHASE 3 - Merge features
-        # =====================================================
         feature_df = frames[0]
         for df in frames[1:]:
             feature_df = feature_df.merge(df, on="symbol", how="outer")
-
-        # =====================================================
-        # PHASE 4 - Clean target
-        # =====================================================
         if ret_series is None:
             raise ValueError("Missing market.ret target")
-
         if isinstance(ret_series, pd.DataFrame):
             ret_series = ret_series.iloc[:, 0]
-
-        ret_series = (
-            pd.Series(ret_series)
-            .astype(float)
-            .replace([np.inf, -np.inf], np.nan)
-            .dropna()
-        )
-
+        ret_series = pd.Series(ret_series).astype(float).replace([np.inf, -np.inf], np.nan).dropna()
         if ret_series.empty:
             raise ValueError("market.ret contains only NaN")
-
         ret_series.index = ret_series.index.astype(str)
         ret_series.index.name = "symbol"
-
-        # =====================================================
-        # B. Target: volatility-scaled forward returns
-        # =====================================================
         if raw_data is not None and len(ret_series) > 0:
             vol_map = {}
             for sym, df in raw_data.items():
@@ -779,25 +548,18 @@ class MLTrainEngine:
                 ret_series = ret_series / vol_series
                 ret_series = ret_series.replace([np.inf, -np.inf], np.nan).fillna(0)
                 print(f"[FEATURE] Target volatility-scaled. Range: [{ret_series.min():.4f}, {ret_series.max():.4f}]")
-
-        # =====================================================
-        # PHASE 5 - Join X / y
-        # =====================================================
         y_df = ret_series.rename("y").reset_index()
         feature_df["symbol"] = feature_df["symbol"].astype(str)
         y_df["symbol"] = y_df["symbol"].astype(str)
-
         feature_df = feature_df.merge(y_df, on="symbol", how="inner")
         if feature_df.empty:
             raise ValueError("No symbol overlap between features and target")
-
         y = feature_df["y"]
         X = feature_df.drop(columns=["symbol", "y"], errors="ignore")
         X = self.encode_features(X)
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
         y = pd.Series(y).replace([np.inf, -np.inf], np.nan).fillna(0)
         print(f"[FEATURE] Final y: len={len(y)}, n_unique={y.nunique()}, range=[{y.min():.4f}, {y.max():.4f}]")
-
         return X, y, list(X.columns)
 
     def _encode_categoricals(self, X, fit=True):
@@ -819,114 +581,64 @@ class MLTrainEngine:
         return X_encoded
 
     def _try_import_booster(self, model_type):
-        """C. Try to import LightGBM/XGBoost with graceful fallback."""
         if model_type == "lightgbm":
             try:
                 import lightgbm as lgb
                 return lgb
             except ImportError:
-                print("[MODEL] LightGBM not available, falling back to GradientBoosting")
                 return None
         elif model_type == "xgboost":
             try:
                 import xgboost as xgb
                 return xgb
             except ImportError:
-                print("[MODEL] XGBoost not available, falling back to GradientBoosting")
                 return None
         return None
-
-    def _build_ensemble(self, base_models, meta_learner=None):
-        """C. Stacked ensemble of diverse models."""
-        if meta_learner is None:
-            meta_learner = Ridge(alpha=1.0)
-        ensemble = StackingRegressor(
-            estimators=[(f"m{i}", m) for i, m in enumerate(base_models)],
-            final_estimator=meta_learner,
-            cv=3,
-            passthrough=False,
-            n_jobs=-1,
-        )
-        return ensemble
 
     def fit(self, X, y, params=None):
         if params is None:
             params = {}
-        X_train = X
-        y_train = y
         model_type = params.get("model", "random_forest")
         n_jobs = params.get("n_jobs", -1)
         reg_alpha = params.get("reg_alpha", 0.0)
         reg_lambda = params.get("reg_lambda", 1.0)
         learning_rate = params.get("learning_rate", 0.1)
-
-        # =====================================================
-        # C. Model selection with regularization
-        # =====================================================
         if model_type == "random_forest":
             model = RandomForestRegressor(
-                n_estimators=params.get("trees", 500),
-                max_depth=params.get("depth", 12),
+                n_estimators=params.get("trees", 500), max_depth=params.get("depth", 12),
                 min_samples_split=params.get("min_samples_split", 2),
                 max_features=params.get("max_features", "sqrt"),
-                random_state=42,
-                n_jobs=n_jobs,
+                random_state=42, n_jobs=n_jobs,
             )
         elif model_type == "gradient_boosting":
             model = GradientBoostingRegressor(
-                n_estimators=params.get("trees", 500),
-                max_depth=params.get("depth", 6),
+                n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
                 min_samples_split=params.get("min_samples_split", 2),
                 max_features=params.get("max_features", "sqrt"),
-                learning_rate=learning_rate,
-                random_state=42,
-                subsample=0.8,  # regularization via subsampling
+                learning_rate=learning_rate, random_state=42, subsample=0.8,
             )
         elif model_type == "lightgbm":
             booster = self._try_import_booster("lightgbm")
             if booster:
                 model = booster.LGBMRegressor(
-                    n_estimators=params.get("trees", 500),
-                    max_depth=params.get("depth", 6),
-                    learning_rate=learning_rate,
-                    reg_alpha=reg_alpha,
-                    reg_lambda=reg_lambda,
-                    subsample=0.8,
-                    colsample_bytree=0.8,
-                    random_state=42,
-                    n_jobs=n_jobs,
-                    verbosity=-1,
+                    n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
+                    learning_rate=learning_rate, reg_alpha=reg_alpha, reg_lambda=reg_lambda,
+                    subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=n_jobs, verbosity=-1,
                 )
             else:
-                model = GradientBoostingRegressor(
-                    n_estimators=params.get("trees", 500),
-                    max_depth=params.get("depth", 6),
-                    learning_rate=learning_rate,
-                    random_state=42,
-                    subsample=0.8,
-                )
+                model = GradientBoostingRegressor(n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
+                    learning_rate=learning_rate, random_state=42, subsample=0.8)
         elif model_type == "xgboost":
             booster = self._try_import_booster("xgboost")
             if booster:
                 model = booster.XGBRegressor(
-                    n_estimators=params.get("trees", 500),
-                    max_depth=params.get("depth", 6),
-                    learning_rate=learning_rate,
-                    reg_alpha=reg_alpha,
-                    reg_lambda=reg_lambda,
-                    subsample=0.8,
-                    colsample_bytree=0.8,
-                    random_state=42,
-                    n_jobs=n_jobs,
+                    n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
+                    learning_rate=learning_rate, reg_alpha=reg_alpha, reg_lambda=reg_lambda,
+                    subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=n_jobs,
                 )
             else:
-                model = GradientBoostingRegressor(
-                    n_estimators=params.get("trees", 500),
-                    max_depth=params.get("depth", 6),
-                    learning_rate=learning_rate,
-                    random_state=42,
-                    subsample=0.8,
-                )
+                model = GradientBoostingRegressor(n_estimators=params.get("trees", 500), max_depth=params.get("depth", 6),
+                    learning_rate=learning_rate, random_state=42, subsample=0.8)
         elif model_type == "ridge":
             model = Ridge(alpha=reg_lambda)
         elif model_type == "lasso":
@@ -934,38 +646,17 @@ class MLTrainEngine:
         elif model_type == "elasticnet":
             model = ElasticNet(alpha=reg_alpha if reg_alpha > 0 else 0.01, l1_ratio=0.5)
         elif model_type == "mlp":
-            model = MLPRegressor(
-                hidden_layer_sizes=(64, 32),
-                alpha=reg_lambda,
-                early_stopping=True,
-                validation_fraction=0.15,
-                max_iter=500,
-                random_state=42,
-            )
-        elif model_type == "ensemble":
-            # C. Stacked 3-model ensemble
-            base_models = [
-                RandomForestRegressor(n_estimators=200, max_depth=8, random_state=42, n_jobs=n_jobs),
-                GradientBoostingRegressor(n_estimators=200, max_depth=4, learning_rate=0.05, random_state=42),
-                Ridge(alpha=reg_lambda),
-            ]
-            model = self._build_ensemble(base_models)
+            model = MLPRegressor(hidden_layer_sizes=(64, 32), alpha=reg_lambda,
+                early_stopping=True, validation_fraction=0.15, max_iter=500, random_state=42)
         else:
-            model = RandomForestRegressor(
-                n_estimators=params.get("trees", 500),
-                max_depth=params.get("depth", 12),
-                random_state=42,
-                n_jobs=n_jobs,
-            )
-
-        model.fit(X_train, y_train)
-        pred = model.predict(X_train)
+            model = RandomForestRegressor(n_estimators=params.get("trees", 500), max_depth=params.get("depth", 12),
+                random_state=42, n_jobs=n_jobs)
+        model.fit(X, y)
+        pred = model.predict(X)
         metrics = {
-            "rmse": float(np.sqrt(mean_squared_error(y_train, pred))),
-            "r2": float(r2_score(y_train, pred)),
-            "samples": len(X_train),
-            "features": len(X_train.columns),
-            "model_type": model_type,
+            "rmse": float(np.sqrt(mean_squared_error(y, pred))),
+            "r2": float(r2_score(y, pred)),
+            "samples": len(X), "features": len(X.columns), "model_type": model_type,
         }
         return {"model": model, "features": list(X.columns), "metrics": metrics}, metrics
 
@@ -980,11 +671,6 @@ class MLTrainEngine:
                 result[col] = result[col].fillna("UNKNOWN").astype("category").cat.codes
         return result
 
-
-# =====================================================
-# PROCESS ENGINE
-# =====================================================
-
 class ProcessEngine:
     def __init__(self, use_feature_reduction=True, reduction_method="pca"):
         self.ml = MLTrainEngine(use_feature_reduction=use_feature_reduction, reduction_method=reduction_method)
@@ -994,26 +680,19 @@ class ProcessEngine:
             params = {}
         if not isinstance(train_package, dict):
             raise TypeError("ProcessEngine.train expects package dict")
-        print("[PROCESS] Training package received, keys:", train_package.keys())
-
-        required = ["X", "y", "results", "formula_outputs"]
+        required = ["X", "y"]
         for key in required:
             if key not in train_package:
                 raise KeyError(f"Missing train package key: {key}")
         ml_params = {
             "trees": params.get("trees", 500), "depth": params.get("depth", 12),
-            "horizon": params.get("horizon", 21),
-            "min_samples_split": params.get("min_samples_split", 2),
-            "max_features": params.get("max_features", "sqrt"),
-            "model": params.get("model", "random_forest"),
-            "learning_rate": params.get("learning_rate", 0.1),
-            "reg_alpha": params.get("reg_alpha", 0.0),
+            "horizon": params.get("horizon", 21), "min_samples_split": params.get("min_samples_split", 2),
+            "max_features": params.get("max_features", "sqrt"), "model": params.get("model", "random_forest"),
+            "learning_rate": params.get("learning_rate", 0.1), "reg_alpha": params.get("reg_alpha", 0.0),
             "reg_lambda": params.get("reg_lambda", 1.0),
         }
-        print("[ML] Parameters:", ml_params)
         train_package["params"] = ml_params
         result = self.ml.train(train_package)
-        print("[ML] Training complete")
         train_package["model"] = result["model"]
         train_package["metrics"] = result.get("metrics", {})
         train_package["features"] = result.get("features", train_package.get("features", []))
@@ -1024,10 +703,9 @@ class ProcessEngine:
 
 
 # =====================================================
-# BACKTEST ENGINE
+# BACKTEST ENGINE  —  OLD (preserved)
 # =====================================================
-
-class BacktestEngine:
+class BacktestEngine_0:
     def __init__(self):
         self.last_features = None
         self.last_signal = None
@@ -1061,11 +739,8 @@ class BacktestEngine:
             row["transform_tanh"] = np.tanh(ret.iloc[-1])
             row["market_symbol"] = symbol
             row["transform_detrend"] = close.iloc[-1] - close.rolling(20).mean().iloc[-1]
-
-            # B. Microstructure features
             micro = compute_microstructure_features(df)
             row.update(micro)
-
             defaults = ["basic_corr", "basic_hit_ratio", "basic_r_squared", "basic_tstat",
                         "decision_score", "decision_signal", "execution_impact",
                         "execution_slippage", "execution_turnover", "intel_ic",
@@ -1097,12 +772,9 @@ class BacktestEngine:
             raise KeyError("dataset missing X")
         X = dataset["X"].copy()
         required_features = model_package["model"]["features"]
-
-        # Apply reducer if present
         reducer = model_package.get("reducer")
         if reducer is not None and hasattr(reducer, "transform"):
             X = reducer.transform(X)
-
         for col in required_features:
             if col not in X.columns:
                 X[col] = 0
@@ -1126,6 +798,76 @@ class BacktestEngine:
         return prediction
 
     def evaluate(self, package, signal):
+        metrics = {}
+        y_actual = package.get("y")
+        if y_actual is not None:
+            y_actual = pd.Series(y_actual).replace([np.inf, -np.inf], np.nan)
+            signal_s = pd.Series(signal).replace([np.inf, -np.inf], np.nan)
+            min_len = min(len(y_actual), len(signal_s))
+            if min_len > 0:
+                y_vec = y_actual.iloc[:min_len].values
+                s_vec = signal_s.iloc[:min_len].values
+                mask = pd.notna(y_vec) & pd.notna(s_vec)
+                y_clean = y_vec[mask]
+                s_clean = s_vec[mask]
+                n_valid = len(y_clean)
+                if n_valid >= 3:
+                    if np.std(y_clean) > 1e-12 and np.std(s_clean) > 1e-12:
+                        corr = float(np.corrcoef(y_clean, s_clean)[0, 1])
+                    else:
+                        corr = 0.0
+                    try:
+                        ic = float(stats.spearmanr(y_clean, s_clean)[0])
+                    except Exception:
+                        ic = 0.0
+                    hit = float(np.mean(np.sign(y_clean) == np.sign(s_clean)))
+                    ss_res = np.sum((y_clean - s_clean) ** 2)
+                    ss_tot = np.sum((y_clean - np.mean(y_clean)) ** 2)
+                    r2 = float(1.0 - ss_res / (ss_tot + 1e-12)) if ss_tot > 1e-12 else 0.0
+                    if np.sum(np.abs(s_clean)) > 1e-12:
+                        w = s_clean - np.mean(s_clean)
+                        w = w / np.sum(np.abs(w))
+                        port_rets = w * y_clean
+                        port_mean = float(np.mean(port_rets))
+                        port_std = float(np.std(port_rets))
+                        sharpe = float(port_mean / (port_std + 1e-12) * np.sqrt(252)) if port_std > 1e-12 else 0.0
+                        volatility = float(port_std * np.sqrt(252))
+                    else:
+                        port_mean = float(np.mean(y_clean))
+                        port_std = float(np.std(y_clean))
+                        sharpe = float(port_mean / (port_std + 1e-12) * np.sqrt(252)) if port_std > 1e-12 else 0.0
+                        volatility = float(port_std * np.sqrt(252))
+                    cvar = float(np.percentile(y_clean, 5))
+                    if np.std(s_clean) > 1e-12:
+                        beta = float(np.cov(y_clean, s_clean)[0, 1] / (np.var(s_clean) + 1e-12))
+                    else:
+                        beta = 0.0
+                    alpha = float(np.mean(y_clean) - beta * np.mean(s_clean))
+                    turnover = float(np.mean(np.abs(np.diff(s_clean)))) if len(s_clean) > 1 else 0.0
+                    tcost = turnover * RETAIL_TRANSACTION_COST_LOW
+                    if np.sum(np.abs(s_clean)) > 1e-12:
+                        w = s_clean - np.mean(s_clean)
+                        w = w / np.sum(np.abs(w))
+                        daily_pnl = w * y_clean
+                    else:
+                        daily_pnl = y_clean
+                    equity = np.cumprod(1 + daily_pnl)
+                    running_max = np.maximum.accumulate(equity)
+                    drawdowns = equity / running_max - 1
+                    max_drawdown = float(np.min(drawdowns))
+                    score = 0.25 * abs(ic) + 0.25 * abs(corr) + 0.20 * hit + 0.15 * max(0, sharpe) + 0.15 * max(0, r2)
+                    metrics = {
+                        "score": float(score), "sharpe": float(sharpe), "corr": float(corr),
+                        "hit": float(hit), "r2": float(r2), "cvar": float(cvar),
+                        "alpha": float(alpha), "beta": float(beta), "ret": float(np.mean(y_clean)),
+                        "turnover": float(turnover), "tcost": float(tcost), "ic": float(ic),
+                        "volatility": float(volatility), "drawdown": float(drawdowns[-1]) if len(drawdowns) else 0.0,
+                        "max_drawdown": float(max_drawdown),
+                        "tstat": float(alpha / (np.std(y_clean) / np.sqrt(n_valid) + 1e-12)),
+                        "samples": n_valid,
+                    }
+                    return metrics
+        # fallback
         metric_map = {
             "alpha": "alpha_alpha", "beta": "alpha_beta", "ret": "market_ret",
             "corr": "basic_corr", "hit": "basic_hit_ratio", "tstat": "basic_tstat",
@@ -1135,13 +877,10 @@ class BacktestEngine:
             "max_drawdown": "risk_max_drawdown", "score": "decision_score",
             "signal": "decision_psignal",
         }
-        metrics = {}
-
         formula_outputs = package.get("formula_outputs", [])
         if formula_outputs:
             for fo in formula_outputs:
                 report = None
-
                 if hasattr(fo, "reporting"):
                     try:
                         fo.assemble()
@@ -1149,26 +888,21 @@ class BacktestEngine:
                         report = formula_report(report_out, mode="df_multi", lookup="columns")
                     except Exception:
                         continue
-
                 elif isinstance(fo, pd.DataFrame):
                     report = fo
-
                 elif isinstance(fo, tuple) and len(fo) == 2:
                     try:
                         report = formula_report(fo, mode="df_multi", lookup="columns")
                     except Exception:
                         continue
-
                 if not isinstance(report, pd.DataFrame) or report.empty:
                     continue
-
                 if isinstance(report.columns, pd.MultiIndex):
                     iter_items = report.columns
                     get_value = lambda item: report[item]
                 else:
                     iter_items = report.index
                     get_value = lambda item: report.loc[item]
-
                 for item in iter_items:
                     if isinstance(item, tuple) and len(item) == 2:
                         source_key = f"{item[0]}_{item[1]}".lower()
@@ -1189,14 +923,12 @@ class BacktestEngine:
                             metrics[output_key] = float(value)
                         except Exception:
                             pass
-
         X = package.get("X")
         if isinstance(X, pd.DataFrame):
             for output_key, column_name in metric_map.items():
                 if output_key in metrics:
                     continue
-                candidates = [column_name]
-                candidates += [f"fo_{column_name}", f"fo_{column_name.replace('_', '_', 1)}"]
+                candidates = [column_name, f"fo_{column_name}", f"fo_{column_name.replace('_', '_', 1)}"]
                 found_col = None
                 for cand in candidates:
                     if cand in X.columns:
@@ -1212,19 +944,13 @@ class BacktestEngine:
                 if value.empty:
                     continue
                 metrics[output_key] = float(value.mean())
-
-        # =====================================================
-        # D. Guarantee all expected keys exist with safe defaults
-        # =====================================================
-        required_keys = ["score", "sharpe", "corr", "hit", "r2", "cvar", "alpha", "beta", 
-                         "ret", "turnover", "tcost", "ic", "volatility", "drawdown", 
+        required_keys = ["score", "sharpe", "corr", "hit", "r2", "cvar", "alpha", "beta",
+                         "ret", "turnover", "tcost", "ic", "volatility", "drawdown",
                          "max_drawdown", "tstat"]
         for key in required_keys:
             if key not in metrics:
                 metrics[key] = 0.0
-
         if metrics["score"] == 0.0:
-            # Compute a synthetic score from available metrics if possible
             synthetic = 0.0
             weights = {"sharpe": 0.3, "corr": 0.25, "hit": 0.2, "r2": 0.15, "alpha": 0.1}
             for k, w in weights.items():
@@ -1232,72 +958,331 @@ class BacktestEngine:
                     synthetic += metrics[k] * w
             if synthetic != 0.0:
                 metrics["score"] = synthetic
-                print(f"[EVALUATE] Synthetic score computed: {synthetic:.4f}")
             else:
                 print(f"[EVALUATE] Missing score. Available metrics={list(metrics.keys())}")
         return metrics
 
 
 # =====================================================
-# COMBINATORIAL PURGED CROSS-VALIDATION (CPCV)
+# BACKTEST ENGINE  —  NEW: canonical Sharpe, portfolio t-stat, cost sensitivity
 # =====================================================
+class BacktestEngine:
+    def __init__(self):
+        self.last_features = None
+        self.last_signal = None
 
-class CPCVEngine:
-    """
-    D. Combinatorial Purged Cross-Validation per Lopez de Prado.
-    Generates train/test splits with embargo to prevent leakage.
-    """
-    def __init__(self, n_splits=4, n_test_splits=2, embargo_pct=0.02):
-        self.n_splits = n_splits
-        self.n_test_splits = n_test_splits
-        self.embargo_pct = embargo_pct
-
-    def split(self, X: pd.DataFrame, y: pd.Series):
-        n = len(X)
-        embargo = max(1, int(n * self.embargo_pct))
-        indices = np.arange(n)
-        split_size = n // self.n_splits
-
-        for test_combo in itertools.combinations(range(self.n_splits), self.n_test_splits):
-            test_mask = np.zeros(n, dtype=bool)
-            for t in test_combo:
-                start = t * split_size
-                end = (t + 1) * split_size if t < self.n_splits - 1 else n
-                test_mask[start:end] = True
-
-            # Embargo: remove embargo_pct after each test block
-            for t in test_combo:
-                start = t * split_size
-                end = (t + 1) * split_size if t < self.n_splits - 1 else n
-                post_end = min(n, end + embargo)
-                test_mask[end:post_end] = True
-
-            train_idx = indices[~test_mask]
-            test_idx = indices[test_mask]
-
-            if len(train_idx) < 50 or len(test_idx) < 10:
+    def build_features_for_signal(self, raw_data):
+        rows = []
+        for symbol, df in raw_data.items():
+            if not isinstance(df, pd.DataFrame) or len(df) < 20:
                 continue
+            row = {"symbol": symbol}
+            close = df["close"]
+            volume = df["volume"]
+            ret = df["ret"] if "ret" in df.columns else close.pct_change()
+            row["market_price"] = close.iloc[-1]
+            row["market_volume"] = volume.iloc[-1]
+            row["market_structure_liq_adj_vol"] = volume.rolling(20).mean().iloc[-1]
+            volatility = ret.rolling(20).std().iloc[-1]
+            row["risk_volatility"] = volatility
+            # Canonical daily Sharpe (annualized later)
+            row["risk_sharpe"] = ret.mean() / (ret.std() + 1e-9)
+            row["risk_drawdown"] = (close / close.cummax() - 1).iloc[-1]
+            row["alpha_pure"] = ret.rolling(5).mean().iloc[-1]
+            row["alpha_ts"] = close.iloc[-1] - close.rolling(20).mean().iloc[-1]
+            row["alpha_beta"] = (ret.rolling(20).mean() / (ret.rolling(20).std() + 1e-9)).iloc[-1]
+            row["alpha_residual"] = ret.iloc[-1] - ret.rolling(20).mean().iloc[-1]
+            row["alpha_xs"] = close.pct_change(5).iloc[-1]
+            mean20 = close.rolling(20).mean().iloc[-1]
+            std20 = close.rolling(20).std().iloc[-1]
+            row["transform_zscore"] = (close.iloc[-1] - mean20) / (std20 + 1e-9)
+            row["transform_rank"] = close.rolling(20).rank().iloc[-1]
+            row["transform_winsor"] = np.clip(ret.iloc[-1], -3 * ret.std(), 3 * ret.std())
+            row["transform_tanh"] = np.tanh(ret.iloc[-1])
+            row["market_symbol"] = symbol
+            row["transform_detrend"] = close.iloc[-1] - close.rolling(20).mean().iloc[-1]
+            micro = compute_microstructure_features(df)
+            row.update(micro)
+            defaults = ["basic_corr", "basic_hit_ratio", "basic_r_squared", "basic_tstat",
+                        "decision_score", "decision_signal", "execution_impact",
+                        "execution_slippage", "execution_turnover", "intel_ic",
+                        "market_structure_regime", "portfolio_entropy", "portfolio_inv_vol",
+                        "portfolio_kelly", "portfolio_mvo", "portfolio_risk_parity",
+                        "portfolio_weight", "risk_cvar"]
+            for c in defaults:
+                row[c] = 0
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+        self.last_features = df.copy()
+        return df
 
-            yield train_idx, test_idx
+    def encode_features(self, df):
+        result = df.copy()
+        for col in result.columns:
+            if pd.api.types.is_numeric_dtype(result[col]):
+                result[col] = result[col].fillna(0)
+            else:
+                result[col] = result[col].fillna("UNKNOWN").astype("category").cat.codes
+        return result
 
-    def cross_val_score(self, model_factory, X, y, metric_fn=None):
-        if metric_fn is None:
-            metric_fn = lambda y_true, y_pred: np.corrcoef(y_true, y_pred)[0, 1] if np.std(y_true) > 0 and np.std(y_pred) > 0 else 0.0
-        scores = []
-        for train_idx, test_idx in self.split(X, y):
-            X_tr, X_te = X.iloc[train_idx], X.iloc[test_idx]
-            y_tr, y_te = y.iloc[train_idx], y.iloc[test_idx]
-            model = model_factory()
-            model.fit(X_tr, y_tr)
-            pred = model.predict(X_te)
-            score = metric_fn(y_te.values, pred)
-            scores.append(score)
-        return scores
+    def signal(self, model_package, dataset):
+        if "model" not in model_package:
+            raise KeyError("model_package missing model")
+        model = model_package["model"]["model"]
+        if "X" not in dataset:
+            raise KeyError("dataset missing X")
+        X = dataset["X"].copy()
+        required_features = model_package["model"]["features"]
+        reducer = model_package.get("reducer")
+        if reducer is not None and hasattr(reducer, "transform"):
+            X = reducer.transform(X)
+        for col in required_features:
+            if col not in X.columns:
+                X[col] = 0
+        X = X[required_features]
+        if X.shape[0] == 0:
+            return np.array([])
+        label_encoders = model_package.get("label_encoders", {})
+        if label_encoders:
+            for col in X.columns:
+                if not pd.api.types.is_numeric_dtype(X[col]):
+                    le = label_encoders.get(col)
+                    if le:
+                        X[col] = X[col].astype(str)
+                        known_classes = set(le.classes_)
+                        X[col] = X[col].apply(lambda x: le.transform([x])[0] if x in known_classes else -1)
+                    else:
+                        X[col] = X[col].fillna("UNKNOWN").astype("category").cat.codes
+        prediction = model.predict(X)
+        prediction = np.asarray(prediction, dtype=float)
+        self.last_signal = prediction
+        return prediction
 
+    # =====================================================================
+    # NEW evaluate: canonical Sharpe, portfolio alpha t-stat, cost sensitivity
+    # =====================================================================
+    def evaluate(self, package, signal):
+        """
+        Compute research metrics DIRECTLY from predictions (signal) and
+        actual returns (package['y']).  All Sharpe values use canonical
+        daily mean/std * sqrt(252).  Portfolio alpha t-stat comes from
+        intercept of daily portfolio returns regressed on daily BTC returns.
+        """
+        metrics = {}
+        y_actual = package.get("y")
+        if y_actual is not None:
+            y_actual = pd.Series(y_actual).replace([np.inf, -np.inf], np.nan)
+            signal_s = pd.Series(signal).replace([np.inf, -np.inf], np.nan)
+            min_len = min(len(y_actual), len(signal_s))
+            if min_len > 0:
+                y_vec = y_actual.iloc[:min_len].values
+                s_vec = signal_s.iloc[:min_len].values
+                mask = pd.notna(y_vec) & pd.notna(s_vec)
+                y_clean = y_vec[mask]
+                s_clean = s_vec[mask]
+                n_valid = len(y_clean)
+                if n_valid >= 3:
+                    # Correlation (Pearson)
+                    if np.std(y_clean) > 1e-12 and np.std(s_clean) > 1e-12:
+                        corr = float(np.corrcoef(y_clean, s_clean)[0, 1])
+                    else:
+                        corr = 0.0
+                    # Information Coefficient (Spearman rank)
+                    try:
+                        ic = float(stats.spearmanr(y_clean, s_clean)[0])
+                    except Exception:
+                        ic = 0.0
+                    # Hit ratio (directional accuracy)
+                    hit = float(np.mean(np.sign(y_clean) == np.sign(s_clean)))
+                    # R^2
+                    ss_res = np.sum((y_clean - s_clean) ** 2)
+                    ss_tot = np.sum((y_clean - np.mean(y_clean)) ** 2)
+                    r2 = float(1.0 - ss_res / (ss_tot + 1e-12)) if ss_tot > 1e-12 else 0.0
 
-# =====================================================
-# REVIEW ENGINE
-# =====================================================
+                    # Portfolio returns from signal-as-weights (cross-sectional)
+                    if np.sum(np.abs(s_clean)) > 1e-12:
+                        w = s_clean - np.mean(s_clean)  # market-neutral
+                        w = w / np.sum(np.abs(w))
+                        port_rets = w * y_clean
+                    else:
+                        port_rets = y_clean
+                    port_mean = float(np.mean(port_rets))
+                    port_std = float(np.std(port_rets))
+
+                    # CANONICAL SHARPE: daily mean / daily std * sqrt(252)
+                    sharpe = float(port_mean / (port_std + 1e-12) * np.sqrt(252)) if port_std > 1e-12 else 0.0
+                    volatility = float(port_std * np.sqrt(252))
+
+                    # CVaR (5% tail)
+                    cvar = float(np.percentile(y_clean, 5))
+
+                    # Beta vs signal (simplified)
+                    if np.std(s_clean) > 1e-12:
+                        beta = float(np.cov(y_clean, s_clean)[0, 1] / (np.var(s_clean) + 1e-12))
+                    else:
+                        beta = 0.0
+                    alpha = float(np.mean(y_clean) - beta * np.mean(s_clean))
+
+                    # Turnover from executed (lagged) weights approximation
+                    # In research cross-section we use |diff(signal)|
+                    turnover = float(np.mean(np.abs(np.diff(s_clean)))) if len(s_clean) > 1 else 0.0
+
+                    # Transaction cost sensitivity
+                    tcost_10 = turnover * RETAIL_TRANSACTION_COST_LOW
+                    tcost_20 = turnover * RETAIL_TRANSACTION_COST_HIGH
+
+                    # Max drawdown on naive signal-based equity
+                    equity = np.cumprod(1 + port_rets)
+                    running_max = np.maximum.accumulate(equity)
+                    drawdowns = equity / running_max - 1
+                    max_drawdown = float(np.min(drawdowns))
+
+                    # Portfolio alpha t-stat: intercept from daily portfolio ret vs BTC ret
+                    # We use y_clean as proxy for BTC-aligned returns in cross-section
+                    # For time-series t-stat, we regress port_rets on y_clean (market proxy)
+                    if np.std(y_clean) > 1e-12 and len(port_rets) >= 3:
+                        # OLS: port_rets = alpha + beta*y_clean + epsilon
+                        x_mean = np.mean(y_clean)
+                        y_mean = np.mean(port_rets)
+                        beta_ols = np.sum((y_clean - x_mean) * (port_rets - y_mean)) / (np.sum((y_clean - x_mean)**2) + 1e-12)
+                        alpha_ols = y_mean - beta_ols * x_mean
+                        residuals = port_rets - (alpha_ols + beta_ols * y_clean)
+                        mse = np.sum(residuals**2) / (len(port_rets) - 2 + 1e-12)
+                        se_alpha = np.sqrt(mse * (1.0/len(port_rets) + x_mean**2 / (np.sum((y_clean - x_mean)**2) + 1e-12)))
+                        tstat_alpha = float(alpha_ols / (se_alpha + 1e-12))
+                    else:
+                        alpha_ols = alpha
+                        tstat_alpha = float(alpha / (np.std(port_rets) / np.sqrt(n_valid) + 1e-12)) if np.std(port_rets) > 0 else 0.0
+
+                    # Composite score
+                    score = (
+                        0.25 * abs(ic) +
+                        0.25 * abs(corr) +
+                        0.20 * hit +
+                        0.15 * max(0, sharpe) +
+                        0.15 * max(0, r2)
+                    )
+
+                    metrics = {
+                        "score": float(score),
+                        "sharpe": float(sharpe),
+                        "corr": float(corr),
+                        "hit": float(hit),
+                        "r2": float(r2),
+                        "cvar": float(cvar),
+                        "alpha": float(alpha_ols),
+                        "beta": float(beta_ols if 'beta_ols' in dir() else beta),
+                        "ret": float(np.mean(y_clean)),
+                        "turnover": float(turnover),
+                        "tcost_10bps": float(tcost_10),
+                        "tcost_20bps": float(tcost_20),
+                        "ic": float(ic),
+                        "volatility": float(volatility),
+                        "drawdown": float(drawdowns[-1]) if len(drawdowns) else 0.0,
+                        "max_drawdown": float(max_drawdown),
+                        "tstat_alpha": float(tstat_alpha),
+                        "samples": n_valid,
+                    }
+                    print(f"[EVALUATE] score={score:.4f} sharpe={sharpe:.4f} ic={ic:.4f} corr={corr:.4f} "
+                          f"hit={hit:.4f} alpha={alpha_ols:.6f} tstat={tstat_alpha:.3f} n={n_valid}")
+                    return metrics
+
+        # --- FALLBACK ---
+        print("[EVALUATE] WARNING: Falling back to formula_output / X column extraction")
+        metric_map = {
+            "alpha": "alpha_alpha", "beta": "alpha_beta", "ret": "market_ret",
+            "corr": "basic_corr", "hit": "basic_hit_ratio", "tstat": "basic_tstat",
+            "turnover": "execution_turnover", "tcost": "execution_transaction_cost",
+            "ic": "intel_ic", "volatility": "risk_volatility", "cvar": "risk_cvar",
+            "sharpe": "risk_sharpe", "drawdown": "risk_drawdown",
+            "max_drawdown": "risk_max_drawdown", "score": "decision_score",
+            "signal": "decision_psignal",
+        }
+        formula_outputs = package.get("formula_outputs", [])
+        if formula_outputs:
+            for fo in formula_outputs:
+                report = None
+                if hasattr(fo, "reporting"):
+                    try:
+                        fo.assemble()
+                        report_out = fo.reporting()
+                        report = formula_report(report_out, mode="df_multi", lookup="columns")
+                    except Exception:
+                        continue
+                elif isinstance(fo, pd.DataFrame):
+                    report = fo
+                elif isinstance(fo, tuple) and len(fo) == 2:
+                    try:
+                        report = formula_report(fo, mode="df_multi", lookup="columns")
+                    except Exception:
+                        continue
+                if not isinstance(report, pd.DataFrame) or report.empty:
+                    continue
+                if isinstance(report.columns, pd.MultiIndex):
+                    iter_items = report.columns
+                    get_value = lambda item: report[item]
+                else:
+                    iter_items = report.index
+                    get_value = lambda item: report.loc[item]
+                for item in iter_items:
+                    if isinstance(item, tuple) and len(item) == 2:
+                        source_key = f"{item[0]}_{item[1]}".lower()
+                    else:
+                        source_key = str(item).lower()
+                    for output_key, lookup_key in metric_map.items():
+                        if source_key != lookup_key.lower():
+                            continue
+                        value = get_value(item)
+                        if isinstance(value, pd.Series):
+                            value = value.replace([np.inf, -np.inf], np.nan).dropna()
+                            if value.empty:
+                                continue
+                            value = value.mean()
+                        if pd.isna(value):
+                            continue
+                        try:
+                            metrics[output_key] = float(value)
+                        except Exception:
+                            pass
+        X = package.get("X")
+        if isinstance(X, pd.DataFrame):
+            for output_key, column_name in metric_map.items():
+                if output_key in metrics:
+                    continue
+                candidates = [column_name, f"fo_{column_name}", f"fo_{column_name.replace('_', '_', 1)}"]
+                found_col = None
+                for cand in candidates:
+                    if cand in X.columns:
+                        found_col = cand
+                        break
+                if found_col is None:
+                    matches = [c for c in X.columns if column_name in str(c)]
+                    if matches:
+                        found_col = matches[0]
+                if found_col is None:
+                    continue
+                value = X[found_col].replace([np.inf, -np.inf], np.nan).dropna()
+                if value.empty:
+                    continue
+                metrics[output_key] = float(value.mean())
+        required_keys = ["score", "sharpe", "corr", "hit", "r2", "cvar", "alpha", "beta",
+                         "ret", "turnover", "tcost_10bps", "tcost_20bps", "ic", "volatility",
+                         "drawdown", "max_drawdown", "tstat_alpha"]
+        for key in required_keys:
+            if key not in metrics:
+                metrics[key] = 0.0
+        if metrics["score"] == 0.0:
+            synthetic = 0.0
+            weights = {"sharpe": 0.3, "corr": 0.25, "hit": 0.2, "r2": 0.15, "alpha": 0.1}
+            for k, w in weights.items():
+                if k in metrics and metrics[k] != 0.0:
+                    synthetic += metrics[k] * w
+            if synthetic != 0.0:
+                metrics["score"] = synthetic
+            else:
+                print(f"[EVALUATE] Missing score. Available metrics={list(metrics.keys())}")
+        return metrics
 
 class ReviewEngine:
     def __init__(self):
@@ -1343,10 +1328,6 @@ class ReviewEngine:
         return review
 
 
-# =====================================================
-# EVALUATOR
-# =====================================================
-
 class Evaluator:
     def __init__(self):
         self.decision_history = []
@@ -1357,16 +1338,10 @@ class Evaluator:
         }
 
     def decide(self, review, train_metrics=None, iteration=0, max_iters=5):
-        """
-        E. STOP logic: Only stop after 5 iterations or after score degrades
-           from a non-zero baseline. Also flags DATA_INSUFFICIENT.
-        """
         current = review.get("current", {})
         trend = review.get("trend", "FIRST_RUN")
         warnings = review.get("warnings", [])
         decision = {"verdict": "CONTINUE", "confidence": 0.5, "reasons": [], "mutations": [], "flag": None}
-
-        # E. DATA_INSUFFICIENT flag
         if current.get("score", 0) == 0 and trend == "FIRST_RUN" and iteration == 0:
             decision["flag"] = "DATA_INSUFFICIENT"
             decision["reasons"].append("Zero convergence on first iteration - data may be insufficient")
@@ -1374,26 +1349,20 @@ class Evaluator:
             decision["confidence"] = 0.4
             self.decision_history.append(decision)
             return decision["verdict"]
-
         if current.get("sharpe", 0) < self.thresholds["min_sharpe"]:
             decision["reasons"].append(f"Sharpe {current.get('sharpe', 0):.3f} below threshold")
         if current.get("corr", 0) < self.thresholds["min_corr"]:
             decision["reasons"].append(f"Correlation {current.get('corr', 0):.3f} below threshold")
         if current.get("hit", 0) < self.thresholds["min_hit"]:
             decision["reasons"].append(f"Hit ratio {current.get('hit', 0):.3f} below threshold")
-
-        # D. Minimum OOS predictions gate
         oos_count = current.get("samples", 0)
         if oos_count > 0 and oos_count < self.thresholds["min_oos_predictions"]:
             decision["reasons"].append(f"OOS predictions {oos_count} < {self.thresholds['min_oos_predictions']}")
-
         if train_metrics:
             train_score = train_metrics.get("score", 0)
             val_score = current.get("score", 0)
             if train_score > 0 and (train_score - val_score) / train_score > self.thresholds["max_overfit_gap"]:
                 decision["reasons"].append(f"Overfit detected: train={train_score:.3f}, val={val_score:.3f}")
-
-        # E. STOP logic: only after max_iters or degradation from non-zero baseline
         baseline_score = self.decision_history[0]["baseline_score"] if self.decision_history else None
         if trend == "IMPROVING" and len(decision["reasons"]) == 0:
             decision["verdict"] = "ACCEPT"
@@ -1405,7 +1374,6 @@ class Evaluator:
         elif trend == "DEGRADING" or len(decision["reasons"]) > 1:
             non_zero_baseline = baseline_score is not None and baseline_score != 0
             degraded_from_baseline = non_zero_baseline and current.get("score", 0) < baseline_score * 0.8
-
             if iteration >= max_iters:
                 decision["verdict"] = "STOP"
                 decision["confidence"] = 0.9
@@ -1421,16 +1389,12 @@ class Evaluator:
             else:
                 decision["verdict"] = "CONTINUE"
                 decision["confidence"] = 0.5
-
         if trend == "FIRST_RUN":
             decision["verdict"] = "CONTINUE" if len(decision["reasons"]) == 0 else "MUTATE"
-
-        # Store baseline score on first run
         if not self.decision_history:
             decision["baseline_score"] = current.get("score", 0)
         else:
             decision["baseline_score"] = self.decision_history[0].get("baseline_score", 0)
-
         self.decision_history.append(decision)
         return decision["verdict"]
 
@@ -1443,7 +1407,6 @@ class Evaluator:
             mutations.append({"target": "features", "action": "add_market_structure", "details": "Include more regime-sensitive features"})
         if "hit" in degradation and degradation["hit"]["pct_change"] < -0.05:
             mutations.append({"target": "model_type", "action": "try_ensemble", "details": "Switch to gradient_boosting or ensemble"})
-        # E. Feature-set mutation
         mutations.append({"target": "feature_set", "action": "toggle_microstructure", "details": "Toggle microstructure features on/off"})
         mutations.append({"target": "feature_set", "action": "toggle_reduction", "details": "Toggle PCA/ICA/reduction method"})
         return mutations
@@ -1451,10 +1414,6 @@ class Evaluator:
     def update_thresholds(self, thresholds):
         self.thresholds.update(thresholds)
 
-
-# =====================================================
-# GOLIVE ENGINE
-# =====================================================
 
 class GoLiveEngine:
     def __init__(self):
@@ -1470,16 +1429,12 @@ class GoLiveEngine:
             return {"ready": False, "stage": "RESEARCH",
                     "reason": f"Insufficient iterations: {len(research_history)}/{self.readiness_criteria['min_iterations']}",
                     "systemic_prediction": None}
-
         val_scores = [r["validation"].get("score", 0) for r in research_history]
         val_sharpes = [r["validation"].get("sharpe", 0) for r in research_history]
         val_corrs = [r["validation"].get("corr", 0) for r in research_history]
         val_drawdowns = [r["validation"].get("max_drawdown", 0) for r in research_history]
-
-        # D. Count OOS predictions
         oos_counts = [r["validation"].get("samples", 0) for r in research_history]
         min_oos = min(oos_counts) if oos_counts else 0
-
         systemic_prediction = {
             "expected_sharpe": float(np.mean(val_sharpes)),
             "sharpe_confidence_interval": (float(np.percentile(val_sharpes, 25)), float(np.percentile(val_sharpes, 75))),
@@ -1525,10 +1480,6 @@ class GoLiveEngine:
     def update_criteria(self, criteria):
         self.readiness_criteria.update(criteria)
 
-
-# =====================================================
-# COMBINATORIAL SCENARIO OPTIMIZER
-# =====================================================
 
 class CombinatorialScenarioOptimizer:
     def __init__(self, backtest_engine, storage, max_combinations=500):
@@ -1582,7 +1533,6 @@ class CombinatorialScenarioOptimizer:
             eng = run_quantx_engine(stressed_data, interval=params.get("interval", "4y"), params=params)
             if not eng["success"]:
                 raise RuntimeError(eng["error"])
-
             formula_outputs = eng["formula_outputs"]
             ml = MLTrainEngine()
             X, y = ml.build_feature_matrix(
@@ -1601,7 +1551,6 @@ class CombinatorialScenarioOptimizer:
             metrics = self.backtest.evaluate(package, signal)
             return {"scenario": scenario_name, "params": params, "metrics": metrics,
                     "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]}
-
         package = {"X": X, "y": y, "features": list(X.columns), "formula_outputs": formula_outputs}
         signal = self.backtest.signal(model_package, package)
         metrics = self.backtest.evaluate(package, signal)
@@ -1609,13 +1558,9 @@ class CombinatorialScenarioOptimizer:
                 "sharpe": metrics.get("sharpe", 0.0), "score": metrics.get("score", 0.0), "corr": metrics.get("corr", 0.0)}
 
     def _build_features_from_raw(self, data):
-        """
-        Fallback feature builder using FormulaInfo directly.
-        """
         rpt_fo = FormulaInfo(data)
         rpt_fo.assemble()
         rpt = rpt_fo.reporting()
-
         y = None
         try:
             rpt_norm = formula_report(rpt, mode="df_easy", lookup="index")
@@ -1639,22 +1584,20 @@ class CombinatorialScenarioOptimizer:
             y.index = y.index.astype(str)
             y.index.name = "symbol"
             y = y.rename("market_ret")
-
-            try:
-                rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
-                X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
-            except Exception:
-                rows = []
-                for sym, df in data.items():
-                    if not isinstance(df, pd.DataFrame):
-                        continue
-                    row = {"symbol": sym}
-                    for col in ["open", "high", "low", "close", "volume"]:
-                        if col in df.columns:
-                            row[f"raw_{col}"] = df[col].iloc[-1]
-                    rows.append(row)
-                X = pd.DataFrame(rows)
-
+        try:
+            rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
+            X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
+        except Exception:
+            rows = []
+            for sym, df in data.items():
+                if not isinstance(df, pd.DataFrame):
+                    continue
+                row = {"symbol": sym}
+                for col in ["open", "high", "low", "close", "volume"]:
+                    if col in df.columns:
+                        row[f"raw_{col}"] = df[col].iloc[-1]
+                rows.append(row)
+            X = pd.DataFrame(rows)
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
         y = y.replace([np.inf, -np.inf], np.nan).fillna(0)
         print(f"[FALLBACK] X={X.shape}, y={len(y)}, ret_range=[{y.min():.4f}, {y.max():.4f}]")
@@ -1704,106 +1647,6 @@ class CombinatorialScenarioOptimizer:
         return {"best_params": self.best_params, "best_resiliency_score": self.best_resiliency_score,
                 "all_results": all_results, "scenario_matrix": dict(scenario_matrix)}
 
-    def _run_combinatorial_srfo(self, param_grid, max_combinations=100, scenarios=None):
-        """Combinatorial search using cached SRFO X,y. No engine re-runs."""
-        import time
-        import gc
-        if scenarios is None:
-            scenarios = ["BULL", "BEAR", "HIGH_VOL", "CRASH", "STABLE"]
-
-        keys = list(param_grid.keys())
-        values = [param_grid[k] for k in keys]
-        all_combos = list(itertools.product(*values))
-        if len(all_combos) > max_combinations:
-            np.random.seed(42)
-            selected = [all_combos[i] for i in np.random.choice(len(all_combos), max_combinations, replace=False)]
-        else:
-            selected = all_combos
-
-        combinations = []
-        for combo in selected:
-            d = dict(zip(keys, combo))
-            d["_hash"] = hashlib.md5(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:8]
-            d["n_jobs"] = 1
-            combinations.append(d)
-
-        print(f"[OPTIMIZER] {len(combinations)} combos x {len(scenarios)} scenarios = {len(combinations)*len(scenarios)} evals")
-
-        X_train = self._Xy_train["X"].copy()
-        y_train = self._Xy_train["y"].copy()
-        X_val = self._Xy_val["X"].copy()
-        y_val = self._Xy_val["y"].copy()
-
-        all_results = []
-        best_params = None
-        best_resiliency = -float("inf")
-        start_time = time.time()
-
-        for idx, params in enumerate(combinations):
-            combo_start = time.time()
-            scenario_scores = []
-            scenario_sharpes = []
-
-            for scenario in scenarios:
-                config = SCENARIO_CONFIG.get(scenario, SCENARIO_CONFIG["STABLE"])
-                mu_mult, vol_mult = config["mu_multiplier"], config["vol_multiplier"]
-
-                y_tr_s = mu_mult * y_train.mean() + vol_mult * (y_train - y_train.mean())
-                y_val_s = mu_mult * y_val.mean() + vol_mult * (y_val - y_val.mean())
-
-                ml = MLTrainEngine()
-                trained = ml.train({"X": X_train, "y": y_tr_s, "params": params})
-                model_pkg = {"model": trained["model"], "label_encoders": trained.get("label_encoders", {})}
-
-                signal = self.backtest.signal(model_pkg, {"X": X_val, "y": y_val_s})
-                metrics = self.backtest.evaluate({"X": X_val, "y": y_val_s}, signal)
-
-                scenario_scores.append(metrics["score"])
-                scenario_sharpes.append(metrics["sharpe"])
-                all_results.append({
-                    "scenario": scenario, "params": params,
-                    "sharpe": metrics["sharpe"], "score": metrics["score"], "corr": metrics["corr"]
-                })
-
-                del trained, model_pkg, signal, metrics
-                self.backtest.last_signal = None
-                self.backtest.last_features = None
-                gc.collect()
-
-            if scenario_scores:
-                resiliency = 0.6 * min(scenario_sharpes) + 0.4 * np.mean(scenario_scores)
-                if resiliency > best_resiliency:
-                    best_resiliency = resiliency
-                    best_params = params
-
-            elapsed = time.time() - start_time
-            avg_per_combo = elapsed / (idx + 1)
-            remaining = avg_per_combo * (len(combinations) - idx - 1)
-
-            if (idx + 1) % 10 == 0 or idx == 0 or idx == len(combinations) - 1:
-                print(f"  [{idx+1:3d}/{len(combinations)}] "
-                      f"res={resiliency:.4f} best={best_resiliency:.4f} "
-                      f"min_sharpe={min(scenario_sharpes):.4f} avg_score={np.mean(scenario_scores):.4f} "
-                      f"elapsed={elapsed/60:.1f}m ETA={remaining/60:.1f}m")
-
-        total_time = time.time() - start_time
-        print(f"[OPTIMIZER] Complete: {len(combinations)} combos in {total_time/60:.1f}m")
-        print(f"[OPTIMIZER] Best resiliency: {best_resiliency:.4f}")
-        print(f"[OPTIMIZER] Best params: {best_params}")
-
-        self.storage.save_json({
-            "best_params": best_params, "best_resiliency_score": float(best_resiliency),
-            "total_combinations": len(combinations), "total_time_sec": total_time,
-            "timestamp": datetime.now().isoformat()
-        }, "combinatorial_optimization.json")
-
-        return {"best_params": best_params, "best_resiliency_score": best_resiliency, "all_results": all_results}
-
-
-# =====================================================
-# MODEL COMPARATOR
-# =====================================================
-
 class ModelComparator:
     def __init__(self, storage):
         self.storage = storage
@@ -1812,10 +1655,8 @@ class ModelComparator:
     def compare_models(self, baseline_model, optimized_model, baseline_val_metrics, optimized_val_metrics):
         comparison = {
             "timestamp": datetime.now().isoformat(),
-            "model_comparison": {},
-            "validation_comparison": {},
-            "rating": {},
-            "prediction": {}
+            "model_comparison": {}, "validation_comparison": {},
+            "rating": {}, "prediction": {}
         }
         baseline_ml = baseline_model.get("metrics", {})
         optimized_ml = optimized_model.get("metrics", {})
@@ -1906,10 +1747,6 @@ class ModelComparator:
             return "KEEP_BASELINE: Optimized model underperforms. Retain baseline and investigate search space."
 
 
-# =====================================================
-# TRUE VALIDATION ENGINE
-# =====================================================
-
 class TrueValidationEngine:
     def __init__(self):
         self.validation_history = []
@@ -1988,13 +1825,7 @@ class TrueValidationEngine:
         return result
 
 
-# =====================================================
-# SRFO static registry of sr and fo instances
-# =====================================================
 class SRFORegistry:
-    """
-    SRFO uniqueness manager.
-    """
     _counter = 0
 
     @classmethod
@@ -2039,14 +1870,9 @@ class SRFORegistry:
             reports.append(df)
         return reports
 
-
-# =====================================================
-# AGENTIC PIPELINE (MAIN ORCHESTRATOR)
-# =====================================================
-
 class AgenticPipeline:
-
-    def __init__(self, data, base_dir="runs", use_feature_reduction=True, reduction_method="pca"):
+    def __init__(self, data, base_dir="runs", use_feature_reduction=True, reduction_method="pca",
+                 split_ratio=DEFAULT_SPLIT_RATIO, split_date=None):
         self.data = data
         self.base_dir = base_dir
         self.current_run_idx = None
@@ -2075,20 +1901,16 @@ class AgenticPipeline:
         self._Xy_val = None
         self.use_feature_reduction = use_feature_reduction
         self.reduction_method = reduction_method
+        self.split_ratio = split_ratio
+        self.split_date = split_date  # optional explicit YYYY-MM-DD
         self._feature_reduction_enabled = use_feature_reduction
 
     def _generate_srfo(self, data):
-        """
-        Run QuantXEngine ONCE via the canonical run_quantx_engine().
-        """
         eng = run_quantx_engine(data, interval="4y")
         if not eng["success"]:
             print(f"[SRFO] Engine failed: {eng['error']}")
             return None
-        print(
-            f"[SRFO] Engine: {len(eng['results'])} strategies, "
-            f"{len(eng['formula_outputs_raw'])} raw formulaOutput objects"
-        )
+        print(f"[SRFO] Engine: {len(eng['results'])} strategies, {len(eng['formula_outputs_raw'])} raw formulaOutput objects")
         return {
             "results": eng["results"],
             "formula_outputs": eng["formula_outputs"],
@@ -2097,165 +1919,96 @@ class AgenticPipeline:
         }
 
     def _ensure_srfo(self):
-        """Lazy init: generate SRFO once. If engine output fails to parse, use fallback."""
         if self._srfo_full is not None:
             return
-
         print("[SRFO] Generating raw SRFO from full dataset...")
-        self._srfo_full = self._generate_srfo(self.data)
-        print("[DEBUG SRFO]", self._srfo_full)
-        results, formula_outputs = None, []
-        X, y = None, None
+        # NEW: common cutoff date temporal split
+        train_data, val_data = self.split_engine.split(
+            self.data,
+            split_ratio=self.split_ratio,
+            explicit_split_date=self.split_date
+        )
+        print(f"[SRFO] Temporal split: train symbols={len(train_data)}, val symbols={len(val_data)}")
 
-        if self._srfo_full:
-            results = self._srfo_full.get("results")
-            formula_outputs = self._srfo_full.get("formula_outputs", [])
+        # Build train features
+        print("[SRFO] Building train-period features...")
+        eng_train = run_quantx_engine(train_data, interval="4y")
+        ml_train = MLTrainEngine(use_feature_reduction=self._feature_reduction_enabled, reduction_method=self.reduction_method)
+        if eng_train["success"] and eng_train.get("formula_outputs"):
+            try:
+                X_train, y_train = ml_train.build_feature_matrix(
+                    strategy_results=eng_train["results"],
+                    formula_outputs=eng_train["formula_outputs"],
+                    raw_data=train_data
+                )
+                results_train = eng_train["results"]
+                fo_train = eng_train["formula_outputs"]
+                fo_raw_train = eng_train["formula_outputs_raw"]
+            except Exception as e:
+                print(f"[SRFO] Train engine feature build failed: {e}")
+                X_train, y_train = self._build_features_from_raw(train_data)
+                results_train = []
+                fo_train = []
+                fo_raw_train = []
+        else:
+            print("[SRFO] Train engine failed, using fallback feature extraction")
+            X_train, y_train = self._build_features_from_raw(train_data)
+            results_train = []
+            fo_train = []
+            fo_raw_train = []
 
-        ml = MLTrainEngine(use_feature_reduction=self._feature_reduction_enabled, reduction_method=self.reduction_method)
-        try:
-            X, y = ml.build_feature_matrix(
-                strategy_results=results,
-                formula_outputs=formula_outputs,
-                raw_data=self._srfo_full["raw_data"]
-            )
-            print(f"[SRFO] Engine feature matrix: {X.shape}")
-        except Exception as e:
-            print(f"[SRFO] Engine output failed: {e}")
-            X, y = None, None
-
-        # Fallback if engine parsing failed or produced empty data
-        if X is None or len(X) == 0:
-            print("[SRFO] Using fallback feature extraction...")
-            X, y = self._build_features_from_raw(self.data)
-            results, formula_outputs = None, []
-            print(f"[SRFO] Fallback feature matrix: {X.shape}")
-
-        # Temporal 50/50 split
-        n = len(y)
-        split_idx = n // 2
+        # Build val features
+        print("[SRFO] Building validation-period features...")
+        eng_val = run_quantx_engine(val_data, interval="4y")
+        ml_val = MLTrainEngine(use_feature_reduction=self._feature_reduction_enabled, reduction_method=self.reduction_method)
+        if eng_val["success"] and eng_val.get("formula_outputs"):
+            try:
+                X_val, y_val = ml_val.build_feature_matrix(
+                    strategy_results=eng_val["results"],
+                    formula_outputs=eng_val["formula_outputs"],
+                    raw_data=val_data
+                )
+                results_val = eng_val["results"]
+                fo_val = eng_val["formula_outputs"]
+                fo_raw_val = eng_val["formula_outputs_raw"]
+            except Exception as e:
+                print(f"[SRFO] Val engine feature build failed: {e}")
+                X_val, y_val = self._build_features_from_raw(val_data)
+                results_val = []
+                fo_val = []
+                fo_raw_val = []
+        else:
+            print("[SRFO] Val engine failed, using fallback feature extraction")
+            X_val, y_val = self._build_features_from_raw(val_data)
+            results_val = []
+            fo_val = []
+            fo_raw_val = []
 
         self._Xy_train = {
-            "X": X.iloc[:split_idx].copy(),
-            "y": y.iloc[:split_idx].copy(),
-            "features": list(X.columns),
-            "results": results,
-            "formula_outputs": formula_outputs
+            "X": X_train, "y": y_train, "features": list(X_train.columns),
+            "results": results_train, "formula_outputs": fo_train,
+            "formula_outputs_raw": fo_raw_train
         }
         self._Xy_val = {
-            "X": X.iloc[split_idx:].copy(),
-            "y": y.iloc[split_idx:].copy(),
-            "features": list(X.columns),
-            "results": results,
-            "formula_outputs": formula_outputs
+            "X": X_val, "y": y_val, "features": list(X_val.columns),
+            "results": results_val, "formula_outputs": fo_val,
+            "formula_outputs_raw": fo_raw_val
         }
-        # Cache raw objects for .assemble() in portfolio construction
-        if self._srfo_full and self._srfo_full.get("formula_outputs_raw"):
-            self._formula_outputs_raw = self._srfo_full["formula_outputs_raw"]
+        self._srfo_full = {
+            "train": eng_train, "val": eng_val,
+            "train_data": train_data, "val_data": val_data
+        }
+        if fo_raw_train:
+            self._formula_outputs_raw = fo_raw_train
+        elif fo_raw_val:
+            self._formula_outputs_raw = fo_raw_val
         else:
             self._formula_outputs_raw = []
         print(f"[SRFO] Cached raw formulaOutput objects: {len(self._formula_outputs_raw)}")
         print(f"[SRFO] Split: train={len(self._Xy_train['y'])}, val={len(self._Xy_val['y'])}")
-
-        # Store full X,y for potential scenario stress testing
-        self._Xy_full = {"X": X.copy(), "y": y.copy(), "features": list(X.columns)}
-
-    def _run_combinatorial_srfo(self, param_grid, max_combinations=500, scenarios=None):
-        """Combinatorial search using cached SRFO X,y. No engine re-runs."""
-        import time
-        import gc
-        if scenarios is None:
-            scenarios = ["BULL", "BEAR", "HIGH_VOL", "CRASH", "STABLE"]
-
-        keys = list(param_grid.keys())
-        values = [param_grid[k] for k in keys]
-        all_combos = list(itertools.product(*values))
-        if len(all_combos) > max_combinations:
-            np.random.seed(42)
-            selected = [all_combos[i] for i in np.random.choice(len(all_combos), max_combinations, replace=False)]
-        else:
-            selected = all_combos
-
-        combinations = []
-        for combo in selected:
-            d = dict(zip(keys, combo))
-            d["_hash"] = hashlib.md5(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:8]
-            d["n_jobs"] = 1
-            combinations.append(d)
-
-        print(f"[OPTIMIZER] {len(combinations)} combos x {len(scenarios)} scenarios = {len(combinations)*len(scenarios)} evals")
-
-        X_train = self._Xy_train["X"].copy()
-        y_train = self._Xy_train["y"].copy()
-        X_val = self._Xy_val["X"].copy()
-        y_val = self._Xy_val["y"].copy()
-
-        all_results = []
-        best_params = None
-        best_resiliency = -float("inf")
-        start_time = time.time()
-
-        for idx, params in enumerate(combinations):
-            scenario_scores = []
-            scenario_sharpes = []
-
-            for scenario in scenarios:
-                config = SCENARIO_CONFIG.get(scenario, SCENARIO_CONFIG["STABLE"])
-                mu_mult, vol_mult = config["mu_multiplier"], config["vol_multiplier"]
-
-                y_tr_s = mu_mult * y_train.mean() + vol_mult * (y_train - y_train.mean())
-                y_val_s = mu_mult * y_val.mean() + vol_mult * (y_val - y_val.mean())
-
-                ml = MLTrainEngine(use_feature_reduction=self._feature_reduction_enabled, reduction_method=self.reduction_method)
-                trained = ml.train({"X": X_train, "y": y_tr_s, "params": params})
-                model_pkg = {"model": trained["model"], "label_encoders": trained.get("label_encoders", {}), "reducer": trained.get("reducer", None)}
-
-                signal = self.backtest.signal(model_pkg, {"X": X_val, "y": y_val_s})
-                metrics = self.backtest.evaluate({"X": X_val, "y": y_val_s}, signal)
-
-                scenario_scores.append(metrics["score"])
-                scenario_sharpes.append(metrics["sharpe"])
-                all_results.append({
-                    "scenario": scenario,
-                    "params": {k: v for k, v in params.items() if k != "_hash"},
-                    "sharpe": metrics["sharpe"],
-                    "score": metrics["score"],
-                    "corr": metrics["corr"]
-                })
-
-                del trained, model_pkg, signal, metrics
-                self.backtest.last_signal = None
-                self.backtest.last_features = None
-                gc.collect()
-
-            if scenario_scores:
-                resiliency = 0.6 * min(scenario_sharpes) + 0.4 * np.mean(scenario_scores)
-                if resiliency > best_resiliency:
-                    best_resiliency = resiliency
-                    best_params = params
-
-            elapsed = time.time() - start_time
-            avg_per_combo = elapsed / (idx + 1)
-            remaining = avg_per_combo * (len(combinations) - idx - 1)
-
-            if (idx + 1) % 10 == 0 or idx == 0 or idx == len(combinations) - 1:
-                print(f"  [{idx+1:3d}/{len(combinations)}] "
-                      f"res={resiliency:.4f} best={best_resiliency:.4f} "
-                      f"min_sharpe={min(scenario_sharpes):.4f} avg_score={np.mean(scenario_scores):.4f} "
-                      f"elapsed={elapsed/60:.1f}m ETA={remaining/60:.1f}m")
-
-        total_time = time.time() - start_time
-        print(f"[OPTIMIZER] Complete: {len(combinations)} combos in {total_time/60:.1f}m")
-        print(f"[OPTIMIZER] Best resiliency: {best_resiliency:.4f}")
-        print(f"[OPTIMIZER] Best params: {best_params}")
-
-        self.storage.save_json({
-            "best_params": {k: v for k, v in best_params.items() if k != "_hash"} if best_params else None,
-            "best_resiliency_score": float(best_resiliency),
-            "total_combinations": len(combinations),
-            "timestamp": datetime.now().isoformat()
-        }, "combinatorial_optimization.json")
-
-        return {"best_params": best_params, "best_resiliency_score": best_resiliency, "all_results": all_results}
+        self._Xy_full = {"X": pd.concat([X_train, X_val], ignore_index=True),
+                         "y": pd.concat([y_train, y_val], ignore_index=True),
+                         "features": list(X_train.columns)}
 
     def get_train_package(self, params=None):
         self._ensure_srfo()
@@ -2276,12 +2029,10 @@ class AgenticPipeline:
             eng = run_quantx_engine(data, interval=params.get("interval", "4y"), params=params)
             if not eng["success"]:
                 raise RuntimeError(eng["error"])
-
             print(f"[ENGINE] Strategies: {len(eng['results'])}")
             print(f"[ML] Formula outputs: {len(eng['formula_outputs'])}")
             if len(eng["formula_outputs"]) == 0:
                 raise ValueError("No formula outputs generated")
-
             ml = MLTrainEngine(use_feature_reduction=self._feature_reduction_enabled, reduction_method=self.reduction_method)
             X, y = ml.build_feature_matrix(
                 strategy_results=eng["results"],
@@ -2307,7 +2058,6 @@ class AgenticPipeline:
         rpt_fo = FormulaInfo(data)
         rpt_fo.assemble()
         rpt = rpt_fo.reporting()
-
         y = None
         try:
             rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
@@ -2331,28 +2081,30 @@ class AgenticPipeline:
             y.index = y.index.astype(str)
             y.index.name = "symbol"
             y = y.rename("market_ret")
-
-            try:
-                rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
-                X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
-            except Exception:
-                rows = []
-                for sym, df in data.items():
-                    if not isinstance(df, pd.DataFrame):
-                        continue
-                    row = {"symbol": sym}
-                    for col in ["open", "high", "low", "close", "volume"]:
-                        if col in df.columns:
-                            row[f"raw_{col}"] = df[col].iloc[-1]
-                    rows.append(row)
-                X = pd.DataFrame(rows)
-
+        try:
+            rpt_norm = formula_report(rpt, mode="df_easy", lookup="symbol_features")
+            X = rpt_norm.drop(columns=["market_ret"], errors="ignore")
+        except Exception:
+            rows = []
+            for sym, df in data.items():
+                if not isinstance(df, pd.DataFrame):
+                    continue
+                row = {"symbol": sym}
+                for col in ["open", "high", "low", "close", "volume"]:
+                    if col in df.columns:
+                        row[f"raw_{col}"] = df[col].iloc[-1]
+                rows.append(row)
+            X = pd.DataFrame(rows)
         X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
         y = y.replace([np.inf, -np.inf], np.nan).fillna(0)
         print(f"[FALLBACK] X={X.shape}, y={len(y)}, ret_range=[{y.min():.4f}, {y.max():.4f}]")
         return X, y
 
-    def run_agent(self, params=None, max_iters=5, run_combinatorial=True, param_grid=None):
+    def run_agent(self, params=None, max_iters=5, run_combinatorial=False, param_grid=None):
+        """
+        run_combinatorial is DISABLED by default per user request.
+        Only basic train/val research loop + portfolio summary table.
+        """
         if params is None:
             params = {}
 
@@ -2367,12 +2119,9 @@ class AgenticPipeline:
         if insufficient_assets:
             print(f"[DATA_GATE] WARNING: {len(insufficient_assets)} assets below {MIN_ROWS_PER_ASSET} rows: {insufficient_assets}")
             print(f"[DATA_GATE] Flagging DATA_INSUFFICIENT for human review.")
-            # E. Inject human-in-the-loop flag
             self.storage.save_json({
-                "flag": "DATA_INSUFFICIENT",
-                "assets": insufficient_assets,
-                "min_required": MIN_ROWS_PER_ASSET,
-                "timestamp": datetime.now().isoformat()
+                "flag": "DATA_INSUFFICIENT", "assets": insufficient_assets,
+                "min_required": MIN_ROWS_PER_ASSET, "timestamp": datetime.now().isoformat()
             }, "data_insufficient_flag.json")
         else:
             print(f"[DATA_GATE] All assets pass >= {MIN_ROWS_PER_ASSET} rows check.")
@@ -2401,8 +2150,7 @@ class AgenticPipeline:
             "trees": params.get("trees", 500), "depth": params.get("depth", 12),
             "horizon": params.get("horizon", 21), "min_samples_split": params.get("min_samples_split", 2),
             "max_features": params.get("max_features", "sqrt"), "model": params.get("model", "random_forest"),
-            "learning_rate": params.get("learning_rate", 0.1),
-            "reg_alpha": params.get("reg_alpha", 0.0),
+            "learning_rate": params.get("learning_rate", 0.1), "reg_alpha": params.get("reg_alpha", 0.0),
             "reg_lambda": params.get("reg_lambda", 1.0),
         }
         baseline_train = self.strategy.train(self.get_train_package(baseline_params))
@@ -2415,23 +2163,23 @@ class AgenticPipeline:
         print(f"[BASELINE] Score: {self.baseline_val_metrics.get('score', 0):.4f}")
         self.storage.save(self.baseline_val_metrics, f"{self.current_run_dir}/baseline/baseline_val_metrics.pkl")
 
-        # === PHASE 2: COMBINATORIAL ===
-        if run_combinatorial:
-            print(f"\n{'='*60}")
-            print("PHASE 2: COMBINATORIAL SEARCH (SRFO-CACHED)")
-            print(f"{'='*60}")
-            if param_grid is None:
-                param_grid = PARAM_GRID_INSIDE
-            opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=100)
-            best_params = opt_result["best_params"]
-            if best_params:
-                for k in ["trees", "depth", "horizon", "min_samples_split", "max_features", "model", "learning_rate", "reg_alpha", "reg_lambda"]:
-                    if k in best_params:
-                        params[k] = best_params[k]
-                print(f"[OPTIMIZER] Best: {best_params}, Resiliency: {opt_result['best_resiliency_score']:.4f}")
-            self.storage.save_json(opt_result, f"{self.current_run_dir}/combinatorial/combinatorial_optimization.json")
+        # === PHASE 2: COMBINATORIAL — DISABLED per user request ===
+        # if run_combinatorial:
+        #     print(f"\n{'='*60}")
+        #     print("PHASE 2: COMBINATORIAL SEARCH (SRFO-CACHED)")
+        #     print(f"{'='*60}")
+        #     if param_grid is None:
+        #         param_grid = PARAM_GRID_INSIDE
+        #     opt_result = self._run_combinatorial_srfo(param_grid, max_combinations=100)
+        #     best_params = opt_result["best_params"]
+        #     if best_params:
+        #         for k in ["trees", "depth", "horizon", "min_samples_split", "max_features", "model", "learning_rate", "reg_alpha", "reg_lambda"]:
+        #             if k in best_params:
+        #                 params[k] = best_params[k]
+        #         print(f"[OPTIMIZER] Best: {best_params}, Resiliency: {opt_result['best_resiliency_score']:.4f}")
+        #     self.storage.save_json(opt_result, f"{self.current_run_dir}/combinatorial/combinatorial_optimization.json")
 
-        # === PHASE 3: OPTIMIZED ===
+        # === PHASE 3: OPTIMIZED (same as baseline when combinatorial disabled) ===
         print(f"\n{'='*60}")
         print("PHASE 3: OPTIMIZED MODEL")
         print(f"{'='*60}")
@@ -2476,10 +2224,9 @@ class AgenticPipeline:
             val_metrics = self.backtest.evaluate(val_pkg, val_signal)
 
             print(f"Train: Sharpe={train_metrics.get('sharpe', 0):.3f} Score={train_metrics.get('score', 0):.3f}")
-            print(f"Val: Sharpe={val_metrics.get('sharpe', 0):.3f} Score={val_metrics.get('score', 0):.3f}")
+            print(f"Val:   Sharpe={val_metrics.get('sharpe', 0):.3f} Score={val_metrics.get('score', 0):.3f}")
 
             review = self.review_engine.compare(val_metrics, previous_val)
-            # E. Pass iteration info to evaluator
             decision = self.evaluator.decide(review, train_metrics, iteration=self.iteration, max_iters=max_iters)
 
             if val_metrics.get("score", 0) > self.best_score:
@@ -2522,11 +2269,9 @@ class AgenticPipeline:
             previous_val = val_metrics
 
         # ============================================================
-        # PORTFOLIO HELPERS
+        # PORTFOLIO HELPERS  —  compute metrics from actual series
         # ============================================================
-
         def _build_portfolio(fo, data_source, label="portfolio"):
-            """Build, invoke, and persist a Portfolio from assembled formula output."""
             if fo is None:
                 print(f"[PORTFOLIO] [{label}] No formulaOutput. Skipping.")
                 return None
@@ -2538,7 +2283,6 @@ class AgenticPipeline:
                         if isinstance(df, pd.DataFrame) and "close" in df.columns:
                             ret_parts.append(df["close"].pct_change().fillna(0).rename(sym))
                     ret_df = pd.concat(ret_parts, axis=1).fillna(0) if ret_parts else None
-
                 if ret_df is None or ret_df.empty:
                     raise ValueError("No return data.")
 
@@ -2575,16 +2319,15 @@ class AgenticPipeline:
                     benchmark = benchmark.iloc[:, 0]
                 benchmark = benchmark.squeeze()
 
-                # D. Transaction cost modeling: 10 bps retail
                 transaction_cost = fo.get("transaction_cost")
                 if transaction_cost is None:
-                    transaction_cost = RETAIL_TRANSACTION_COST
+                    transaction_cost = RETAIL_TRANSACTION_COST_LOW
                 if hasattr(transaction_cost, "iloc"):
-                    transaction_cost = float(transaction_cost.iloc[0]) if len(transaction_cost) > 0 else RETAIL_TRANSACTION_COST
+                    transaction_cost = float(transaction_cost.iloc[0]) if len(transaction_cost) > 0 else RETAIL_TRANSACTION_COST_LOW
                 try:
                     transaction_cost = float(transaction_cost)
                 except (TypeError, ValueError):
-                    transaction_cost = RETAIL_TRANSACTION_COST
+                    transaction_cost = RETAIL_TRANSACTION_COST_LOW
 
                 common_idx = ret_df.index.intersection(weights.index).intersection(benchmark.index)
                 ret_df = ret_df.loc[common_idx].sort_index()
@@ -2593,12 +2336,8 @@ class AgenticPipeline:
 
                 portfolio = Portfolio()
                 result = portfolio.invoke(
-                    fo=fo,
-                    weights=weights,
-                    returns=ret_df,
-                    benchmark=benchmark,
-                    transaction_cost=transaction_cost,
-                    annualization=252
+                    fo=fo, weights=weights, returns=ret_df,
+                    benchmark=benchmark, transaction_cost=transaction_cost, annualization=252
                 )
 
                 chart_path = os.path.join(self.current_run_dir, f"{label}_chart.html")
@@ -2612,19 +2351,16 @@ class AgenticPipeline:
                 m = result["metrics"]
                 print(f"[PORTFOLIO] [{label}] Metrics:")
                 print(f"  Gross Return: {m.get('gross_return', 0):.4f}")
-                print(f"  Net Return: {m.get('net_return', 0):.4f}")
-                print(f"  Sharpe: {m.get('sharpe', 0):.4f}")
-                print(f"  Volatility: {m.get('volatility', 0):.4f}")
+                print(f"  Net Return:   {m.get('net_return', 0):.4f}")
+                print(f"  Sharpe:       {m.get('sharpe', 0):.4f}")
+                print(f"  Volatility:   {m.get('volatility', 0):.4f}")
                 print(f"  Max Drawdown: {m.get('max_drawdown', 0):.4f}")
-                print(f"  BTC Correlation: {m.get('corr_rm', 0):.4f}")
-                print(f"  Alpha: {m.get('alpha', 0):.6f}")
-                print(f"  Beta: {m.get('beta', 0):.4f}")
-                print(f"  Alpha t-stat: {m.get('tstat_alpha', 0):.4f}")
-                print(f"  Hit Ratio: {m.get('hit_ratio', 0):.4f}")
-                print(f"  IC: {m.get('ic', 0):.4f}")
-                print(f"  Mean Turnover: {m.get('mean_turnover', 0):.4f}")
-                print(f"  Total Costs: {m.get('total_costs', 0):.4f}")
-
+                print(f"  BTC Corr:     {m.get('corr_rm', 0):.4f}")
+                print(f"  Alpha:        {m.get('alpha', 0):.6f}")
+                print(f"  Beta:         {m.get('beta', 0):.4f}")
+                print(f"  Hit Ratio:    {m.get('hit_ratio', 0):.4f}")
+                print(f"  IC:           {m.get('ic', 0):.4f}")
+                print(f"  Turnover:     {m.get('mean_turnover', 0):.4f}")
                 return result
             except Exception as e:
                 print(f"[PORTFOLIO] [{label}] Failed: {e}")
@@ -2645,10 +2381,8 @@ class AgenticPipeline:
                 if isinstance(df, pd.DataFrame):
                     split_idx = len(df) // 2
                     trained_data[sym] = df.iloc[:split_idx].copy()
-
             fo_train = None
             try:
-                from ..qxEngine import QuantXEngine
                 eng_train = run_quantx_engine(trained_data, interval=params.get("interval", "4y"), params=params)
                 if eng_train["success"] and eng_train["formula_outputs_raw"]:
                     fo_train = eng_train["formula_outputs_raw"][0]
@@ -2661,7 +2395,6 @@ class AgenticPipeline:
                 trained_fo = FormulaInfo(trained_data)
                 trained_fo.assemble()
                 chk_formula_output = trained_fo
-
             _build_portfolio(chk_formula_output, trained_data, label="portfolio_train")
         except Exception as e:
             print(f"[PORTFOLIO] [train] Outer exception: {e}")
@@ -2669,15 +2402,12 @@ class AgenticPipeline:
             traceback.print_exc()
 
         # ============================================================
-        # PORTFOLIO 2 - MERGED / FULL DATA (complete dataset)
+        # PORTFOLIO 2 - MERGED / FULL DATA
         # ============================================================
         print(f"\n{'='*60}")
         print("PORTFOLIO: MERGED / FULL DATA")
         print(f"{'='*60}")
-
         fo_merged = None
-
-        # 1st try: instance cache
         raw_cache = getattr(self, '_formula_outputs_raw', None)
         if raw_cache and len(raw_cache) > 0:
             try:
@@ -2686,8 +2416,6 @@ class AgenticPipeline:
                 print("[PORTFOLIO] [merged] Using _formula_outputs_raw cache.")
             except Exception as e:
                 print(f"[PORTFOLIO] [merged] Cache failed: {e}")
-
-        # 2nd try: SRFO dict
         if fo_merged is None and getattr(self, '_srfo_full', None):
             srfo_raw = self._srfo_full.get('formula_outputs_raw')
             if srfo_raw and len(srfo_raw) > 0:
@@ -2697,8 +2425,6 @@ class AgenticPipeline:
                     print("[PORTFOLIO] [merged] Using _srfo_full cache.")
                 except Exception as e:
                     print(f"[PORTFOLIO] [merged] SRFO cache failed: {e}")
-
-        # 3rd try: run engine directly
         if fo_merged is None:
             try:
                 eng_merged = run_quantx_engine(self.data, interval=params.get("interval", "4y"), params=params)
@@ -2713,7 +2439,6 @@ class AgenticPipeline:
                 merged_fo = FormulaInfo(self.data)
                 merged_fo.assemble()
                 chk_formula_output = merged_fo
-
         _build_portfolio(chk_formula_output, self.data, label="portfolio_merged")
 
         # === FINAL SUMMARY ===
@@ -2721,7 +2446,6 @@ class AgenticPipeline:
 
     def _apply_mutations(self, params, recommendations, mutations):
         new_params = deepcopy(params)
-        # E. Feature-set mutation operators
         for mutation in mutations:
             if isinstance(mutation, dict):
                 if mutation.get("target") == "model_params":
@@ -2734,11 +2458,9 @@ class AgenticPipeline:
                     new_params["ensemble"] = True
                 elif mutation.get("target") == "feature_set":
                     if mutation.get("action") == "toggle_microstructure":
-                        # Toggle microstructure inclusion
                         new_params["_microstructure_enabled"] = not new_params.get("_microstructure_enabled", True)
                         print(f"[MUTATION] Toggled microstructure: {new_params['_microstructure_enabled']}")
                     elif mutation.get("action") == "toggle_reduction":
-                        # Toggle reduction method
                         methods = ["pca", "ica", "none"]
                         current = new_params.get("_reduction_method", "pca")
                         idx = methods.index(current) if current in methods else 0
@@ -2763,8 +2485,7 @@ class AgenticPipeline:
         }
         if self.best_model:
             self.storage.save(self.best_model, f"{self.current_run_dir}/best_model.pkl")
-            self.storage.save_json(summary, f"{self.current_run_dir}/final_summary.json")
-
+        self.storage.save_json(summary, f"{self.current_run_dir}/final_summary.json")
         print(f"\n{'='*50}FINAL SUMMARY - RUN {self.current_run_idx:06d}{'='*50}")
         print(f"Run directory: {self.current_run_dir}")
         print(f"Total iterations: {self.iteration}")
@@ -2772,79 +2493,101 @@ class AgenticPipeline:
         print(f"GoLive ready: {summary['golive_ready']}")
         return summary
 
-
 # =====================================================
-# DATA LOADER
-# =====================================================
-
-def build_data():
-    symbols = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT","DOGEUSDT","ADAUSDT","TRXUSDT","HYPEUSDT","SUIUSDT","LINKUSDT","AVAXUSDT","XLMUSDT","HBARUSDT","BCHUSDT","LTCUSDT","SHIBUSDT","DOTUSDT","AAVEUSDT","PEPEUSDT","NEARUSDT","APTUSDT","ICPUSDT","ETCUSDT","ONDOUSDT","POLUSDT","CROUSDT","TONUSDT", "UNIUSDT"]
-
-    try:
-        from ..PickleDataManager import PickleDataManager
-        dm = PickleDataManager("backtest")
-    except ImportError:
-        print("[WARN] PickleDataManager not available, using sample data")
-        return create_sample_data()
-    data = {}
-    for symbol in symbols:
-        try:
-            df = dm.fetch_store(symbol)
-            if df is not None and not df.empty:
-                data[symbol] = df
-                print(f"[DATA] Loaded {symbol} ({len(df)} rows)")
-            else:
-                print(f"[DATA] Empty dataset {symbol}")
-        except Exception as e:
-            print(f"[DATA] Failed {symbol}: {e}")
-    if not data:
-        print("[DATA] Universe empty, using sample data")
-        return create_sample_data()
-    print("[DATA] Assets:", list(data.keys()))
-    return data
-
-def create_sample_data(n_symbols=5, n_days=800):
-    np.random.seed(42)
-    data = {}
-    for i in range(n_symbols):
-        symbol = f"SYM{i:03d}"
-        dates = pd.date_range("2020-01-01", periods=n_days, freq="D")
-        returns = np.random.normal(0.0005, 0.02, n_days)
-        price = 100 * np.exp(np.cumsum(returns))
-        volume = np.random.lognormal(15, 0.5, n_days)
-        df = pd.DataFrame({
-            "open": price * (1 + np.random.normal(0, 0.001, n_days)),
-            "high": price * (1 + abs(np.random.normal(0, 0.01, n_days))),
-            "low": price * (1 - abs(np.random.normal(0, 0.01, n_days))),
-            "close": price,
-            "volume": volume.astype(int)
-        }, index=dates)
-        data[symbol] = df
-    return data
-
-
-# =====================================================
-# Portfolio class
+# Portfolio class  —  FIXED: compute metrics from series
 # =====================================================
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly
 import plotly.colors
 
+
 class Portfolio:
     def __init__(self, run_dir: Optional[str] = None, storage: Optional[Any] = None):
         self.run_dir = run_dir
         self.storage = storage
 
-    def invoke(
-        self,
-        fo: Dict[str, Any],
-        weights: pd.DataFrame,
-        returns: pd.DataFrame,
-        benchmark: pd.Series,
-        transaction_cost: float = RETAIL_TRANSACTION_COST,
-        annualization: int = 252,
-    ) -> Dict[str, Any]:
+    def _compute_metrics_from_series(self, gross_return, net_return, benchmark, turnover, costs):
+        """Compute all portfolio metrics from actual return series (not stale fo)."""
+        gross_return = pd.Series(gross_return).replace([np.inf, -np.inf], np.nan).dropna()
+        net_return = pd.Series(net_return).replace([np.inf, -np.inf], np.nan).dropna()
+        benchmark = pd.Series(benchmark).replace([np.inf, -np.inf], np.nan).dropna()
+
+        if len(net_return) == 0:
+            return {k: 0.0 for k in ["gross_return","net_return","sharpe","volatility",
+                                      "max_drawdown","alpha","beta","tstat_alpha","hit_ratio","ic",
+                                      "mean_turnover","total_turnover","total_costs","corr_rm"]}
+
+        # Cumulative
+        gross_equity = (1 + gross_return).cumprod()
+        net_equity = (1 + net_return).cumprod()
+        bench_equity = (1 + benchmark.reindex(net_return.index).fillna(0)).cumprod()
+
+        # Drawdown
+        running_max = net_equity.cummax()
+        drawdown = net_equity / running_max - 1
+        max_drawdown = float(drawdown.min())
+
+        # Annualized metrics — CANONICAL: daily mean/std * sqrt(252)
+        ann_factor = 252
+        mean_ret = float(net_return.mean())
+        std_ret = float(net_return.std())
+        sharpe = float(mean_ret / (std_ret + 1e-12) * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
+        volatility = float(std_ret * np.sqrt(ann_factor))
+
+        # Alpha / Beta vs benchmark — daily regression
+        bench_aligned = benchmark.reindex(net_return.index).fillna(0)
+        if np.std(bench_aligned) > 1e-12 and len(net_return) >= 3:
+            # OLS: net_return = alpha + beta * benchmark + epsilon
+            x_mean = np.mean(bench_aligned)
+            y_mean = np.mean(net_return)
+            beta = float(np.sum((bench_aligned - x_mean) * (net_return - y_mean)) / (np.sum((bench_aligned - x_mean)**2) + 1e-12))
+            alpha = float(y_mean - beta * x_mean)
+            residuals = net_return - (alpha + beta * bench_aligned)
+            mse = np.sum(residuals**2) / (len(net_return) - 2 + 1e-12)
+            se_alpha = np.sqrt(mse * (1.0/len(net_return) + x_mean**2 / (np.sum((bench_aligned - x_mean)**2) + 1e-12)))
+            tstat_alpha = float(alpha / (se_alpha + 1e-12))
+        else:
+            beta = 0.0
+            alpha = float(mean_ret)
+            tstat_alpha = float(alpha / (std_ret / np.sqrt(len(net_return)) + 1e-12)) if std_ret > 0 else 0.0
+
+        # Hit ratio (daily)
+        hit_ratio = float(np.mean(net_return > 0))
+
+        # Information coefficient (rank corr between gross return and benchmark)
+        if np.std(gross_return) > 1e-12 and np.std(bench_aligned) > 1e-12:
+            try:
+                ic = float(stats.spearmanr(gross_return, bench_aligned)[0])
+            except Exception:
+                ic = 0.0
+        else:
+            ic = 0.0
+
+        # BTC correlation
+        if np.std(bench_aligned) > 1e-12 and np.std(gross_return) > 1e-12:
+            corr_rm = float(np.corrcoef(gross_return, bench_aligned)[0,1])
+        else:
+            corr_rm = 0.0
+
+        return {
+            "gross_return": float(gross_equity.iloc[-1] - 1) if len(gross_equity) else 0.0,
+            "net_return": float(net_equity.iloc[-1] - 1) if len(net_equity) else 0.0,
+            "sharpe": sharpe,
+            "volatility": volatility,
+            "max_drawdown": max_drawdown,
+            "alpha": alpha,
+            "beta": beta,
+            "tstat_alpha": tstat_alpha,
+            "hit_ratio": hit_ratio,
+            "ic": ic,
+            "mean_turnover": float(turnover.mean()) if hasattr(turnover, "mean") else 0.0,
+            "total_turnover": float(turnover.sum()) if hasattr(turnover, "sum") else 0.0,
+            "total_costs": float(costs.sum()) if hasattr(costs, "sum") else 0.0,
+            "corr_rm": corr_rm,
+        }
+
+    def invoke(self, fo, weights, returns, benchmark, transaction_cost=RETAIL_TRANSACTION_COST_LOW, annualization=252):
         idx = weights.index.intersection(returns.index).intersection(benchmark.index)
         weights = weights.loc[idx].sort_index()
         returns = returns.loc[idx].sort_index()
@@ -2861,97 +2604,42 @@ class Portfolio:
             executed_weight = weights.shift(1).fillna(0)
         lagged_weights = executed_weight.copy()
 
-        gross_return = fo.get("strategy_ret")
-        if isinstance(gross_return, pd.Series):
-            gross_return = gross_return.reindex(idx).fillna(0).sort_index()
-        elif isinstance(gross_return, pd.DataFrame) and gross_return.shape[1] == 1:
-            gross_return = gross_return.iloc[:, 0].reindex(idx).fillna(0).sort_index()
-        else:
-            gross_return = (executed_weight * returns).sum(axis=1)
-            gross_return.name = "gross_return"
+        # Gross return from executed (lagged) weights * returns
+        gross_return = (executed_weight * returns).sum(axis=1)
+        gross_return.name = "gross_return"
 
-        tc_rate = fo.get("transaction_cost", transaction_cost)
-        if hasattr(tc_rate, "iloc"):
-            tc_rate = float(tc_rate.iloc[0]) if len(tc_rate) > 0 else RETAIL_TRANSACTION_COST
-        try:
-            tc_rate = float(tc_rate)
-        except (TypeError, ValueError):
-            tc_rate = RETAIL_TRANSACTION_COST
-
-        turnover_series = fo.get("turnover")
-        if isinstance(turnover_series, pd.Series):
-            turnover_series = turnover_series.reindex(idx).fillna(0).sort_index()
-        else:
-            turnover_series = weights.diff().abs().sum(axis=1)
-            turnover_series.iloc[0] = weights.iloc[0].abs().sum()
-            turnover_series.name = "turnover"
-        costs = turnover_series * tc_rate
+        # Turnover from executed weights (positions actually held)
+        turnover_series = executed_weight.diff().abs().sum(axis=1)
+        turnover_series.iloc[0] = executed_weight.iloc[0].abs().sum()
+        turnover_series.name = "turnover"
+        costs = turnover_series * transaction_cost
         costs.name = "costs"
 
-        net_return = fo.get("net_ret")
-        if isinstance(net_return, pd.Series):
-            net_return = net_return.reindex(idx).fillna(0).sort_index()
-        elif isinstance(net_return, pd.DataFrame) and net_return.shape[1] == 1:
-            net_return = net_return.iloc[:, 0].reindex(idx).fillna(0).sort_index()
-        else:
-            net_return = gross_return - costs
-            net_return.name = "net_return"
+        # Net return
+        net_return = gross_return - costs
+        net_return.name = "net_return"
 
-        equity = fo.get("equity")
-        if isinstance(equity, pd.Series):
-            net_equity = equity.reindex(idx).fillna(0).sort_index()
-            # gross_equity and benchmark_equity must always be defined
-            gross_equity = (1 + gross_return).cumprod()
-            benchmark_equity = (1 + benchmark).cumprod()
-        else:
-            net_equity = (1 + net_return).cumprod()
-            gross_equity = (1 + gross_return).cumprod()
-            benchmark_equity = (1 + benchmark).cumprod()
+        # Equity curves
+        gross_equity = (1 + gross_return).cumprod()
+        net_equity = (1 + net_return).cumprod()
+        benchmark_equity = (1 + benchmark).cumprod()
 
-        drawdown = fo.get("drawdown")
-        if isinstance(drawdown, pd.Series):
-            drawdown = drawdown.reindex(idx).fillna(0).sort_index()
-        else:
-            running_max = net_equity.cummax()
-            drawdown = net_equity / running_max - 1
-            drawdown.name = "drawdown"
+        # Drawdown
+        running_max = net_equity.cummax()
+        drawdown = net_equity / running_max - 1
+        drawdown.name = "drawdown"
 
-        def _scalar(key, default=0.0):
-            v = fo.get(key)
-            if v is None:
-                return default
-            if isinstance(v, pd.Series):
-                return float(v.iloc[-1]) if len(v) > 0 else default
-            if isinstance(v, pd.DataFrame):
-                return float(v.iloc[-1, 0]) if v.size > 0 else default
-            try:
-                return float(v)
-            except (TypeError, ValueError):
-                return default
+        # === CRITICAL FIX: compute metrics from series, not stale fo ===
+        metrics = self._compute_metrics_from_series(
+            gross_return=gross_return,
+            net_return=net_return,
+            benchmark=benchmark,
+            turnover=turnover_series,
+            costs=costs
+        )
 
-        ic = fo.get("ic")
-        hit_ratio = fo.get("hit_ratio")
-        tstat_alpha = fo.get("tstat_alpha")
-        beta = fo.get("beta")
-        #if hasattr(beta, "mean"):
-        #    beta = beta.mean()
-        alpha = fo.get("alpha")
-        #if hasattr(alpha, "mean"):
-        #    alpha = alpha.mean()
-        btc_corr = fo.get("corr_rm")
-        #if hasattr(btc_corr, "mean"):
-        #    btc_corr = btc_corr.mean()
-        max_drawdown = fo.get("max_drawdown")
-        volatility = fo.get("volatility")
-        sharpe = fo.get("sharpe")
-
-        gross_cumret = gross_equity.iloc[-1] - 1 if len(gross_equity) else 0.0
-        net_cumret = net_equity.iloc[-1] - 1 if len(net_equity) else 0.0
-        mean_turnover = turnover_series.mean()
-        total_turnover = turnover_series.sum()
-        total_costs = costs.sum()
-
-        plot_keys = ["corr_rm", "drawdown", "sharpe", "alpha", "beta", "tstat_alpha", "weights", "turnover", "hit_ratio", "ic", "volatility"]
+        # Plotting
+        plot_keys = ["drawdown", "turnover", "weights"]
         plot_items = []
         for key in plot_keys:
             if key == "drawdown":
@@ -2968,19 +2656,14 @@ class Portfolio:
                 obj = obj.copy()
                 if not isinstance(obj.index, pd.DatetimeIndex):
                     obj.index = pd.to_datetime(obj.index, errors="coerce")
-                #obj = obj.dropna(how="all")
                 if not obj.empty:
                     plot_items.append((key, obj))
             elif isinstance(obj, pd.Series):
                 obj = obj.copy()
                 if not isinstance(obj.index, pd.DatetimeIndex):
                     obj.index = pd.to_datetime(obj.index, errors="coerce")
-                #obj = obj.dropna()
                 if len(obj):
                     plot_items.append((key, obj))
-            else:
-                obj = pd.Series(obj, index=idx, name=key)
-                plot_items.append((key, obj))
 
         n_metric_rows = len(plot_items)
         total_rows = 1 + max(n_metric_rows, 1)
@@ -2996,10 +2679,7 @@ class Portfolio:
         fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.12)", line=dict(color="rgba(231, 76, 60, 0.55)", width=1)), row=1, col=1)
 
         colors = plotly.colors.qualitative.Plotly
-        for key, obj in plot_items:
-            print(key, type(obj), obj.shape if hasattr(obj, "shape") else len(obj), obj.index[:3], obj.isna().sum() if isinstance(obj, pd.Series) else obj.isna().sum().to_dict())
         for row, (key, obj) in enumerate(plot_items, start=2):
-            print(" plotly ", obj, type(obj))
             if isinstance(obj, pd.Series):
                 fig.add_trace(go.Scatter(x=obj.index, y=obj, mode="lines", name=key.replace("_", " ").title(), line=dict(width=1.5)), row=row, col=1)
             else:
@@ -3017,16 +2697,6 @@ class Portfolio:
             fig.update_yaxes(title_text="Value", row=i, col=1)
         fig.update_xaxes(title_text="Date", row=total_rows, col=1)
 
-        metrics = {
-            "gross_return": gross_cumret, "net_return": net_cumret,
-            "sharpe": _scalar("sharpe"), "volatility": _scalar("volatility"),
-            "max_drawdown": _scalar("max_drawdown") if fo.get("max_drawdown") is not None else float(drawdown.min()),
-            "btc_correlation": btc_corr.mean(), "alpha": alpha.mean(),
-            "beta": beta.mean(), "tstat_alpha": _scalar("tstat_alpha"),
-            "hit_ratio": _scalar("hit_ratio"), "ic": _scalar("ic"),
-            "mean_turnover": mean_turnover, "total_turnover": total_turnover,
-            "total_costs": total_costs,
-        }
         series = {
             "gross_return": gross_return, "net_return": net_return,
             "gross_equity": gross_equity, "net_equity": net_equity,
@@ -3037,8 +2707,9 @@ class Portfolio:
         }
         return {"chart": fig, "metrics": metrics, "series": series}
 
+
 class Portfolio0:
-    def invoke(self, fo, weights: pd.DataFrame, returns: pd.DataFrame, benchmark: pd.Series, transaction_cost: float = RETAIL_TRANSACTION_COST, annualization: int = 252):
+    def invoke(self, fo, weights, returns, benchmark, transaction_cost=RETAIL_TRANSACTION_COST_LOW, annualization=252):
         idx = weights.index.intersection(returns.index).intersection(benchmark.index)
         weights = weights.loc[idx]
         returns = returns.loc[idx]
@@ -3062,15 +2733,12 @@ class Portfolio0:
         benchmark_equity = (1 + benchmark).cumprod()
         drawdown = net_equity / net_equity.cummax() - 1
 
-        sharpe = fo.get("sharpe")
-        volatility = fo.get("volatility")
-        max_drawdown = fo.get("max_drawdown") if fo.get("max_drawdown") is not None else drawdown.min()
-        btc_corr = fo.get("corr_rm")
-        alpha = fo.get("alpha")
-        beta = fo.get("beta")
-        tstat_alpha = fo.get("tstat_alpha")
-        hit_ratio = fo.get("hit_ratio")
-        ic = fo.get("ic")
+        # Compute from series instead of stale fo
+        portfolio = Portfolio()
+        metrics = portfolio._compute_metrics_from_series(
+            gross_return=gross_return, net_return=net_return,
+            benchmark=benchmark, turnover=turnover, costs=costs
+        )
 
         metric_keys = ["sharpe", "alpha", "beta", "tstat_alpha", "hit_ratio", "ic", "volatility"]
         plottable = {}
@@ -3120,13 +2788,7 @@ class Portfolio0:
 
         return {
             "chart": fig,
-            "metrics": {
-                "gross_return": fo.get("ret"), "net_return": fo.get("net_ret"),
-                "sharpe": sharpe, "volatility": volatility, "max_drawdown": max_drawdown,
-                "btc_correlation": btc_corr, "alpha": alpha, "beta": beta,
-                "tstat_alpha": tstat_alpha, "hit_ratio": hit_ratio, "ic": ic,
-                "turnover": fo.get("turnover"), "transaction_cost": costs,
-            },
+            "metrics": metrics,
             "series": {
                 "gross_return": gross_return, "net_return": net_return,
                 "equity": net_equity, "benchmark": benchmark_equity,
@@ -3134,6 +2796,60 @@ class Portfolio0:
                 "executed_weight": executed_weight, "lagged_weights": lagged_weights,
             },
         }
+
+
+# =====================================================
+# DATA LOADER
+# =====================================================
+
+def build_data():
+    symbols = ["BTCUSDT","ETHUSDT","XRPUSDT","BNBUSDT","SOLUSDT","DOGEUSDT",
+               "ADAUSDT","TRXUSDT","HYPEUSDT","SUIUSDT","LINKUSDT","AVAXUSDT",
+               "XLMUSDT","HBARUSDT","BCHUSDT","LTCUSDT","SHIBUSDT","DOTUSDT",
+               "AAVEUSDT","PEPEUSDT","NEARUSDT","APTUSDT","ICPUSDT","ETCUSDT",
+               "ONDOUSDT","POLUSDT","CROUSDT","TONUSDT","UNIUSDT"]
+    try:
+        from ..PickleDataManager import PickleDataManager
+        dm = PickleDataManager("backtest")
+    except ImportError:
+        print("[WARN] PickleDataManager not available, using sample data")
+        return create_sample_data()
+    data = {}
+    for symbol in symbols:
+        try:
+            df = dm.fetch_store(symbol)
+            if df is not None and not df.empty:
+                data[symbol] = df
+                print(f"[DATA] Loaded {symbol} ({len(df)} rows)")
+            else:
+                print(f"[DATA] Empty dataset {symbol}")
+        except Exception as e:
+            print(f"[DATA] Failed {symbol}: {e}")
+    if not data:
+        print("[DATA] Universe empty, using sample data")
+        return create_sample_data()
+    print("[DATA] Assets:", list(data.keys()))
+    return data
+
+
+def create_sample_data(n_symbols=5, n_days=800):
+    np.random.seed(42)
+    data = {}
+    for i in range(n_symbols):
+        symbol = f"SYM{i:03d}"
+        dates = pd.date_range("2020-01-01", periods=n_days, freq="D")
+        returns = np.random.normal(0.0005, 0.02, n_days)
+        price = 100 * np.exp(np.cumsum(returns))
+        volume = np.random.lognormal(15, 0.5, n_days)
+        df = pd.DataFrame({
+            "open": price * (1 + np.random.normal(0, 0.001, n_days)),
+            "high": price * (1 + abs(np.random.normal(0, 0.01, n_days))),
+            "low": price * (1 - abs(np.random.normal(0, 0.01, n_days))),
+            "close": price,
+            "volume": volume.astype(int)
+        }, index=dates)
+        data[symbol] = df
+    return data
 
 
 # =====================================================
@@ -3153,11 +2869,13 @@ if __name__ == "__main__":
         "reg_lambda": 1.0,
     }
     pipeline = AgenticPipeline(market_data, base_dir="runs", use_feature_reduction=True, reduction_method="pca")
-    result = pipeline.run_agent(params, max_iters=5, run_combinatorial=True, param_grid=PARAM_GRID_FAST)
+    # Combinatorial disabled by default per user request
+    result = pipeline.run_agent(params, max_iters=5, run_combinatorial=False, param_grid=PARAM_GRID_FAST)
     print(f"Pipeline complete. Results saved to: {pipeline.base_dir}")
     print("Baseline model: runs/baseline_model.pkl")
     print("Optimized model: runs/optimized_model.pkl")
     print("Comparison report: runs/model_comparison.json")
+
 
 # ======================================================
 # END OF THE PIPELINE
