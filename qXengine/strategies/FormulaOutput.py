@@ -375,7 +375,7 @@ class FormulaOutput:
       # RISK (DERIVED LAYER)
       # =========================
       "volatility": {"category":"risk","type":"volatility","formula":"rolling_std(ret)","depends":["rolling_std"],"dtype":"float","return_result":"volatility"},
-      "sharpe":     {"category":"risk","type":"sharpe","formula":"mean/std","depends":["mean_ret","std_ret"],"dtype":"float","return_result":"sharpe"},
+      "sharpe":     {"category":"risk","type":"sharpe","formula":"mean/std * np.sqrt(252)","depends":["mean_ret","std_ret"],"dtype":"float","return_result":"sharpe"},
 
       "equity":     {"category":"risk","type":"equity","formula":"cumprod(1+ret)","depends":["ret"],"dtype":"Series","return_result":"equity"},
       "peak":       {"category":"risk","type":"peak","formula":"cummax(equity)","depends":["equity"],"dtype":"Series","return_result":"peak"},

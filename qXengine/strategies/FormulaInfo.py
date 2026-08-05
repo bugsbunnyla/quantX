@@ -9,7 +9,7 @@ import pandas as pd
 import ast
 import numexpr 
 import bottleneck
-
+from scipy import stats
 
 class RegressionEngine:
 
@@ -45,6 +45,7 @@ class RegressionEngine:
             "rolling_mean": self.rolling_mean,
             "rolling_std": self.rolling_std,
             "rolling_var": self.rolling_var,
+            "rolling_spearman" : self.rolling_spearman,
             "window": 20,
             "lag": 1,
             "lookback": 5,
@@ -219,7 +220,16 @@ class RegressionEngine:
     def rolling_mean(self, x, w=20): return pd.Series(x).rolling(w).mean().values
     def rolling_std(self, x, w=20): return pd.Series(x).rolling(w).std().values
     def rolling_var(self, x, w=20): return pd.Series(x).rolling(w).var().values
-
+    def rolling_spearman(self, s1, s2, w):
+      out = pd.Series(index=s1.index, dtype=float)
+      if len(s1) < w:
+        return out  # all NaN
+      for i in range(w, len(s1) + 1):
+        try:
+            out.iloc[i - 1] = stats.spearmanr(s1.iloc[i - w:i], s2.iloc[i - w:i])[0]
+        except Exception:
+            out.iloc[i - 1] = np.nan
+      return out
 
 class FormulaInfo:
 
@@ -298,6 +308,7 @@ class FormulaInfo:
             "rolling_mean": self.rolling_mean,
             "rolling_std": self.rolling_std,
             "rolling_var": self.rolling_var,
+            "rolling_spearman" : self.rolling_spearman,
             "build_X": self.build_X,
             "transpose_": self.transpose_,
         }
@@ -353,6 +364,7 @@ class FormulaInfo:
             "rolling_mean": self.rolling_mean,
             "rolling_std": self.rolling_std,
             "rolling_var": self.rolling_var,
+            "rolling_spearman" : self.rolling_spearman,
             "build_X": self.build_X,
             "transpose_": self.transpose_,
         }
@@ -443,6 +455,16 @@ class FormulaInfo:
     def rolling_var(self, x, w=20):
         return x.rolling(w).var(ddof=0)
 
+    def rolling_spearman(self, s1, s2, w):
+      out = pd.Series(index=s1.index, dtype=float)
+      if len(s1) < w:
+        return out  # all NaN
+      for i in range(w, len(s1) + 1):
+        try:
+            out.iloc[i - 1] = stats.spearmanr(s1.iloc[i - w:i], s2.iloc[i - w:i])[0]
+        except Exception:
+            out.iloc[i - 1] = np.nan
+      return out
     # =====================================================
     # DAG COMPUTE (FIXED)
     # =====================================================
@@ -920,7 +942,7 @@ class FormulaInfo:
         "cumprod": {"category": "transform", "type": "cumprod", "formula": "(1 + ret.replace([np.inf, -np.inf], 0).fillna(0)).cumprod()", "depends": ["ret"], "dtype": "DataFrame", "return_result": "cumprod"},
         "volatility": {"category": "risk", "type": "volatility", "formula": "np.sqrt(sum((ret - mean(ret))**2) / len(ret))", "depends": ["ret"], "dtype": "Series", "return_result": "volatility"},
         "sharpe": {"category": "basic", "type": "sharpe", "formula": "mean(daily_ret)/std(daily_ret)*np.sqrt(252)", "depends": ["daily_ret"], "dtype": "Series", "return_result": "sharpe"},
-        "reg_sharpe": {"category": "risk", "type": "reg_sharpe", "formula": "mean(ret_all) / (np.sqrt(252) * std(ret_all))", "depends": ["ret_all"], "dtype": "Series", "return_result": "reg_sharpe"},
+        "reg_sharpe": {"category": "risk", "type": "reg_sharpe", "formula": "mean(ret_all) /  std(ret_all) * np.sqrt(252)", "depends": ["ret_all"], "dtype": "Series", "return_result": "reg_sharpe"},
         "equity": {"category": "risk", "type": "equity", "formula": "(1 + net_ret).cumprod()", "depends": ["net_ret"], "dtype": "DataFrame", "return_result": "equity"},
         "peak": {"category": "risk", "type": "peak", "formula": "equity.cummax()", "depends": ["equity"], "dtype": "Series", "return_result": "peak"},
         "drawdown": {"category": "risk", "type": "drawdown", "formula": "equity / peak - 1", "depends": ["equity", "peak"], "dtype": "DataFrame", "return_result": "drawdown"},
@@ -965,6 +987,17 @@ class FormulaInfo:
         "psignal": {"category": "decision", "type": "psignal", "formula": "np.where((m := np.mean(np.where((score + future_ret - 0.41) <= 0.04, 0, np.where((score + future_ret - 0.41) <= 0.06, 1, 2)), axis=0)) < 0.5, 'BUY', np.where(m < 1.5, 'HOLD', 'SELL'))", "depends": ["score", "future_ret"], "dtype": "Series", "return_result": "psignal"},
         "strategy_returns": {"category": "portfolio", "type": "strategy_returns", "formula": "signal.shift(1)*ret", "depends": ["signal", "ret"], "dtype": "Series", "return_result": "strategy_returns"},
         "benchmark": {"category": "market", "type": "benchmark", "formula": "(ret['BTCUSDT'] if 'BTCUSDT' in ret.columns else (ret['SPY'] if 'SPY' in ret.columns else ret.mean(axis=1)))", "depends": ["ret"], "dtype": "Series", "return_result": "benchmark"},
+        "rolling_sharpe": { "category": "risk", "type": "rolling_sharpe", "formula": "(daily_ret.rolling(20).mean() / (daily_ret.rolling(20).std() + 1e-12)) * np.sqrt(252)",
+                            "depends": ["daily_ret"],  "dtype": "Series",      "return_result": "rolling_sharpe"   },
+        "rolling_beta": { "category": "alpha",   "type": "rolling_beta",  "formula": "daily_ret.rolling(20).cov(benchmark) / (benchmark.rolling(20).var() + 1e-12)",
+               "depends": ["daily_ret", "benchmark"],"dtype": "Series", "return_result": "rolling_beta" },
+        "rolling_alpha": { "category": "alpha", "type": "rolling_alpha",  "formula": "daily_ret.rolling(20).mean() - rolling_beta * benchmark.rolling(20).mean()",
+               "depends": ["daily_ret", "benchmark", "rolling_beta"], "dtype": "Series",   "return_result": "rolling_alpha"  },
+        "rolling_r2": { "category": "basic",  "type": "rolling_r2", "formula": "(daily_ret.rolling(20).corr(benchmark)) ** 2",   "depends": ["daily_ret", "benchmark"],
+               "dtype": "Series",  "return_result": "rolling_r2"  },
+        "rolling_ic": { "category": "intel",  "type": "rolling_ic",  "formula": "rolling_spearman(daily_ret, benchmark, 20)",  "depends": ["daily_ret", "benchmark"],
+               "dtype": "Series",   "return_result": "rolling_ic"  },
+
         "reg_beta": {"category": "regression", "type": "reg_beta", "depends": {"y": "ret", "X": ["mkt_ret"]}, "transforms": {}, "formula": "_ols(y=ret, X=[mkt_ret]).beta", "dtype": "float", "return_result": "reg_beta"},
         "reg_alpha": {"category": "regression", "type": "reg_alpha", "depends": {"y": "ret", "X": ["mkt_ret"]}, "transforms": {}, "formula": "_ols(y=ret, X=[mkt_ret]).alpha", "dtype": "float", "return_result": "reg_alpha"},
         "reg_r2": {"category": "regression", "type": "reg_r2", "depends": {"y": "ret", "X": ["mkt_ret"]}, "transforms": {}, "formula": "np.nanmean(_ols(y=ret, X=[mkt_ret]).r2)", "dtype": "float", "return_result": "reg_r2"},

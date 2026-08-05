@@ -728,8 +728,83 @@ class BacktestEngine_0:
     def __init__(self):
         self.last_features = None
         self.last_signal = None
-
+   
     def build_features_for_signal(self, raw_data):
+              # 1. Build the FormulaInfo instance for this snapshot
+              bfosfo = FormulaInfo(raw_data)
+              bfosfo.assemble()
+              rpt = bfosfo.reporting()          # tuple (df_multi, df_easy) — kept for compatibility
+
+              # 2. Single canonical list of every attribute the model expects
+              default_rpt = [
+                  "market_price", "market_volume", "market_structure_liq_adj_vol",
+                  "risk_volatility", "risk_sharpe", "risk_drawdown",
+                  "alpha_pure", "alpha_ts", "alpha_beta", "alpha_residual", "alpha_xs",
+                  "transform_zscore", "transform_rank", "transform_winsor", "transform_tanh",
+                  "transform_detrend",
+                  "basic_corr", "basic_hit_ratio", "basic_r_squared", "basic_tstat",
+                  "decision_score", "decision_signal", "execution_impact",
+                  "execution_slippage", "execution_turnover", "intel_ic",
+                  "market_structure_regime", "portfolio_entropy", "portfolio_inv_vol",
+                  "portfolio_kelly", "portfolio_mvo", "portfolio_risk_parity",
+                  "portfolio_weight", "risk_cvar",
+              ]
+
+              # 3. Pull each object once from the assembled FormulaInfo
+              attr_cache = {}
+              for attr in default_rpt:
+                  try:
+                      attr_cache[attr] = bfosfo.get(attr)
+                  except Exception:
+                      attr_cache[attr] = None
+
+              rows = []
+              for symbol, df in raw_data.items():
+                  if not isinstance(df, pd.DataFrame) or len(df) < 20:
+                      continue
+                  row = {"symbol": symbol}
+
+                  # 4. Loop the list and extract the latest scalar per symbol
+                  for attr in default_rpt:
+                      val = attr_cache[attr]
+                      if val is None:
+                          row[attr] = 0.0
+                          continue
+
+                      try:
+                          if isinstance(val, pd.DataFrame):
+                              if symbol in val.columns:
+                                  s = val[symbol]
+                                  scalar = float(s.iloc[-1]) if hasattr(s, "iloc") else float(s)
+                              elif symbol in val.index:
+                                  s = val.loc[symbol]
+                                  scalar = float(s.iloc[-1]) if hasattr(s, "iloc") else float(s)
+                              else:
+                                  scalar = 0.0
+                          elif isinstance(val, pd.Series):
+                              scalar = float(val.loc[symbol]) if symbol in val.index else float(val.iloc[-1])
+                          else:
+                              scalar = float(val)
+                          row[attr] = scalar
+                      except Exception:
+                          row[attr] = 0.0
+
+                  # Symbol identity (not a FormulaInfo metric, so set directly)
+                  row["market_symbol"] = symbol
+
+                  # 5. Microstructure features (orthogonal to FormulaInfo)
+                  micro = compute_microstructure_features(df)
+                  row.update(micro)
+
+                  rows.append(row)
+
+              df = pd.DataFrame(rows)
+              df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
+              self.last_features = df.copy()
+              return df
+      
+      
+    def build_features_for_signal0(self, raw_data):
         rows = []
         for symbol, df in raw_data.items():
             if not isinstance(df, pd.DataFrame) or len(df) < 20:
@@ -815,8 +890,153 @@ class BacktestEngine_0:
         prediction = np.asarray(prediction, dtype=float)
         self.last_signal = prediction
         return prediction
-
     def evaluate(self, package, signal):
+           metrics = {}
+           y_actual = package.get("y")
+           formula_outputs = package.get("formula_outputs_raw", package.get("formula_outputs", []))
+
+           # --- 1. Signal-quality metrics (manual — require ML signal vector) ---
+           if y_actual is not None:
+               y_actual = pd.Series(y_actual).replace([np.inf, -np.inf], np.nan)
+               signal_s = pd.Series(signal).replace([np.inf, -np.inf], np.nan)
+               min_len = min(len(y_actual), len(signal_s))
+               if min_len > 0:
+                   y_vec = y_actual.iloc[:min_len].values
+                   s_vec = signal_s.iloc[:min_len].values
+                   mask = pd.notna(y_vec) & pd.notna(s_vec)
+                   y_clean = y_vec[mask]
+                   s_clean = s_vec[mask]
+                   n_valid = len(y_clean)
+                   if n_valid >= 3:
+                       if np.std(y_clean) > 1e-12 and np.std(s_clean) > 1e-12:
+                           try:
+                               corr = float(np.corrcoef(y_clean, s_clean)[0, 1])
+                           except Exception:
+                               corr = 0.0
+                       else:
+                           corr = 0.0
+
+                       if np.std(s_clean) > 1e-12 and np.std(y_clean) > 1e-12:
+                           try:
+                               ic = float(stats.spearmanr(y_clean, s_clean)[0])
+                           except Exception:
+                               ic = 0.0
+                       else:
+                           ic = 0.0
+
+                       hit = float(np.mean(np.sign(y_clean) == np.sign(s_clean)))
+                       ss_res = np.sum((y_clean - s_clean) ** 2)
+                       ss_tot = np.sum((y_clean - np.mean(y_clean)) ** 2)
+                       r2 = float(1.0 - ss_res / (ss_tot + 1e-12)) if ss_tot > 1e-12 else 0.0
+
+                       turnover = float(np.mean(np.abs(np.diff(s_clean)))) if len(s_clean) > 1 else 0.0
+
+                       # --- 2. FormulaInfo scalar metrics (assemble + reporting + fo.get) ---
+                       fo = None
+                       for candidate in formula_outputs:
+                           if hasattr(candidate, "get"):
+                               fo = candidate
+                               break
+
+                       if fo is not None:
+                           if hasattr(fo, "assemble"):
+                               fo.assemble()
+                           if hasattr(fo, "reporting"):
+                               fo.reporting()
+
+                           metrics["sharpe"] = self._fo_get_scalar(fo, "risk_sharpe")
+                           metrics["volatility"] = self._fo_get_scalar(fo, "risk_volatility")
+                           metrics["cvar"] = self._fo_get_scalar(fo, "risk_cvar")
+                           metrics["alpha"] = self._fo_get_scalar(fo, "alpha_alpha")
+                           metrics["beta"] = self._fo_get_scalar(fo, "alpha_beta")
+                           metrics["tstat_alpha"] = self._fo_get_scalar(fo, "basic_tstat")
+                           metrics["ret"] = self._fo_get_scalar(fo, "market_ret")
+                           metrics["drawdown"] = self._fo_get_scalar(fo, "risk_drawdown")
+                           metrics["max_drawdown"] = self._fo_get_scalar(fo, "risk_max_drawdown")
+                           metrics["tcost_10bps"] = turnover * RETAIL_TRANSACTION_COST_LOW
+                           metrics["tcost_20bps"] = turnover * RETAIL_TRANSACTION_COST_HIGH
+                       else:
+                           metrics["sharpe"] = 0.0
+                           metrics["volatility"] = 0.0
+                           metrics["cvar"] = 0.0
+                           metrics["alpha"] = 0.0
+                           metrics["beta"] = 0.0
+                           metrics["tstat_alpha"] = 0.0
+                           metrics["ret"] = 0.0
+                           metrics["drawdown"] = 0.0
+                           metrics["max_drawdown"] = 0.0
+                           metrics["tcost_10bps"] = turnover * RETAIL_TRANSACTION_COST_LOW
+                           metrics["tcost_20bps"] = turnover * RETAIL_TRANSACTION_COST_HIGH
+
+                       # Composite score (signal-quality, manual)
+                       ic_safe = float(np.nan_to_num(ic, nan=0.0, posinf=0.0, neginf=0.0))
+                       corr_safe = float(np.nan_to_num(corr, nan=0.0, posinf=0.0, neginf=0.0))
+                       sharpe_safe = float(np.nan_to_num(metrics.get("sharpe", 0), nan=0.0, posinf=0.0, neginf=0.0))
+                       r2_safe = float(np.nan_to_num(r2, nan=0.0, posinf=0.0, neginf=0.0))
+                       score = (
+                           0.25 * abs(ic_safe) +
+                           0.25 * abs(corr_safe) +
+                           0.20 * hit +
+                           0.15 * max(0, sharpe_safe) +
+                           0.15 * max(0, r2_safe)
+                       )
+
+                       metrics.update({
+                           "score": float(score),
+                           "corr": float(corr),
+                           "hit": float(hit),
+                           "r2": float(r2),
+                           "ic": float(ic),
+                           "turnover": float(turnover),
+                           "samples": n_valid,
+                       })
+                       print(f"[EVALUATE] score={score:.4f} sharpe={metrics.get('sharpe', 0):.4f} ic={ic:.4f} corr={corr:.4f} "
+                             f"hit={hit:.4f} alpha={metrics.get('alpha', 0):.6f} tstat={metrics.get('tstat_alpha', 0):.3f} n={n_valid}")
+                       return metrics
+
+           # --- FALLBACK: FormulaInfo scrape via assemble/reporting/get ---
+           print("[EVALUATE] WARNING: Falling back to formula_output extraction")
+           metric_map = {
+               "alpha": "alpha_alpha", "beta": "alpha_beta", "ret": "market_ret",
+               "corr": "basic_corr", "hit": "basic_hit_ratio", "tstat": "basic_tstat",
+               "turnover": "execution_turnover", "tcost_10bps": "execution_transaction_cost",
+               "tcost_20bps": "execution_transaction_cost",
+               "ic": "intel_ic", "volatility": "risk_volatility", "cvar": "risk_cvar",
+               "sharpe": "risk_sharpe", "drawdown": "risk_drawdown",
+               "max_drawdown": "risk_max_drawdown", "score": "decision_score",
+           }
+           for candidate in formula_outputs:
+               if hasattr(candidate, "assemble"):
+                   candidate.assemble()
+               if hasattr(candidate, "reporting"):
+                   candidate.reporting()
+               if hasattr(candidate, "get"):
+                   for out_key, fo_key in metric_map.items():
+                       if out_key not in metrics:
+                           metrics[out_key] = self._fo_get_scalar(candidate, fo_key)
+
+           required_keys = ["score", "sharpe", "corr", "hit", "r2", "cvar", "alpha", "beta",
+                            "ret", "turnover", "tcost_10bps", "tcost_20bps", "ic", "volatility",
+                            "drawdown", "max_drawdown", "tstat_alpha"]
+           for key in required_keys:
+               if key not in metrics:
+                   metrics[key] = 0.0
+           return metrics
+
+    def _fo_get_scalar(self, fo, key, default=0.0):
+           try:
+               val = fo.get(key)
+               if isinstance(val, pd.DataFrame):
+                   s = val.iloc[-1]
+                   scalar = float(s.iloc[-1]) if hasattr(s, "iloc") else float(s)
+               elif isinstance(val, pd.Series):
+                   scalar = float(val.iloc[-1])
+               else:
+                   scalar = float(val)
+               return scalar
+           except Exception:
+               return default
+    def evaluate0(self, package, signal):
         metrics = {}
         y_actual = package.get("y")
         if y_actual is not None:

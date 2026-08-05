@@ -9,7 +9,7 @@ from ..qxEngine import QuantXEngine
 from ..PickleDataManager import PickleDataManager
 from pprint import pprint
 
-def inspect_object(obj, indent=0):
+def bp_inspect_object(obj, indent=0):
     prefix = " " * indent
 
     if isinstance(obj, list):
@@ -34,15 +34,15 @@ def inspect_object(obj, indent=0):
 # =========================================================
 #class Storage:
 
-#    def __init__(self, base_dir):
+#    def bp___init__(self, base_dir):
 #        self.base_dir = base_dir
 #        os.makedirs(base_dir, exist_ok=True)
 
-#    def save(self, obj, path):
+#    def bp_save(self, obj, path):
 #        with open(path, "wb") as f:
 #            pickle.dump(obj, f)
 
-#    def load(self, path):
+#    def bp_load(self, path):
 #        with open(path, "rb") as f:
 #            return pickle.load(f)
 import os
@@ -60,7 +60,7 @@ class Storage:
         storage.save(obj, "run_000001/model.pkl")
     """
 
-    def __init__(self, base_dir="runs"):
+    def bp___init__(self, base_dir="runs"):
         self.base = Path(base_dir)
         self.datasets = self.base / "datasets"
         self.base.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,7 @@ class Storage:
     # ---------------------------------------------------
     # Internal path resolver
     # ---------------------------------------------------
-    def _resolve(self, path):
+    def bp__resolve(self, path):
         path = Path(path)
         # Absolute path -> leave unchanged
         if path.is_absolute():
@@ -83,28 +83,28 @@ class Storage:
     # ---------------------------------------------------
     # Generic pickle
     # ---------------------------------------------------
-    def save(self, obj, path):
+    def bp_save(self, obj, path):
         path = self._resolve(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wb") as f:
             pickle.dump(obj, f)
         return path
-    def load(self, path):
+    def bp_load(self, path):
         path = self._resolve(path)
         with open(path, "rb") as f:
             return pickle.load(f)
     # ---------------------------------------------------
     # Dataset helpers
     # ---------------------------------------------------
-    def save_dataset(self, name, data):
+    def bp_save_dataset(self, name, data):
         return self.save(data, self.datasets / f"{name}.pkl")
-    def load_dataset(self, name):
+    def bp_load_dataset(self, name):
         return self.load(self.datasets / f"{name}.pkl")
 
     # ---------------------------------------------------
     # Run management
     # ---------------------------------------------------
-    def create_run(self):
+    def bp_create_run(self):
         runs = sorted(self.base.glob("run_*"))
         if runs:
             last = int(runs[-1].name.split("_")[1])
@@ -117,23 +117,23 @@ class Storage:
             f.write(run_dir.name)
         return idx, run_dir
 
-    def latest_run(self):
+    def bp_latest_run(self):
         latest = self.base / "latest.txt"
         if not latest.exists():
             return None
         with open(latest, "r") as f:
             return self.base / f.read().strip()
 
-    def list_runs(self):
+    def bp_list_runs(self):
         return sorted(self.base.glob("run_*"))
 
     # ---------------------------------------------------
     # Run artifact helpers
     # ---------------------------------------------------
-    def save_run_file(self, run_dir, name, obj):
+    def bp_save_run_file(self, run_dir, name, obj):
         return self.save(obj, Path(run_dir) / f"{name}.pkl")
 
-    def load_run_file(self, run_dir, name):
+    def bp_load_run_file(self, run_dir, name):
         return self.load(Path(run_dir) / f"{name}.pkl")
 
 # =========================================================
@@ -141,12 +141,12 @@ class Storage:
 # =========================================================
 class SplitEngine:
 
-    #def split(self, data):
+    #def bp_split(self, data):
     #    idx = int(len(data) * 0.7)
     #    return data.iloc[:idx], data.iloc[idx:]
 
 
-    def split(self, data):
+    def bp_split(self, data):
         train = copy.deepcopy(data)
         val = copy.deepcopy(data)
         return train, val
@@ -180,7 +180,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 class MLTrainEngine:
 
 
-    def __init__(self):
+    def bp___init__(self):
 
         self.feature_schema = None
 
@@ -201,7 +201,7 @@ class MLTrainEngine:
     # RECEIVES PACKAGE FROM AgenticPipeline
     # =====================================================
 
-    def train(
+    def bp_train(
         self,
         train_package
     ):
@@ -361,7 +361,7 @@ class MLTrainEngine:
     # USED BY AgenticPipeline.prepare()
     # =====================================================
 
-    def build_feature_matrix(
+    def bp_build_feature_matrix(
         self,
         strategy_results,
         formula_outputs,
@@ -392,7 +392,7 @@ class MLTrainEngine:
     # FEATURE BUILDER
     # =====================================================
 
-    def build_features(
+    def bp_build_features(
         self,
         strategy_results,
         formula_outputs,
@@ -749,7 +749,7 @@ class MLTrainEngine:
     # MODEL FIT
     # =====================================================
 
-    def fit(
+    def bp_fit(
         self,
         X,
         y,
@@ -882,7 +882,7 @@ class MLTrainEngine:
     # ENCODER
     # =====================================================
 
-    def encode_features(
+    def bp_encode_features(
         self,
         df
     ):
@@ -939,7 +939,7 @@ class MLTrainEngine:
 class ProcessEngine:
 
 
-    def __init__(self):
+    def bp___init__(self):
 
         self.ml = MLTrainEngine()
 
@@ -950,7 +950,7 @@ class ProcessEngine:
     # RECEIVES PACKAGE FROM AgenticPipeline
     # =====================================================
 
-    def train(
+    def bp_train(
         self,
         train_package,
         params=None
@@ -1129,7 +1129,7 @@ class ProcessEngine:
 class BacktestEngine:
 
 
-    def __init__(self):
+    def bp___init__(self):
 
         self.last_features = None
         self.last_signal = None
@@ -1142,7 +1142,7 @@ class BacktestEngine:
     # QuantX PREPARE CURRENTLY OWNS THIS
     # =====================================================
 
-    def build_features_for_signal(
+    def bp_build_features_for_signal(
         self,
         raw_data
     ):
@@ -1450,7 +1450,7 @@ class BacktestEngine:
     # ENCODER
     # =====================================================
 
-    def encode_features(
+    def bp_encode_features(
         self,
         df
     ):
@@ -1497,7 +1497,7 @@ class BacktestEngine:
     # TRAIN MODEL -> TRAIN OR VAL DATA
     # =====================================================
 
-    def signal(
+    def bp_signal(
         self,
         model_package,
         dataset
@@ -1581,7 +1581,7 @@ class BacktestEngine:
     # EVALUATION
     # =====================================================
 
-    def evaluate(
+    def bp_evaluate(
         self,
         package,
         signal
@@ -1751,7 +1751,7 @@ class BacktestEngine:
 
         }
 
-    def encode_features(self, df):
+    def bp_encode_features(self, df):
         result = df.copy()
 
         for col in result.columns:
@@ -1777,7 +1777,7 @@ class BacktestEngine:
 # =========================================================
 class ReviewEngine:
 
-    def compare(self, current, previous):
+    def bp_compare(self, current, previous):
 
         if previous is None:
             return {
@@ -1800,7 +1800,7 @@ class ReviewEngine:
 # =========================================================
 class Evaluator:
 
-    def decide(self, review):
+    def bp_decide(self, review):
 
         return "CONTINUE" if review["decision"] != "STOP" else "STOP"
 
@@ -1811,7 +1811,7 @@ class Evaluator:
 class AgenticPipeline:
 
 
-    def __init__(
+    def bp___init__(
         self,
         data,
         base_dir="runs"
@@ -1851,7 +1851,7 @@ class AgenticPipeline:
     # SAME LOGIC TRAIN + VALIDATION
     # =====================================================
 
-    def prepare(
+    def bp_prepare(
         self,
         data,
         params=None
@@ -1997,7 +1997,7 @@ class AgenticPipeline:
     # AGENT LOOP
     # =====================================================
 
-    def run_agent(
+    def bp_run_agent(
         self,
         params,
         max_iters=5
@@ -2499,7 +2499,7 @@ AGENT DECISION
 
             previous_val = val_metrics
 
-def build_data():
+def bp_build_data():
 
     #read pkl files to create data
     symbols = ["BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","DOGEUSDT",]
