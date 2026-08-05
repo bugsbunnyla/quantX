@@ -138,7 +138,8 @@ class PairTradingFallback(BaseStrategy):
                 name="PairTradingFallback",
                 data=self.data,
                 metrics={"error": "insufficient history"},
-                signals={}
+                signals={},
+                chart = None
             )
 
         corr = rets.tail(corr_window).corr().abs()

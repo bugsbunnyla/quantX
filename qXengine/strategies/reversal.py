@@ -462,7 +462,7 @@ class IntradayReversal(BaseStrategy):
         if not frames:
             return StrategyResult(
                 name=self.__class__.__name__,
-                data=self.data
+                data=self.data,
                 metrics=None,
                 signals = None,
                 chart=None

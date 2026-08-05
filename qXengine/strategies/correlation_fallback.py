@@ -111,7 +111,7 @@ class CorrelationFallback(BaseStrategy):
         returns = price_df.pct_change().dropna()
 
         if len(returns) < corr_window:
-            return StrategyResult("CorrelationFallback", self.data, {}, {})
+            return StrategyResult("CorrelationFallback", self.data, {}, {}, None)
 
         # =====================================================
         # ROLLING CORRELATION
