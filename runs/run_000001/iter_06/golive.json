@@ -1,0 +1,27 @@
+{
+  "ready": false,
+  "stage": "RESEARCH",
+  "checks": {
+    "accept_ratio": 0.0,
+    "avg_sharpe": 0.37566192709391616,
+    "avg_corr": 0.0,
+    "avg_drawdown": NaN,
+    "consistency": 0.0,
+    "oos_sufficient": false
+  },
+  "systemic_prediction": {
+    "expected_sharpe": 0.37566192709391616,
+    "sharpe_confidence_interval": [
+      0.0,
+      0.8452393359613114
+    ],
+    "expected_corr": 0.0,
+    "expected_score": 0.18362201633681474,
+    "score_stability": 0.5660110373455898,
+    "win_rate": 1.0,
+    "consistency_ratio": 0.0,
+    "min_oos_predictions": 22
+  },
+  "deployment_package": null,
+  "recommendation": "CONTINUE_RESEARCH"
+}

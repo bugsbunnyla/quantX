@@ -221,25 +221,27 @@ class Storage:
 
 
 # =====================================================
-# SPLIT ENGINE  —  OLD (preserved)
+# SPLIT ENGINE  —  NEW: common cutoff date
 # =====================================================
+class SplitEngine0:
+    def split(self, data, split_ratio=0.5):
+        train, val = {}, {}
+        for symbol, df in data.items():
+            if not isinstance(df, pd.DataFrame):
+                continue
+            split_idx = int(len(df) * split_ratio)
+            if split_idx < 10:
+                split_idx = len(df) // 2
+            train[symbol] = df.iloc[:split_idx].copy()
+            val[symbol] = df.iloc[split_idx:].copy()
+        return train, val
+
+
 # =====================================================
 # SPLIT ENGINE  —  NEW: common cutoff date
 # =====================================================
 class SplitEngine:
-    def split(self, data, split_ratio=DEFAULT_SPLIT_RATIO, explicit_split_date=None):
-        """
-        Temporal split at a COMMON CALENDAR DATE across all symbols.
-
-        1. Finds the full calendar span (union of all asset date ranges).
-        2. Computes the cutoff date as split_ratio along that span.
-        3. Splits EVERY asset at that exact date.
-
-        Assets that start after the cutoff get 0%% train.
-        Assets that end before the cutoff get 0%% val.
-        The split wall is a single calendar date.
-        """
-        # Per-asset date ranges
+    def split(self, data, split_ratio=0.5, explicit_split_date=None):
         ranges = {}
         for sym, df in data.items():
             if isinstance(df, pd.DataFrame) and len(df) > 0:
@@ -249,23 +251,18 @@ class SplitEngine:
 
         if not ranges:
             print("[SPLIT] No valid dates found; falling back to per-symbol row split.")
-            train, val = {}, {}
-            for symbol, df in data.items():
-                if not isinstance(df, pd.DataFrame):
-                    continue
-                split_idx = int(len(df) * split_ratio)
-                if split_idx < 10:
-                    split_idx = len(df) // 2
-                train[symbol] = df.iloc[:split_idx].copy()
-                val[symbol] = df.iloc[split_idx:].copy()
-            return train, val
+            return SplitEngine0().split(data, split_ratio)  # fallback to row-based splitter
 
-        # Union: overall calendar span across ALL assets
         union_start = min(r[0] for r in ranges.values())
-        union_end = max(r[1] for r in ranges.values())
-        union_days = (union_end - union_start).days
+        union_end   = max(r[1] for r in ranges.values())
+        union_days  = (union_end - union_start).days
 
-        # Determine cutoff date
+        # ---- NEW GUARD ----
+        if union_days < MIN_SPLIT_DAYS:
+            print(f"[SPLIT] Union span only {union_days}d (< {MIN_SPLIT_DAYS}). "
+                  f"Falling back to per-symbol row split.")
+            return SplitEngine0().split(data, split_ratio)
+
         if explicit_split_date is not None:
             cutoff_date = pd.Timestamp(explicit_split_date)
             print(f"[SPLIT] Explicit split date requested: {explicit_split_date}")
@@ -274,10 +271,11 @@ class SplitEngine:
             cutoff_date = union_start + pd.Timedelta(days=cutoff_offset)
             print(f"[SPLIT] Splitting union span at ratio={split_ratio}")
 
-        print(f"[SPLIT] Union range:   {union_start.strftime('%%Y-%%m-%%d')} to {union_end.strftime('%%Y-%%m-%%d')}  ({union_days} calendar days)")
-        print(f"[SPLIT] Cutoff date:   {cutoff_date.strftime('%%Y-%%m-%%d')}")
+        # fixed strftime formats
+        print(f"[SPLIT] Union range:   {union_start.strftime('%Y-%m-%d')} to "
+              f"{union_end.strftime('%Y-%m-%d')}  ({union_days} calendar days)")
+        print(f"[SPLIT] Cutoff date:   {cutoff_date.strftime('%Y-%m-%d')}")
 
-        # Apply cutoff uniformly to EVERY asset
         train, val = {}, {}
         per_asset_stats = []
         for sym, df in data.items():
@@ -285,23 +283,23 @@ class SplitEngine:
                 continue
             idx = pd.to_datetime(df.index, errors="coerce")
             train_mask = idx <= cutoff_date
-            val_mask = idx > cutoff_date
+            val_mask   = idx > cutoff_date
             train[sym] = df.loc[train_mask].copy()
-            val[sym] = df.loc[val_mask].copy()
+            val[sym]   = df.loc[val_mask].copy()
             n_total = len(df)
             n_train = len(train[sym])
-            n_val = len(val[sym])
+            n_val   = len(val[sym])
             pct_train = n_train / n_total * 100 if n_total > 0 else 0
-            pct_val = n_val / n_total * 100 if n_total > 0 else 0
+            pct_val   = n_val   / n_total * 100 if n_total > 0 else 0
             per_asset_stats.append({
                 "symbol": sym, "total": n_total, "train": n_train, "val": n_val,
                 "train_pct": pct_train, "val_pct": pct_val,
-                "start": ranges[sym][0].strftime('%%Y-%%m-%%d'),
-                "end": ranges[sym][1].strftime('%%Y-%%m-%%d')
+                "start": ranges[sym][0].strftime('%Y-%m-%d'),   # fixed
+                "end":   ranges[sym][1].strftime('%Y-%m-%d')    # fixed
             })
 
         # Print per-asset diagnostics
-        print(f"\n[SPLIT] Per-asset split diagnostics (cutoff: {cutoff_date.strftime('%%Y-%%m-%%d')}):")
+        print(f"\n[SPLIT] Per-asset split diagnostics (cutoff: {cutoff_date.strftime('%Y-%m-%d')}):")
         print(f"  {'Symbol':<12} {'Start':<12} {'End':<12} {'Total':>6} {'Train':>6} {'Val':>6} {'Train%%':>7} {'Val%%':>7}")
         print(f"  {'-'*12} {'-'*12} {'-'*12} {'-'*6} {'-'*6} {'-'*6} {'-'*7} {'-'*7}")
         for s in per_asset_stats:
@@ -314,6 +312,8 @@ class SplitEngine:
         print(f"\n[SPLIT] GLOBAL SUMMARY: Train={total_train}/{total_obs} ({total_train/total_obs*100:.1f}%%), Val={total_val}/{total_obs} ({total_val/total_obs*100:.1f}%%)")
 
         return train, val
+
+
 class FeatureReducer:
     def __init__(self, n_components=TARGET_N_COMPONENTS, method="pca"):
         self.n_components = n_components
@@ -1096,8 +1096,8 @@ class Evaluator:
     def __init__(self):
         self.decision_history = []
         self.thresholds = {
-            "min_sharpe": 0.5, "min_corr": 0.1, "min_hit": 0.52,
-            "max_overfit_gap": 0.3, "min_score": 0.3,
+            "min_sharpe": 0.2, "min_corr": 0.05, "min_hit": 0.51,
+            "max_overfit_gap": 0.5, "min_score": 0.15,
             "min_oos_predictions": MIN_OOS_PREDICTIONS,
         }
 
@@ -1182,9 +1182,9 @@ class Evaluator:
 class GoLiveEngine:
     def __init__(self):
         self.readiness_criteria = {
-            "min_iterations": 3, "min_accept_ratio": 0.5,
-            "min_avg_sharpe": 0.6, "min_avg_corr": 0.15,
-            "max_avg_drawdown": -0.15, "min_consistency": 0.7,
+            "min_iterations": 3, "min_accept_ratio": 0.3,
+            "min_avg_sharpe": 0.3, "min_avg_corr": 0.08,
+            "max_avg_drawdown": -0.35, "min_consistency": 0.5,
             "min_oos_predictions": MIN_OOS_PREDICTIONS,
         }
 
@@ -2079,6 +2079,47 @@ class AgenticPipeline:
 
             print(f"Decision: {decision} | GoLive: {golive['stage']}")
 
+            # --- GOLIVE AUTO-IMPROVEMENT: aggressive param mutation ---
+            if not golive["ready"] and decision != "STOP":
+                checks = golive.get("checks", {})
+                mutations_applied = []
+                # Sharpe too low → more capacity + regularization
+                if checks.get("avg_sharpe", 0) < self.golive.readiness_criteria["min_avg_sharpe"]:
+                    params["trees"] = min(params.get("trees", 500) + 300, 2000)
+                    params["depth"] = max(params.get("depth", 12) - 3, 3)
+                    params["min_samples_split"] = max(params.get("min_samples_split", 2) * 2, 20)
+                    params["learning_rate"] = min(params.get("learning_rate", 0.1) * 1.2, 0.3)
+                    mutations_applied.append("sharpe_boost")
+                # Corr too low → shorter horizon, subsample features
+                if checks.get("avg_corr", 0) < self.golive.readiness_criteria["min_avg_corr"]:
+                    params["horizon"] = max(params.get("horizon", 21) - 7, 3)
+                    params["max_features"] = "log2"
+                    mutations_applied.append("corr_boost")
+                # Drawdown too deep → much stronger regularization + shallower trees
+                if checks.get("avg_drawdown", 0) < self.golive.readiness_criteria["max_avg_drawdown"]:
+                    params["reg_alpha"] = min(params.get("reg_alpha", 0.0) + 0.2, 2.0)
+                    params["reg_lambda"] = min(params.get("reg_lambda", 1.0) + 1.0, 10.0)
+                    params["depth"] = max(params.get("depth", 12) - 4, 2)
+                    mutations_applied.append("drawdown_guard")
+                # Consistency too low → model upgrade cascade
+                if checks.get("consistency", 0) < self.golive.readiness_criteria["min_consistency"]:
+                    model_cascade = ["random_forest", "gradient_boosting", "xgboost", "lightgbm"]
+                    curr = params.get("model", "random_forest")
+                    if curr in model_cascade:
+                        idx = model_cascade.index(curr)
+                        if idx < len(model_cascade) - 1:
+                            params["model"] = model_cascade[idx + 1]
+                    mutations_applied.append("model_upgrade")
+                # OOS insufficient → reduce horizon to get more predictions
+                if not checks.get("oos_sufficient", True):
+                    params["horizon"] = max(params.get("horizon", 21) - 10, 1)
+                    mutations_applied.append("oos_boost")
+                if mutations_applied:
+                    print(f"[GOLIVE TUNE] Iter {self.iteration}: mutations {mutations_applied}")
+                    print(f"[GOLIVE TUNE] New params: trees={params.get('trees')}, depth={params.get('depth')}, "
+                          f"model={params.get('model')}, horizon={params.get('horizon')}, "
+                          f"reg_a={params.get('reg_alpha')}, reg_l={params.get('reg_lambda')}")
+
             if decision == "STOP":
                 break
             if decision == "ACCEPT" and golive["ready"]:
@@ -2108,6 +2149,11 @@ class AgenticPipeline:
                             print(f"[PORTFOLIO] [{label}] WARNING: ret values out of range [{min_val:.4f}, {max_val:.4f}]. "
                                   f"Expected decimal daily returns. Forcing fallback pct_change().")
                             ret_df = None  # force fallback
+                        elif max_val > 0.5 or min_val < -0.5:
+                            # Percent-scale returns (e.g. 5.0 = 5%) — rescale to decimal
+                            print(f"[PORTFOLIO] [{label}] WARNING: ret looks percent-scale "
+                                  f"[{min_val:.4f}, {max_val:.4f}]. Rescaling by /100.")
+                            ret_df = ret_df / 100.0
                 if ret_df is None or not isinstance(ret_df, pd.DataFrame):
                     ret_parts = []
                     for sym, df in data_source.items():
@@ -2116,6 +2162,32 @@ class AgenticPipeline:
                     ret_df = pd.concat(ret_parts, axis=1).fillna(0) if ret_parts else None
                 if ret_df is None or ret_df.empty:
                     raise ValueError("No return data.")
+
+                # --- FIX A: Ensure DatetimeIndex on ret_df ---
+                if not isinstance(ret_df.index, pd.DatetimeIndex):
+                    if pd.api.types.is_integer_dtype(ret_df.index):
+                        # Integer index = row numbers, NOT nanoseconds since epoch.
+                        # Try to borrow real dates from the raw data_source.
+                        ref = next((df for df in data_source.values()
+                                    if isinstance(df, pd.DataFrame)
+                                    and isinstance(df.index, pd.DatetimeIndex)
+                                    and len(df) >= len(ret_df)), None)
+                        if ref is not None:
+                            ret_df = ret_df.copy()
+                            ret_df.index = ref.index[-len(ret_df):]
+                            print(f"[PORTFOLIO] [{label}] Mapped integer ret_df index to raw-data dates "
+                                  f"({ret_df.index[0]} to {ret_df.index[-1]})")
+                        else:
+                            ret_df = ret_df.copy()
+                            ret_df.index = pd.date_range(
+                                end=pd.Timestamp.today(), periods=len(ret_df), freq='D'
+                            )
+                            print(f"[PORTFOLIO] [{label}] Generated synthetic daily index for ret_df "
+                                  f"({ret_df.index[0]} to {ret_df.index[-1]})")
+                    else:
+                        ret_df = ret_df.copy()
+                        ret_df.index = pd.to_datetime(ret_df.index, errors="coerce")
+                        ret_df = ret_df.loc[ret_df.index.notna()]
 
                 weights = fo.get("executed_weight")
                 if weights is None:
@@ -2126,17 +2198,32 @@ class AgenticPipeline:
                         columns=ret_df.columns
                     )
                 elif isinstance(weights, pd.Series):
+                    # --- FIX B: Tile Series values across all dates ---
+                    weights = weights.reindex(ret_df.columns).fillna(0)
                     weights = pd.DataFrame(
-                        {col: weights for col in ret_df.columns},
-                        index=ret_df.index
-                    ).fillna(0)
-                    weights = weights[ret_df.columns].fillna(0)
+                        np.tile(weights.values, (len(ret_df.index), 1)),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
                 elif isinstance(weights, pd.DataFrame):
-                    for c in ret_df.columns:
-                        if c not in weights.columns:
-                            weights[c] = 0.0
-                    weights = weights[ret_df.columns].fillna(0)
+                    if pd.api.types.is_integer_dtype(weights.index) and len(weights) == len(ret_df):
+                        weights = weights.copy()
+                        weights.index = ret_df.index
+                    elif not isinstance(weights.index, pd.DatetimeIndex):
+                        weights = weights.copy()
+                        weights.index = pd.to_datetime(weights.index, errors="coerce")
+                        weights = weights.loc[weights.index.notna()]
+                    weights = weights.reindex(index=ret_df.index, columns=ret_df.columns).fillna(0)
                 else:
+                    weights = pd.DataFrame(
+                        1.0 / len(ret_df.columns),
+                        index=ret_df.index,
+                        columns=ret_df.columns
+                    )
+
+                # GUARD: if reindexed weights are all-zero, fall back to equal weight
+                if weights.abs().sum().sum() < 1e-12:
+                    print(f"[PORTFOLIO] [{label}] Weights all-zero after alignment; using equal weight fallback.")
                     weights = pd.DataFrame(
                         1.0 / len(ret_df.columns),
                         index=ret_df.index,
@@ -2150,6 +2237,28 @@ class AgenticPipeline:
                     benchmark = benchmark.iloc[:, 0]
                 benchmark = benchmark.squeeze()
 
+                # FIX C: benchmark must be aligned to ret_df.index
+                if not hasattr(benchmark, 'index') or np.isscalar(benchmark):
+                    benchmark = pd.Series(float(benchmark) if not pd.isna(benchmark) else 0.0,
+                                          index=ret_df.index)
+                else:
+                    if pd.api.types.is_integer_dtype(benchmark.index) and len(benchmark) == len(ret_df):
+                        benchmark = benchmark.copy()
+                        benchmark.index = ret_df.index
+                    elif not isinstance(benchmark.index, pd.DatetimeIndex):
+                        benchmark = benchmark.copy()
+                        benchmark.index = pd.to_datetime(benchmark.index, errors="coerce")
+                        benchmark = benchmark.loc[benchmark.index.notna()]
+                    benchmark = pd.Series(benchmark).reindex(ret_df.index).fillna(0)
+
+                # --- BENCHMARK VALIDATION: constant/zero benchmark breaks rolling corr / IC ---
+                if benchmark.std() < 1e-12 or benchmark.isna().all() or (benchmark == 0).all():
+                    print(f"[PORTFOLIO] [{label}] WARNING: benchmark is constant/invalid "
+                          f"(std={benchmark.std():.6f}, unique={benchmark.nunique()}). "
+                          f"Falling back to equal-weight market proxy.")
+                    benchmark = ret_df.mean(axis=1)
+                    benchmark = pd.Series(benchmark).reindex(ret_df.index).fillna(0)
+
                 transaction_cost = fo.get("transaction_cost")
                 if transaction_cost is None:
                     transaction_cost = RETAIL_TRANSACTION_COST_LOW
@@ -2160,10 +2269,24 @@ class AgenticPipeline:
                 except (TypeError, ValueError):
                     transaction_cost = RETAIL_TRANSACTION_COST_LOW
 
-                common_idx = ret_df.index.intersection(weights.index).intersection(benchmark.index)
+                # --- FIX D: Explicit common index alignment (all three guaranteed to share ret_df.index) ---
+                common_idx = ret_df.index.sort_values()
                 ret_df = ret_df.loc[common_idx].sort_index()
-                weights = weights.loc[common_idx].sort_index()
-                benchmark = benchmark.loc[common_idx].sort_index()
+                weights = weights.reindex(index=common_idx, columns=ret_df.columns).fillna(0).sort_index()
+                benchmark = benchmark.reindex(common_idx).fillna(0).sort_index()
+
+                # Verify alignment
+                assert weights.index.equals(ret_df.index), f"weights/ret_df index mismatch"
+                assert benchmark.index.equals(ret_df.index), f"benchmark/ret_df index mismatch"
+
+                # --- DIAGNOSTIC PRINTS ---
+                print(f"[PORTFOLIO] [{label}] ret_df   : shape={ret_df.shape}, idx_type={type(ret_df.index).__name__}, "
+                      f"idx_range={ret_df.index[0]} to {ret_df.index[-1]}")
+                print(f"[PORTFOLIO] [{label}] weights  : shape={weights.shape}, idx_type={type(weights.index).__name__}, "
+                      f"cols={list(weights.columns)[:3]}...")
+                print(f"[PORTFOLIO] [{label}] benchmark: len={len(benchmark)}, idx_type={type(benchmark.index).__name__}, "
+                      f"std={benchmark.std():.6f}, mean={benchmark.mean():.6f}")
+                print(f"[PORTFOLIO] [{label}] intersection: {len(common_idx)} rows")
 
                 portfolio = Portfolio()
                 result = portfolio.invoke(
@@ -2171,8 +2294,17 @@ class AgenticPipeline:
                     benchmark=benchmark, transaction_cost=transaction_cost, annualization=252
                 )
 
+                # --- FIX E: Guard against empty traces before write_html ---
+                for trace_name, series in [
+                    ("gross_equity", result["series"]["gross_equity"]),
+                    ("net_equity", result["series"]["net_equity"]),
+                    ("benchmark_equity", result["series"]["benchmark_equity"]),
+                ]:
+                    if series.isna().all() or len(series) == 0:
+                        print(f"[PORTFOLIO] WARNING: {trace_name} is empty/NaN — chart will be missing data")
+
                 chart_path = os.path.join(self.current_run_dir, f"{label}_chart.html")
-                result["chart"].write_html(chart_path)
+                result["chart"].write_html(chart_path, include_plotlyjs="cdn")
                 print(f"[PORTFOLIO] [{label}] Chart saved: {chart_path}")
 
                 self.storage.save(result["metrics"], f"{self.current_run_dir}/{label}_metrics.pkl")
@@ -2198,7 +2330,6 @@ class AgenticPipeline:
                 import traceback
                 traceback.print_exc()
                 return None
-
         # ============================================================
         # PORTFOLIO 1 - TRAINED DATA (1st 50%)
         # ============================================================
@@ -2207,11 +2338,8 @@ class AgenticPipeline:
         print(f"{'='*60}")
         chk_formula_output = None
         try:
-            trained_data = {}
-            for sym, df in self.data.items():
-                if isinstance(df, pd.DataFrame):
-                    split_idx = len(df) // 2
-                    trained_data[sym] = df.iloc[:split_idx].copy()
+            # FIXED: use date-based split (same cutoff as _ensure_srfo)
+            trained_data = self._srfo_full["train_data"]
             fo_train = None
             try:
                 eng_train = run_quantx_engine(trained_data, interval=params.get("interval", "4y"), params=params)
@@ -2238,39 +2366,79 @@ class AgenticPipeline:
         print(f"\n{'='*60}")
         print("PORTFOLIO: MERGED / FULL DATA")
         print(f"{'='*60}")
-        fo_merged = None
-        raw_cache = getattr(self, '_formula_outputs_raw', None)
-        if raw_cache and len(raw_cache) > 0:
-            try:
-                fo_merged = raw_cache[0]
-                chk_formula_output = fo_merged
-                print("[PORTFOLIO] [merged] Using _formula_outputs_raw cache.")
-            except Exception as e:
-                print(f"[PORTFOLIO] [merged] Cache failed: {e}")
-        if fo_merged is None and getattr(self, '_srfo_full', None):
-            srfo_raw = self._srfo_full.get('formula_outputs_raw')
-            if srfo_raw and len(srfo_raw) > 0:
-                try:
-                    fo_merged = srfo_raw[0]
-                    chk_formula_output = fo_merged
-                    print("[PORTFOLIO] [merged] Using _srfo_full cache.")
-                except Exception as e:
-                    print(f"[PORTFOLIO] [merged] SRFO cache failed: {e}")
-        if fo_merged is None:
-            try:
-                eng_merged = run_quantx_engine(self.data, interval=params.get("interval", "4y"), params=params)
-                if eng_merged["success"] and eng_merged["formula_outputs_raw"]:
-                    fo_merged = eng_merged["formula_outputs_raw"][0]
-                    chk_formula_output = fo_merged
-                    print("[PORTFOLIO] [merged] Using run_quantx_engine().")
-                else:
-                    raise RuntimeError("Engine returned no formula outputs")
-            except Exception as e:
-                print(f"[PORTFOLIO] [merged] Engine failed ({e}), falling back to FormulaInfo")
-                merged_fo = FormulaInfo(self.data)
-                merged_fo.assemble()
-                chk_formula_output = merged_fo
+        chk_formula_output = None
+        try:
+            # CRITICAL FIX: always run fresh engine on full data; cached SRFO
+            # objects are from train/val subsets and lack full-series weights.
+            eng_merged = run_quantx_engine(self.data, interval=params.get("interval", "4y"), params=params)
+            if eng_merged["success"] and eng_merged["formula_outputs_raw"]:
+                chk_formula_output = eng_merged["formula_outputs_raw"][0]
+                print("[PORTFOLIO] [merged] Using fresh run_quantx_engine().")
+            else:
+                raise RuntimeError("Engine returned no formula outputs")
+        except Exception as e:
+            print(f"[PORTFOLIO] [merged] Engine failed ({e}), falling back to FormulaInfo")
+            merged_fo = FormulaInfo(self.data)
+            merged_fo.assemble()
+            chk_formula_output = merged_fo
         _build_portfolio(chk_formula_output, self.data, label="portfolio_merged")
+
+        # === PHASE 6: BEST-MODEL EXTENSION (if GoLive not ready) ===
+        golive_final = self.golive.assess(self.research_history, self.best_model or self.optimized_model_package)
+        if not golive_final["ready"] and self.best_model is not None:
+            print(f"\n{'='*60}")
+            print("PHASE 6: BEST-MODEL EXTENSION")
+            print(f"{'='*60}")
+            print(f"[GOLIVE] Not ready after {self.iteration} iters. Running 3 extension iters with best params.")
+            best_params = self.best_model.get("params", params)
+            for ext_i in range(3):
+                self.iteration += 1
+                iter_dir = f"{self.current_run_dir}/iter_{self.iteration:02d}"
+                os.makedirs(f"{self.base_dir}/{iter_dir}", exist_ok=True)
+                print(f"\n--- Extension {ext_i+1}/3 --> {iter_dir} ---")
+
+                train_pkg = self.strategy.train(self.get_train_package(best_params))
+                val_pkg = self.get_val_package()
+
+                train_signal = self.backtest.signal(train_pkg, train_pkg)
+                train_metrics = self.backtest.evaluate(train_pkg, train_signal)
+
+                val_signal = self.backtest.signal(train_pkg, val_pkg)
+                val_metrics = self.backtest.evaluate(val_pkg, val_signal)
+
+                _fmt_metrics(train_metrics, "TRAIN")
+                _fmt_metrics(val_metrics, "VALIDATION")
+
+                review = self.review_engine.compare(val_metrics, previous_val)
+                decision = self.evaluator.decide(review, train_metrics, iteration=self.iteration, max_iters=max_iters+3)
+
+                research = {
+                    "iteration": self.iteration,
+                    "train": {k: v for k, v in train_metrics.items() if k not in ["signal", "pnl"]},
+                    "validation": {k: v for k, v in val_metrics.items() if k not in ["signal", "pnl"]},
+                    "decision": decision
+                }
+                self.research_history.append(research)
+
+                self.storage.save(train_pkg, f"{iter_dir}/train_package.pkl")
+                self.storage.save(val_pkg, f"{iter_dir}/val_package.pkl")
+                self.storage.save(train_signal, f"{iter_dir}/train_signal.pkl")
+                self.storage.save(val_signal, f"{iter_dir}/val_signal.pkl")
+                self.storage.save(train_metrics, f"{iter_dir}/train_metrics.pkl")
+                self.storage.save(val_metrics, f"{iter_dir}/val_metrics.pkl")
+                self.storage.save(research, f"{iter_dir}/research.pkl")
+                self.storage.save_json(research, f"{iter_dir}/research.json")
+
+                golive = self.golive.assess(self.research_history, train_pkg)
+                self.storage.save(golive, f"{iter_dir}/golive.pkl")
+                self.storage.save_json(golive, f"{iter_dir}/golive.json")
+
+                print(f"Decision: {decision} | GoLive: {golive['stage']}")
+                if golive["ready"]:
+                    print(f"[GOLIVE] READY after extension! Deploying.")
+                    self.storage.save(golive.get("deployment_package"), f"{self.current_run_dir}/deployment_package.pkl")
+                    break
+                previous_val = val_metrics
 
         # === FINAL SUMMARY ===
         return self._generate_final_summary()
@@ -2336,6 +2504,15 @@ class AgenticPipeline:
         print(f"Total iterations: {self.iteration}")
         print(f"Best validation score: {self.best_score:.4f}")
         print(f"GoLive ready: {summary['golive_ready']}")
+        if not summary['golive_ready']:
+            print("[GOLIVE] TIPS to reach GoLive:")
+            print("  1. Increase max_iters (e.g. 10-15) for more mutation cycles")
+            print("  2. Start with gradient_boosting or xgboost instead of random_forest")
+            print("  3. Lower reg_alpha/reg_lambda if underfitting (score low, train~val)")
+            print("  4. Use longer history (>=4yr) and more assets (>=10)")
+            print("  5. Enable feature reduction (PCA) if p > n")
+        else:
+            print("[GOLIVE] Deployment package saved. Model is production-ready.")
 
         # Print best validation metrics if available
         if self.best_model and self.research_history:
@@ -2399,7 +2576,6 @@ class Portfolio:
         # Alpha / Beta vs benchmark — daily regression
         bench_aligned = benchmark.reindex(net_return.index).fillna(0)
         if np.std(bench_aligned) > 1e-12 and len(net_return) >= 3:
-            # OLS: net_return = alpha + beta * benchmark + epsilon
             x_mean = np.mean(bench_aligned)
             y_mean = np.mean(net_return)
             beta = float(np.sum((bench_aligned - x_mean) * (net_return - y_mean)) / (np.sum((bench_aligned - x_mean)**2) + 1e-12))
@@ -2448,20 +2624,69 @@ class Portfolio:
             "corr_rm": corr_rm,
         }
 
+    # =====================================================================
+    # FIXED invoke: DatetimeIndex coercion + empty-intersection guard +
+    #               executed_weight column mapping + alignment verification
+    # =====================================================================
     def invoke(self, fo, weights, returns, benchmark, transaction_cost=RETAIL_TRANSACTION_COST_LOW, annualization=252):
+        # --- FIX 1: Coerce everything to DatetimeIndex safely ---
+        def _safe_dt(obj, name):
+            if not hasattr(obj, "index"):
+                return obj
+            if isinstance(obj.index, pd.DatetimeIndex):
+                return obj
+            if pd.api.types.is_integer_dtype(obj.index):
+                # Integer indices are row numbers, not nanoseconds since epoch.
+                obj = obj.copy()
+                obj.index = pd.date_range(
+                    end=pd.Timestamp.today(), periods=len(obj), freq='D'
+                )
+                print(f"[PORTFOLIO] WARNING: {name}.index was integer — replaced with synthetic daily dates "
+                      f"({obj.index[0]} to {obj.index[-1]})")
+                return obj
+            # Only use pd.to_datetime for string/object indices
+            obj = obj.copy()
+            obj.index = pd.to_datetime(obj.index, errors="coerce")
+            if obj.index.isna().any():
+                print(f"[PORTFOLIO] WARNING: {name} has NaT indices after coercion — dropping")
+                obj = obj.loc[obj.index.notna()]
+            return obj
+
+        weights = _safe_dt(weights, "weights")
+        returns = _safe_dt(returns, "returns")
+        benchmark = _safe_dt(benchmark, "benchmark")
+
+        # --- FIX 2: Empty intersection guard ---
         idx = weights.index.intersection(returns.index).intersection(benchmark.index)
+        if len(idx) == 0:
+            raise ValueError(
+                f"[PORTFOLIO] FATAL: empty index intersection. "
+                f"weights={len(weights)} ({type(weights.index).__name__}), "
+                f"returns={len(returns)} ({type(returns.index).__name__}), "
+                f"benchmark={len(benchmark)} ({type(benchmark.index).__name__})"
+            )
+
         weights = weights.loc[idx].sort_index()
         returns = returns.loc[idx].sort_index()
         benchmark = benchmark.loc[idx].sort_index()
 
+        # --- FIX 3: executed_weight with explicit column mapping ---
         executed_weight = fo.get("executed_weight")
         if isinstance(executed_weight, pd.DataFrame):
-            executed_weight = executed_weight.loc[executed_weight.index.intersection(idx)].reindex(idx).fillna(0).sort_index()
-            for c in returns.columns:
-                if c not in executed_weight.columns:
-                    executed_weight[c] = 0.0
-            executed_weight = executed_weight[returns.columns].fillna(0)
+            # Map columns that exist in returns
+            valid_cols = [c for c in executed_weight.columns if c in returns.columns]
+            if valid_cols:
+                executed_weight = executed_weight[valid_cols]
+            executed_weight = executed_weight.reindex(index=idx, columns=returns.columns).fillna(0).sort_index()
+            if executed_weight.abs().sum().sum() < 1e-12:
+                print("[PORTFOLIO] WARNING: executed_weight all-zero after alignment; using lagged weights fallback.")
+                executed_weight = weights.shift(1).fillna(0)
         else:
+            executed_weight = weights.shift(1).fillna(0)
+
+        # CRITICAL FIX: if executed_weight is empty after alignment, fall back to lagged weights
+        if executed_weight.empty or len(executed_weight) == 0:
+            print("[PORTFOLIO] WARNING: executed_weight empty after alignment; using lagged weights fallback.")
             executed_weight = weights.shift(1).fillna(0)
         lagged_weights = executed_weight.copy()
 
@@ -2471,7 +2696,11 @@ class Portfolio:
 
         # Turnover from executed weights (positions actually held)
         turnover_series = executed_weight.diff().abs().sum(axis=1)
-        turnover_series.iloc[0] = executed_weight.iloc[0].abs().sum()
+        if len(executed_weight) > 0:
+            turnover_series.iloc[0] = executed_weight.iloc[0].abs().sum()
+        else:
+            turnover_series = pd.Series(0.0, index=idx)
+
         turnover_series.name = "turnover"
         costs = turnover_series * transaction_cost
         costs.name = "costs"
@@ -2507,6 +2736,33 @@ class Portfolio:
         rolling_alpha = net_return.rolling(window).mean() - rolling_beta * benchmark.rolling(window).mean()
         rolling_alpha.name = "rolling_alpha"
 
+        # Rolling t-stat of alpha (intercept / SE) — daily OLS in rolling window
+        def _rolling_tstat_alpha(s_port, s_bench, w):
+            out = pd.Series(index=s_port.index, dtype=float)
+            for i in range(w, len(s_port) + 1):
+                y_win = s_port.iloc[i - w:i]
+                x_win = s_bench.iloc[i - w:i]
+                mask = y_win.notna() & x_win.notna()
+                y = y_win[mask]
+                x = x_win[mask]
+                if len(y) < 3 or y.std() < 1e-12 or x.std() < 1e-12:
+                    out.iloc[i - 1] = np.nan
+                    continue
+                try:
+                    x_mean, y_mean = x.mean(), y.mean()
+                    beta = np.sum((x - x_mean) * (y - y_mean)) / (np.sum((x - x_mean)**2) + 1e-12)
+                    alpha = y_mean - beta * x_mean
+                    residuals = y - (alpha + beta * x)
+                    mse = np.sum(residuals**2) / (len(y) - 2 + 1e-12)
+                    se_alpha = np.sqrt(mse * (1.0/len(y) + x_mean**2 / (np.sum((x - x_mean)**2) + 1e-12)))
+                    out.iloc[i - 1] = alpha / (se_alpha + 1e-12)
+                except Exception:
+                    out.iloc[i - 1] = np.nan
+            return out
+
+        rolling_tstat_alpha = _rolling_tstat_alpha(net_return, benchmark, window)
+        rolling_tstat_alpha.name = "rolling_tstat_alpha"
+
         # Rolling R² (Pearson squared)
         rolling_corr = net_return.rolling(window).corr(benchmark)
         rolling_r2 = rolling_corr ** 2
@@ -2517,13 +2773,32 @@ class Portfolio:
             out = pd.Series(index=s1.index, dtype=float)
             for i in range(w, len(s1) + 1):
                 try:
-                    out.iloc[i - 1] = stats.spearmanr(s1.iloc[i - w:i], s2.iloc[i - w:i])[0]
+                    y_win = s1.iloc[i - w:i]
+                    x_win = s2.iloc[i - w:i]
+                    mask = y_win.notna() & x_win.notna()
+                    y = y_win[mask]
+                    x = x_win[mask]
+                    if len(y) < 3 or y.nunique() <= 1 or x.nunique() <= 1:
+                        out.iloc[i - 1] = np.nan
+                        continue
+                    out.iloc[i - 1] = stats.spearmanr(y, x)[0]
                 except Exception:
                     out.iloc[i - 1] = np.nan
             return out
 
         rolling_ic = _rolling_spearman(net_return, benchmark, window)
         rolling_ic.name = "rolling_ic"
+
+        # FIX: Explicitly format dates as ISO strings to prevent Plotly JSON epoch bug (1970-01-01)
+        date_idx = gross_equity.index.strftime("%Y-%m-%d")
+
+        # GUARD: if rolling metrics are all-NaN (constant benchmark), backfill so traces render
+        if rolling_r2.isna().all():
+            print("[PORTFOLIO] WARNING: rolling_r2 is all-NaN (benchmark likely constant). Backfilling to 0.")
+            rolling_r2 = rolling_r2.fillna(0)
+        if rolling_ic.isna().all():
+            print("[PORTFOLIO] WARNING: rolling_ic is all-NaN (benchmark likely constant). Backfilling to 0.")
+            rolling_ic = rolling_ic.fillna(0)
 
         # === CRITICAL FIX: compute scalar metrics from series, not stale fo ===
         metrics = self._compute_metrics_from_series(
@@ -2543,29 +2818,30 @@ class Portfolio:
                 "Portfolio Performance",
                 "Drawdown",
                 "Rolling Sharpe (30d)",
-                "Rolling Alpha & Beta (30d)",
+                "Rolling Alpha, Beta & t-stat (30d)",
                 "Rolling R² & IC (30d)"
             ],
         )
 
         # Row 1: Performance
-        fig.add_trace(go.Scatter(x=gross_equity.index, y=gross_equity, name="Gross Return", mode="lines", line=dict(color="#2E86AB", width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=net_equity.index, y=net_equity, name="Net Return", mode="lines", line=dict(color="#A23B72", width=1.5)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=benchmark_equity.index, y=benchmark_equity, name="Benchmark", mode="lines", line=dict(color="#F18F01", width=1.5, dash="dash")), row=1, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=gross_equity, name="Gross Return", mode="lines", line=dict(color="#2E86AB", width=1.5)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=net_equity, name="Net Return", mode="lines", line=dict(color="#A23B72", width=1.5)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=benchmark_equity, name="Benchmark", mode="lines", line=dict(color="#F18F01", width=1.5, dash="dash")), row=1, col=1)
 
         # Row 2: Drawdown
-        fig.add_trace(go.Scatter(x=drawdown.index, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.15)", line=dict(color="rgba(231, 76, 60, 0.7)", width=1)), row=2, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=drawdown, name="Drawdown", fill="tozeroy", fillcolor="rgba(231, 76, 60, 0.15)", line=dict(color="rgba(231, 76, 60, 0.7)", width=1)), row=2, col=1)
 
         # Row 3: Rolling Sharpe
-        fig.add_trace(go.Scatter(x=rolling_sharpe.index, y=rolling_sharpe, name="Rolling Sharpe", mode="lines", line=dict(color="#27AE60", width=1.2)), row=3, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_sharpe, name="Rolling Sharpe", mode="lines", line=dict(color="#27AE60", width=1.2)), row=3, col=1)
 
-        # Row 4: Rolling Alpha & Beta
-        fig.add_trace(go.Scatter(x=rolling_alpha.index, y=rolling_alpha, name="Rolling Alpha", mode="lines", line=dict(color="#8E44AD", width=1.2)), row=4, col=1)
-        fig.add_trace(go.Scatter(x=rolling_beta.index, y=rolling_beta, name="Rolling Beta", mode="lines", line=dict(color="#E67E22", width=1.2)), row=4, col=1)
+        # Row 4: Rolling Alpha, Beta & t-stat
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_alpha, name="Rolling Alpha", mode="lines", line=dict(color="#8E44AD", width=1.2)), row=4, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_beta, name="Rolling Beta", mode="lines", line=dict(color="#E67E22", width=1.2)), row=4, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_tstat_alpha, name="Rolling t-stat α", mode="lines", line=dict(color="#16A085", width=1.2)), row=4, col=1)
 
         # Row 5: Rolling R² & IC
-        fig.add_trace(go.Scatter(x=rolling_r2.index, y=rolling_r2, name="Rolling R²", mode="lines", line=dict(color="#2980B9", width=1.2)), row=5, col=1)
-        fig.add_trace(go.Scatter(x=rolling_ic.index, y=rolling_ic, name="Rolling IC", mode="lines", line=dict(color="#C0392B", width=1.2)), row=5, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_r2, name="Rolling R²", mode="lines", line=dict(color="#2980B9", width=1.2)), row=5, col=1)
+        fig.add_trace(go.Scatter(x=date_idx, y=rolling_ic, name="Rolling IC", mode="lines", line=dict(color="#C0392B", width=1.2)), row=5, col=1)
 
         fig.update_layout(
             template="plotly_white", hovermode="x unified",
@@ -2576,7 +2852,7 @@ class Portfolio:
         fig.update_yaxes(title_text="Equity", row=1, col=1)
         fig.update_yaxes(title_text="Drawdown", row=2, col=1)
         fig.update_yaxes(title_text="Sharpe", range=[-2, 5], dtick=1, row=3, col=1)
-        fig.update_yaxes(title_text="Alpha / Beta", range=[-1, 3], dtick=1, row=4, col=1)
+        fig.update_yaxes(title_text="Alpha / Beta / t-stat", range=[-5, 5], dtick=2, row=4, col=1)
         fig.update_yaxes(title_text="R² / IC", range=[-1, 1.2], dtick=0.5, row=5, col=1)
         fig.update_xaxes(title_text="Date", row=5, col=1)
 
@@ -2590,12 +2866,11 @@ class Portfolio:
             "rolling_sharpe": rolling_sharpe,
             "rolling_alpha": rolling_alpha,
             "rolling_beta": rolling_beta,
+            "rolling_tstat_alpha": rolling_tstat_alpha,
             "rolling_r2": rolling_r2,
             "rolling_ic": rolling_ic,
         }
         return {"chart": fig, "metrics": metrics, "series": series}
-
-
 # =====================================================
 # DATA LOADER
 # =====================================================

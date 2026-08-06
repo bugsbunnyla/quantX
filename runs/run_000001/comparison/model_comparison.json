@@ -1,15 +1,15 @@
 {
-  "timestamp": "2026-08-05T01:21:34.293687",
+  "timestamp": "2026-08-05T23:45:18.802949",
   "model_comparison": {
     "rmse": {
-      "baseline": 0.0,
-      "optimized": 0.0,
+      "baseline": 0.020978336360635758,
+      "optimized": 0.020978336360635758,
       "absolute_change": 0.0,
-      "pct_change": 0
+      "pct_change": 0.0
     },
     "r2": {
-      "baseline": 1.0,
-      "optimized": 1.0,
+      "baseline": -5.188016112733784e-05,
+      "optimized": -5.188016112733784e-05,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
@@ -28,10 +28,10 @@
   },
   "validation_comparison": {
     "sharpe": {
-      "baseline": -1.1269857829703438,
-      "optimized": -1.1269857829703438,
-      "absolute_change": 0.0,
-      "pct_change": 0.0
+      "baseline": 1.1269857812817485,
+      "optimized": 0.0,
+      "absolute_change": -1.1269857812817485,
+      "pct_change": -1.0
     },
     "corr": {
       "baseline": 0.0,
@@ -40,22 +40,22 @@
       "pct_change": 0
     },
     "hit": {
-      "baseline": 0.0,
-      "optimized": 0.0,
+      "baseline": 0.6363636363636364,
+      "optimized": 0.6363636363636364,
       "absolute_change": 0.0,
-      "pct_change": 0
+      "pct_change": 0.0
     },
     "r2": {
-      "baseline": -0.0050400670499726186,
-      "optimized": -0.0050400670499726186,
+      "baseline": -3.62492016902556,
+      "optimized": -3.62492016902556,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
     "score": {
-      "baseline": 0.0,
-      "optimized": 0.0,
-      "absolute_change": 0.0,
-      "pct_change": 0
+      "baseline": 0.2963205944649896,
+      "optimized": 0.1272727272727273,
+      "absolute_change": -0.1690478671922623,
+      "pct_change": -0.5704897680077899
     },
     "cvar": {
       "baseline": -0.01794839950605337,
@@ -65,14 +65,14 @@
     }
   },
   "rating": {
-    "score": 0.0,
-    "label": "NEUTRAL",
+    "score": -0.44262244200194745,
+    "label": "STRONG_DEGRADATION",
     "details": [
       {
         "metric": "sharpe",
         "weight": 0.3,
-        "pct_change": 0.0,
-        "contribution": 0.0
+        "pct_change": -1.0,
+        "contribution": -0.3
       },
       {
         "metric": "corr",
@@ -83,13 +83,13 @@
       {
         "metric": "score",
         "weight": 0.25,
-        "pct_change": 0,
-        "contribution": 0.0
+        "pct_change": -0.5704897680077899,
+        "contribution": -0.14262244200194749
       },
       {
         "metric": "hit",
         "weight": 0.1,
-        "pct_change": 0,
+        "pct_change": 0.0,
         "contribution": 0.0
       },
       {
@@ -99,13 +99,13 @@
         "contribution": 0.0
       }
     ],
-    "interpretation": "No meaningful change. Parameters may already be near-optimal or grid insufficient."
+    "interpretation": "Significant performance loss. Baseline is superior. Investigate data leakage or overfitting."
   },
   "prediction": {
-    "predicted_next_score": 0.0,
-    "improvement_rate": 0.0,
-    "consistency": 1.0,
-    "confidence": 0.95,
-    "recommendation": "EITHER_MODEL_OK: No significant difference. Choose based on computational cost or simplicity."
+    "predicted_next_score": 0.09096883294495882,
+    "improvement_rate": -0.5704897680077899,
+    "consistency": -0.2988415279030745,
+    "confidence": 0.35057923604846275,
+    "recommendation": "KEEP_BASELINE: Optimized model underperforms. Retain baseline and investigate search space."
   }
 }
