@@ -3,11 +3,11 @@
   "removed_assets": [
     {
       "symbol": "HYPEUSDT",
-      "rows": 754
+      "rows": 752
     },
     {
       "symbol": "SUIUSDT",
-      "rows": 670
+      "rows": 668
     },
     {
       "symbol": "PEPEUSDT",
@@ -15,22 +15,22 @@
     },
     {
       "symbol": "APTUSDT",
-      "rows": 1053
+      "rows": 1051
     },
     {
       "symbol": "ONDOUSDT",
-      "rows": 930
+      "rows": 933
     },
     {
       "symbol": "POLUSDT",
-      "rows": 453
+      "rows": 451
     },
     {
       "symbol": "UNIUSDT",
-      "rows": 987
+      "rows": 985
     }
   ],
   "min_required": 1460,
   "remaining_count": 22,
-  "timestamp": "2026-08-05T23:43:08.693343"
+  "timestamp": "2026-08-07T18:47:47.886278"
 }

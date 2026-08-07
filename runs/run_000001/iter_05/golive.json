@@ -3,21 +3,21 @@
   "stage": "RESEARCH",
   "checks": {
     "accept_ratio": 0.0,
-    "avg_sharpe": 0.4507943125126994,
+    "avg_sharpe": 0.0,
     "avg_corr": 0.0,
-    "avg_drawdown": NaN,
+    "avg_drawdown": 0.0,
     "consistency": 0.0,
     "oos_sufficient": false
   },
   "systemic_prediction": {
-    "expected_sharpe": 0.4507943125126994,
+    "expected_sharpe": 0.0,
     "sharpe_confidence_interval": [
       0.0,
-      1.1269857812817485
+      0.0
     ],
     "expected_corr": 0.0,
-    "expected_score": 0.19489187414963222,
-    "score_stability": 0.5750659011219423,
+    "expected_score": 0.09090909090909091,
+    "score_stability": 1.0,
     "win_rate": 1.0,
     "consistency_ratio": 0.0,
     "min_oos_predictions": 22
