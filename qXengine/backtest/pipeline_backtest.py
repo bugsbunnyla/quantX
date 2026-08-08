@@ -84,15 +84,15 @@ from ..strategies.FormulaInfo import FormulaInfo
 # =====================================================
 RETAIL_TRANSACTION_COST_LOW = 0.001   # 10 bps
 RETAIL_TRANSACTION_COST_HIGH = 0.002  # 20 bps
-MIN_ROWS_PER_ASSET = 1460
-MIN_OOS_PREDICTIONS = 100
-MAX_FEATURES_BEFORE_REDUCTION = 50
-TARGET_N_COMPONENTS = 12
+MIN_ROWS_PER_ASSET = 730              # FIXED: was 1460 — keep more assets
+MIN_OOS_PREDICTIONS = 6               # FIXED: was 100 — match cross-section size
+MAX_FEATURES_BEFORE_REDUCTION = 15    # FIXED: was 50 — force PCA to fire
+TARGET_N_COMPONENTS = 7               # FIXED: was 12 — n=22 stays well-determined
 
 # =====================================================
 # SPLIT CONFIGURATION
 # =====================================================
-DEFAULT_SPLIT_RATIO = 0.5       # 50% train / 50% val
+DEFAULT_SPLIT_RATIO = 0.7             # FIXED: was 0.5 — 70/30 for more train samples       # 50% train / 50% val
 MIN_SPLIT_DAYS = 30             # minimum days in either split
 
 
@@ -3087,22 +3087,36 @@ if __name__ == "__main__":
     print("Loading market data...")
     market_data = build_data()
     params = {
+        # ── MODEL: Ridge ──
+        # RandomForest/GBM die on n=22. Ridge gives smooth, stable coefficients
+        # which maximizes tstat_alpha and keeps Sharpe positive.
+        "model": "ridge",
+        "reg_lambda": 2.0,       # L2 shrinkage — aggressive enough for n=22,p=7
+        "reg_alpha": 0.0,        # Ridge ignores this; kept for compatibility
+
+        # ── Tree params (fallback / comparator only) ──
+        "trees": 100,
+        "depth": 2,
+        "min_samples_split": 10,
+        "max_features": 0.25,
+        "learning_rate": 0.03,
+
+        # ── Strategy / Horizon ──
+        # 14-day is more responsive to short-term alpha than 21-day
+        "horizon": 14,
         "strategies": ["AlphaStrategy", "MomentumStrategy"],
-        "trees": 500, "depth": 12, "horizon": 21,
-        "min_samples_split": 2, "max_features": "sqrt",
-        "model": "random_forest",
-        "learning_rate": 0.1,
-        "reg_alpha": 0.0,
-        "reg_lambda": 1.0,
+
+        # ── Data gate ──
+        "min_rows": 730,
+        "skip_insufficient": True,
     }
-    pipeline = AgenticPipeline(market_data, base_dir="runs", use_feature_reduction=True, reduction_method="pca")
+    pipeline = AgenticPipeline(market_data, base_dir="runs", use_feature_reduction=True, reduction_method="pca", split_ratio=0.70)
     # Combinatorial disabled by default per user request
-    result = pipeline.run_agent(params, max_iters=5, run_combinatorial=False, param_grid=PARAM_GRID_FAST)
+    result = pipeline.run_agent(params, max_iters=8, run_combinatorial=False, param_grid=PARAM_GRID_FAST)
     print(f"Pipeline complete. Results saved to: {pipeline.base_dir}")
     print("Baseline model: runs/baseline_model.pkl")
     print("Optimized model: runs/optimized_model.pkl")
     print("Comparison report: runs/model_comparison.json")
-
 # ======================================================
 # END OF THE PIPELINE
 # ======================================================

@@ -1,27 +1,27 @@
 {
-  "timestamp": "2026-08-07T18:52:21.990197",
+  "timestamp": "2026-08-07T19:49:02.981559",
   "model_comparison": {
     "rmse": {
-      "baseline": 0.02558959857940392,
-      "optimized": 0.02558959857940392,
+      "baseline": 0.008111867748934895,
+      "optimized": 0.008111867748934895,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
     "r2": {
-      "baseline": -1.322548574878013e-06,
-      "optimized": -1.322548574878013e-06,
+      "baseline": -2.683021480009984e-05,
+      "optimized": -2.683021480009984e-05,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
     "samples": {
-      "baseline": 22,
-      "optimized": 22,
+      "baseline": 26,
+      "optimized": 26,
       "absolute_change": 0,
       "pct_change": 0.0
     },
     "features": {
-      "baseline": 22,
-      "optimized": 22,
+      "baseline": 7,
+      "optimized": 7,
       "absolute_change": 0,
       "pct_change": 0.0
     }
@@ -40,32 +40,32 @@
       "pct_change": 0
     },
     "hit": {
-      "baseline": 0.45454545454545453,
-      "optimized": 0.45454545454545453,
+      "baseline": 0.38461538461538464,
+      "optimized": 0.38461538461538464,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
     "r2": {
-      "baseline": -5.484885616059303,
-      "optimized": -5.484885616059304,
-      "absolute_change": -8.881784197001252e-16,
-      "pct_change": -1.6193198580105488e-16
+      "baseline": -0.31108214350324137,
+      "optimized": -0.31108214350324137,
+      "absolute_change": 0.0,
+      "pct_change": 0.0
     },
     "score": {
-      "baseline": 0.09090909090909091,
-      "optimized": 0.09090909090909091,
+      "baseline": 0.07692307692307693,
+      "optimized": 0.07692307692307693,
       "absolute_change": 0.0,
       "pct_change": 0.0
     },
     "cvar": {
-      "baseline": -0.05821769019443434,
-      "optimized": -0.05821769019443434,
+      "baseline": -0.056899610337572376,
+      "optimized": -0.056899610337572376,
       "absolute_change": 0.0,
       "pct_change": 0.0
     }
   },
   "rating": {
-    "score": -1.619319858010549e-17,
+    "score": 0.0,
     "label": "NEUTRAL",
     "details": [
       {
@@ -95,16 +95,16 @@
       {
         "metric": "r2",
         "weight": 0.1,
-        "pct_change": -1.6193198580105488e-16,
-        "contribution": -1.619319858010549e-17
+        "pct_change": 0.0,
+        "contribution": 0.0
       }
     ],
     "interpretation": "No meaningful change. Parameters may already be near-optimal or grid insufficient."
   },
   "prediction": {
-    "predicted_next_score": 0.09090909090909091,
+    "predicted_next_score": 0.07692307692307693,
     "improvement_rate": 0.0,
-    "consistency": 0.9999999352272078,
+    "consistency": 1.0,
     "confidence": 0.95,
     "recommendation": "EITHER_MODEL_OK: No significant difference. Choose based on computational cost or simplicity."
   }

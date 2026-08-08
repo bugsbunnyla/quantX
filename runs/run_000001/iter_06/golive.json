@@ -7,7 +7,7 @@
     "avg_corr": 0.0,
     "avg_drawdown": 0.0,
     "consistency": 0.0,
-    "oos_sufficient": false
+    "oos_sufficient": true
   },
   "systemic_prediction": {
     "expected_sharpe": 0.0,
@@ -16,11 +16,11 @@
       0.0
     ],
     "expected_corr": 0.0,
-    "expected_score": 0.09090909090909093,
-    "score_stability": 0.9999999999999999,
+    "expected_score": 0.07692307692307693,
+    "score_stability": 1.0,
     "win_rate": 1.0,
     "consistency_ratio": 0.0,
-    "min_oos_predictions": 22
+    "min_oos_predictions": 26
   },
   "deployment_package": null,
   "recommendation": "CONTINUE_RESEARCH"

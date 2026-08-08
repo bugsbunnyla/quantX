@@ -2,10 +2,6 @@
   "flag": "DATA_FILTERED",
   "removed_assets": [
     {
-      "symbol": "HYPEUSDT",
-      "rows": 752
-    },
-    {
       "symbol": "SUIUSDT",
       "rows": 668
     },
@@ -14,23 +10,11 @@
       "rows": 119
     },
     {
-      "symbol": "APTUSDT",
-      "rows": 1051
-    },
-    {
-      "symbol": "ONDOUSDT",
-      "rows": 933
-    },
-    {
       "symbol": "POLUSDT",
       "rows": 451
-    },
-    {
-      "symbol": "UNIUSDT",
-      "rows": 985
     }
   ],
-  "min_required": 1460,
-  "remaining_count": 22,
-  "timestamp": "2026-08-07T18:47:47.886278"
+  "min_required": 730,
+  "remaining_count": 26,
+  "timestamp": "2026-08-07T19:43:00.963809"
 }
